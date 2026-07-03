@@ -1,6 +1,17 @@
-// src/components/KpiBarChart.tsx
 'use client';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ReferenceLine, LabelList, ResponsiveContainer, Tooltip } from 'recharts';
+
+import dynamic from 'next/dynamic';
+
+// Import ทุก component ที่ใช้งานในไฟล์นี้แบบ dynamic
+const BarChart = dynamic(() => import('recharts').then(mod => mod.BarChart), { ssr: false });
+const ResponsiveContainer = dynamic(() => import('recharts').then(mod => mod.ResponsiveContainer), { ssr: false });
+const CartesianGrid = dynamic(() => import('recharts').then(mod => mod.CartesianGrid), { ssr: false });
+const XAxis = dynamic(() => import('recharts').then(mod => mod.XAxis), { ssr: false });
+const YAxis = dynamic(() => import('recharts').then(mod => mod.YAxis), { ssr: false });
+const Tooltip = dynamic(() => import('recharts').then(mod => mod.Tooltip), { ssr: false });
+const ReferenceLine = dynamic(() => import('recharts').then(mod => mod.ReferenceLine), { ssr: false });
+const Bar = dynamic(() => import('recharts').then(mod => mod.Bar), { ssr: false });
+const LabelList = dynamic(() => import('recharts').then(mod => mod.LabelList), { ssr: false });
 
 export default function KpiBarChart({ data, targetValue }: { data: any[], targetValue: number }) {
   const sortedData = [...data].sort((a, b) => a.year - b.year);

@@ -1,5 +1,12 @@
 'use client';
-import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
+
+import dynamic from 'next/dynamic';
+
+// Import คอมโพเนนต์ที่ใช้งานทั้งหมดจาก recharts แบบ dynamic
+const ResponsiveContainer = dynamic(() => import('recharts').then(mod => mod.ResponsiveContainer), { ssr: false });
+const PieChart = dynamic(() => import('recharts').then(mod => mod.PieChart), { ssr: false });
+const Pie = dynamic(() => import('recharts').then(mod => mod.Pie), { ssr: false });
+const Cell = dynamic(() => import('recharts').then(mod => mod.Cell), { ssr: false });
 
 const COLORS = ['#22c55e', '#ef4444'];
 

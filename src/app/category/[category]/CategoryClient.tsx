@@ -35,12 +35,12 @@ export default function CategoryClient({ session, category }: { session: any, ca
         <div key={kpi.id} className="border p-4 mb-4 rounded shadow">
           <h2 className="text-lg font-semibold">{kpi.name}</h2>
           {(userRole === 'executive' || kpi.department_id === userDept) && (
-            <AddEntryForm 
-              kpiId={kpi.id} 
-              type={kpi.type || 'general'} 
-              onSuccess={fetchData} 
-            />
-          )}
+          <AddEntryForm 
+            kpiId={kpi.id} 
+            type={kpi.type || 'general'} 
+            onSuccess={fetchData} 
+          />
+        )}
         </div>
       ))}
     </div>

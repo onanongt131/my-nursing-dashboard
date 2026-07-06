@@ -37,7 +37,7 @@ export default function CategoryClient({ session, category }: { session: any, ca
           {(userRole === 'executive' || kpi.department_id === userDept) && (
             <AddEntryForm 
               kpiId={kpi.id} 
-              type={kpi.type || 'default'} 
+              type={kpi.type || 'general'} 
               onSuccess={fetchData} 
             />
           )}

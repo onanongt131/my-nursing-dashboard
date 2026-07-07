@@ -1,19 +1,16 @@
 import { auth } from "@/auth";
 import { NextResponse } from "next/server";
 
-export default auth((req: any) => {
+export default auth((req) => {
   const { nextUrl } = req;
-  const isLoggedIn = !!req.auth;
-
-  // 1. ระบุหน้า Public ที่ไม่ต้อง Login
+  // ใช้ 'any' เพื่อให้ Build ผ่านแน่นอน
+  const isLoggedIn = !!(req as any).auth;
   const isPublicPage = ["/login", "/register"].includes(nextUrl.pathname);
 
-  // 2. ถ้าไม่ได้ Login และเข้าหน้าที่ไม่ใช่ Public -> ไปที่ Login
   if (!isLoggedIn && !isPublicPage) {
     return NextResponse.redirect(new URL("/login", nextUrl));
   }
 
-  // 3. ถ้า Login แล้ว และเข้าหน้า Login -> ไปที่หน้าแรก/Dashboard
   if (isLoggedIn && isPublicPage) {
     return NextResponse.redirect(new URL("/", nextUrl));
   }

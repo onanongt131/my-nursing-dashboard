@@ -1,6 +1,6 @@
-import NextAuth from "next-auth";
-import { SupabaseAdapter } from "@auth/supabase-adapter";
-import GitHub from "next-auth/providers/github";
+import { NextAuthOptions } from "next-auth"; // เพิ่มบรรทัดนี้หากจำเป็น
+import { JWT } from "next-auth/jwt";
+import { User } from "next-auth";
 
 // 1. แยกคอนฟิกออกมาเป็นตัวแปร เพื่อให้มั่นใจว่า NextAuth ทำงานได้สมบูรณ์
 const authConfig = {
@@ -16,13 +16,13 @@ const authConfig = {
   ],
   session: { strategy: "jwt" },
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user }: { token: JWT; user: User | undefined }) { // <--- ระบุ Type ตรงนี้
       if (user) {
         token.id = user.id;
       }
       return token;
     },
-    async session({ session, token }) {
+    async session({ session, token }: { session: any; token: JWT }) { // <--- ระบุ Type ตรงนี้
       if (session.user) {
         session.user.id = (token.id as string) ?? session.user.id;
       }

@@ -1,9 +1,11 @@
 import { auth } from "@/auth";
+import { NextResponse, NextRequest } from "next/server"; // 1. Import NextRequest เข้ามา
 
-export default auth((req) => {
-  const isLoggedIn = !!req.auth;
+// 2. ระบุ Type ให้ req เป็น NextRequest
+export default auth((req: NextRequest) => { 
   const { nextUrl } = req;
-  
+  const isLoggedIn = !!req.auth;
+
   const isPublicPage = [
     "/login", 
     "/register", 
@@ -11,18 +13,15 @@ export default auth((req) => {
     "/update-password"
   ].includes(nextUrl.pathname);
 
-  // ถ้า Login แล้วและพยายามเข้าหน้า Login ให้เด้งไป Dashboard
   if (isLoggedIn && isPublicPage) {
-    return Response.redirect(new URL("/dashboard", nextUrl));
+     return NextResponse.redirect(new URL("/dashboard", nextUrl));
   }
 
-  // ถ้าไม่ได้ Login และเข้าหน้าที่ไม่ใช่หน้า Public ให้เด้งไปหน้า Login
   if (!isLoggedIn && !isPublicPage) {
-    return Response.redirect(new URL("/login", nextUrl));
+    return NextResponse.redirect(new URL("/login", nextUrl));
   }
 
-  // อนุญาตให้ผ่าน
-  return; 
+  return NextResponse.next();
 });
 
 export const config = {

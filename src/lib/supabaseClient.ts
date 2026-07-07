@@ -1,15 +1,26 @@
-import { createClient } from '@supabase/supabase-js';
+// ตัวอย่างการสร้าง Client ที่ถูกต้อง
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+export async function createClient() {
+  const cookieStore = await cookies()
 
-// สร้างตัวแปรไว้รับค่า client
-let client = null;
-
-// ใส่ด่านตรวจที่เข้มงวดที่สุด: ต้องมีค่าจริงและไม่ใช่ค่าว่าง
-if (supabaseUrl && supabaseAnonKey) {
-  client = createClient(supabaseUrl, supabaseAnonKey);
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll()
+        },
+        setAll(cookiesToSet) {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options)
+            )
+          } catch {}
+        },
+      },
+    }
+  )
 }
-
-// ส่งออกเป็น null หากไม่มีค่า เพื่อไม่ให้โปรเจกต์พังตอน Build
-export const supabase = client;

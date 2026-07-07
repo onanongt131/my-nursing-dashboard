@@ -1,7 +1,7 @@
-import { auth } from "@/auth"; // หรือพาธที่คุณ import auth
-import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/auth";
+import { NextRequest } from "next/server";
 
-export default auth((req: NextRequest) => { // <--- เพิ่ม : NextRequest ตรงนี้ครับ
+export default auth((req: any) => { 
   const { nextUrl } = req;
   const isLoggedIn = !!req.auth;
   

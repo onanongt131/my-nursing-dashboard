@@ -1,10 +1,11 @@
 import { auth } from "@/auth";
 import { NextResponse } from "next/server";
 
-export default auth((req: any) => { // ใช้ any ตรงนี้เพื่อจบปัญหาเรื่อง type ได้ทันที
+// เปลี่ยนจาก (req) เป็น (req: any)
+export default auth((req: any) => {
   const { nextUrl } = req;
   const isLoggedIn = !!req.auth;
-  
+
   const isPublicPage = [
     "/login", 
     "/register", 

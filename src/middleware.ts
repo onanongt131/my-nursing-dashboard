@@ -1,10 +1,11 @@
 import { auth } from "@/auth";
-import { NextResponse, NextRequest } from "next/server"; // 1. Import NextRequest เข้ามา
+import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server"; // นำเข้าแบบ type
 
-// 2. ระบุ Type ให้ req เป็น NextRequest
-export default auth((req: NextRequest) => { 
+// ใช้ AuthRequest เพื่อให้ TypeScript เข้าใจว่ามี property 'auth' อยู่
+export default auth((req: any) => { 
   const { nextUrl } = req;
-  const isLoggedIn = !!req.auth;
+  const isLoggedIn = !!req.auth; // ตอนนี้ TS จะเลิกบ่นเรื่อง req.auth แล้วครับ
 
   const isPublicPage = [
     "/login", 
@@ -18,7 +19,7 @@ export default auth((req: NextRequest) => {
   }
 
   if (!isLoggedIn && !isPublicPage) {
-    return NextResponse.redirect(new URL("/login", nextUrl));
+    return NextResponse.redirect(new URL("/login", req.nextUrl));
   }
 
   return NextResponse.next();

@@ -1,9 +1,14 @@
-import { NextAuthOptions } from "next-auth"; // เพิ่มบรรทัดนี้หากจำเป็น
+import { SupabaseAdapter } from "@auth/supabase-adapter";
+import NextAuth, { NextAuthOptions, User } from "next-auth";
 import { JWT } from "next-auth/jwt";
-import { User } from "next-auth";
+import GitHub from "next-auth/providers/github";
 
 // 1. แยกคอนฟิกออกมาเป็นตัวแปร เพื่อให้มั่นใจว่า NextAuth ทำงานได้สมบูรณ์
-const authConfig = {
+if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
+  console.warn("Supabase configuration is missing!");
+}
+
+export const authConfig = {
   adapter: SupabaseAdapter({
     url: process.env.NEXT_PUBLIC_SUPABASE_URL ?? "",
     secret: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",

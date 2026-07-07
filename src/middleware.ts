@@ -1,11 +1,10 @@
 import { auth } from "@/auth";
 import { NextResponse } from "next/server";
 
-export default auth((req) => {
+export default auth((req: any) => { // ใช้ any ตรงนี้เพื่อจบปัญหาเรื่อง type ได้ทันที
   const { nextUrl } = req;
   const isLoggedIn = !!req.auth;
   
-  // ตรวจสอบเส้นทางที่เป็นหน้า Public
   const isPublicPage = [
     "/login", 
     "/register", 
@@ -13,17 +12,14 @@ export default auth((req) => {
     "/update-password"
   ].includes(nextUrl.pathname);
 
-  // 1. ถ้าล็อกอินแล้ว แต่พยายามเข้าหน้า Login หรือ Register ให้ดีดไปหน้า Dashboard (หรือหน้าแรก)
   if (isLoggedIn && isPublicPage) {
      return NextResponse.redirect(new URL("/dashboard", nextUrl));
   }
 
-  // 2. ถ้ายังไม่ล็อกอิน และพยายามเข้าหน้าอื่นๆ ที่ไม่ใช่ Public ให้ดีดไปหน้า Login
   if (!isLoggedIn && !isPublicPage) {
     return NextResponse.redirect(new URL("/login", nextUrl));
   }
 
-  // กรณีอื่นๆ ให้ผ่านไปได้ปกติ
   return NextResponse.next();
 });
 

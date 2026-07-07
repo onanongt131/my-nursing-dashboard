@@ -1,26 +1,35 @@
+import { auth } from "@/auth";
 import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
 
-export async function middleware(request: NextRequest) {
-  // ดึง Session จาก Cookie โดยตรง (ชื่อคุกกี้อาจเป็น 'better-auth.session_token' หรือตามที่คุณตั้ง)
-  const sessionToken = request.cookies.get("better-auth.session_token")?.value;
-  const { pathname } = request.nextUrl;
+export default auth((req) => {
+  const { nextUrl } = req;
+  const isLoggedIn = !!req.auth;
+  
+  // ตรวจสอบเส้นทางที่เป็นหน้า Public
+  const isPublicPage = [
+    "/login", 
+    "/register", 
+    "/forgot-password", 
+    "/update-password"
+  ].includes(nextUrl.pathname);
 
-  const isPublicPage =
-    pathname.startsWith('/login') ||
-    pathname.startsWith('/register') ||
-    pathname.startsWith('/api/auth') ||
-    pathname.startsWith('/forgot-password') ||
-    pathname.startsWith('/update-password');
-
-  // ถ้าไม่มี Session Token และไม่ใช่หน้า Public ให้ดีดไป login
-  if (!isPublicPage && !sessionToken) {
-    return NextResponse.redirect(new URL('/login', request.url));
+  // 1. ถ้าล็อกอินแล้ว แต่พยายามเข้าหน้า Login หรือ Register ให้ดีดไปหน้า Dashboard (หรือหน้าแรก)
+  if (isLoggedIn && isPublicPage) {
+    return NextResponse.redirect(new URL("/dashboard", nextUrl));
   }
 
-  return NextResponse.next();
-}
+  // 2. ถ้ายังไม่ล็อกอิน และพยายามเข้าหน้าอื่นๆ ที่ไม่ใช่ Public ให้ดีดไปหน้า Login
+  if (!isLoggedIn && !isPublicPage) {
+    return NextResponse.redirect(new URL("/login", nextUrl));
+  }
 
+  // กรณีอื่นๆ ให้ผ่านไปได้ปกติ
+  return NextResponse.next();
+});
+
+// ปรับปรุง Matcher ให้เลี่ยงเส้นทาง API Auth ของ NextAuth อย่างชัดเจน
 export const config = {
-  matcher: ['/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)'],
+  matcher: [
+    "/((?!api/auth|_next/static|_next/image|favicon.ico).*)",
+  ],
 };

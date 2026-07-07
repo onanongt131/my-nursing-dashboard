@@ -1,24 +1,27 @@
 import { auth } from "@/auth";
 import { NextResponse } from "next/server";
+import type { NextRequest } from "next/server"; // นำเข้า NextRequest มาช่วย
 
-export default auth((req) => {
-  const isLoggedIn = !!req.auth;
+// ระบุ Type ให้ req เป็นประเภทที่รวม auth เข้าไปด้วย
+export default auth((req: NextRequest & { auth: any }) => { 
   const { nextUrl } = req;
-  
+  const isLoggedIn = !!req.auth; // ตอนนี้ TypeScript จะไม่บ่นแล้วครับ
+
   const isPublicPage = [
-    "/login", "/register", "/forgot-password", "/update-password"
+    "/login", 
+    "/register", 
+    "/forgot-password", 
+    "/update-password"
   ].includes(nextUrl.pathname);
 
-  // ถ้าเข้าหน้า Dashboard แต่ยังไม่ได้ Login
-  if (!isLoggedIn && nextUrl.pathname.startsWith("/dashboard")) {
+  if (isLoggedIn && isPublicPage) {
+     return NextResponse.redirect(new URL("/dashboard", nextUrl));
+  }
+
+  if (!isLoggedIn && !isPublicPage) {
     return NextResponse.redirect(new URL("/login", nextUrl));
   }
 
-  // ถ้า Login แล้วและพยายามเข้าหน้า Login
-  if (isLoggedIn && isPublicPage) {
-    return NextResponse.redirect(new URL("/dashboard", nextUrl));
-  }
-  
   return NextResponse.next();
 });
 

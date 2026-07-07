@@ -1,2 +1,2 @@
-import { handlers } from "@/auth"; // อ้างอิงจากไฟล์ auth.ts ที่เราตั้งค่าไว้
+import { handlers } from "@/auth"; // @/ หมายถึงโฟลเดอร์ src/auth.ts โดยตรง
 export const { GET, POST } = handlers;

@@ -5,6 +5,11 @@ import { processDataForChart } from '@/lib/chartUtils'; // ใช้ฟังก
 export default async function KpiDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
+  // 1. ตรวจสอบ Supabase ก่อนเริ่มใช้งาน
+  if (!supabase) {
+    return <div>ระบบฐานข้อมูลยังไม่พร้อมใช้งาน (Supabase client not initialized)</div>;
+  }
+
   const categoryMap: { [key: string]: string } = {
     '1': 'หมวด 1 ผลลัพธ์ด้านการนำองค์กร',
     '2': 'หมวด 2 ผลลัพธ์ด้านกลยุทธ์',
@@ -17,13 +22,14 @@ export default async function KpiDetailPage({ params }: { params: Promise<{ id: 
   const categoryName = categoryMap[id];
   if (!categoryName) return <div>ไม่พบข้อมูลหมวดหมู่</div>;
 
-  // ดึงข้อมูล KPI พร้อม Entries
+  // 2. ตอนนี้ TypeScript จะมั่นใจแล้วว่า supabase ไม่เป็น null
   const { data: kpis, error } = await supabase
     .from('kpis')
     .select('*, kpi_entries(*)')
     .eq('category', categoryName);
 
   if (error || !kpis) return <div>เกิดข้อผิดพลาดในการดึงข้อมูล</div>;
+
 
   // เรียงลำดับตามชื่อ KPI (สมมติว่าเป็นเลขหมวด เช่น 1.1, 1.2)
   const sortedKpis = [...kpis].sort((a, b) => {

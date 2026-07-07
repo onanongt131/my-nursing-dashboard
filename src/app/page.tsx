@@ -36,13 +36,26 @@ export default function DashboardPage() {
 
   useEffect(() => {
     async function fetchData() {
+      // ด่านตรวจสำคัญ: ถ้า supabase ไม่มีตัวตน ให้หยุดทำงานและแจ้งเตือน
+      if (!supabase) {
+        console.error("Supabase client is not initialized.");
+        setLoading(false);
+        return;
+      }
+
       setLoading(true);
-      const { data: allKpis } = await supabase.from('kpis').select('*, kpi_entries(*)');
-      const { data: depts } = await supabase.from('departments').select('*');
       
-      if (allKpis) setGroupKpis(allKpis.filter(k => k.departments_id === null));
-      if (depts) setDepartments(depts);
-      setLoading(false);
+      try {
+        const { data: allKpis } = await supabase.from('kpis').select('*, kpi_entries(*)');
+        const { data: depts } = await supabase.from('departments').select('*');
+        
+        if (allKpis) setGroupKpis(allKpis.filter(k => k.departments_id === null));
+        if (depts) setDepartments(depts);
+      } catch (error) {
+        console.error("Error fetching data:", error);
+      } finally {
+        setLoading(false);
+      }
     }
     fetchData();
   }, []);

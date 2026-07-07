@@ -1,17 +1,17 @@
-// src/app/category/[category]/page.tsx
-import { auth } from "@/auth"; // อ้างอิงจาก auth.ts[cite: 2]
-import CategoryClient from "./CategoryClient";
-import { redirect } from "next/navigation";
+import { supabase } from '@/lib/supabaseClient';
+import CategoryClient from './CategoryClient';
 
 export default async function CategoryPage({ params }: { params: Promise<{ category: string }> }) {
-  const session = await auth(); // ดึงข้อมูลผู้ใช้จาก Server[cite: 2]
-
-  if (!session) {
-    redirect("/login"); // ถ้ายังไม่ได้ Login ให้เด้งไปหน้า Login
+  const { category } = await params;
+  
+  // 1. ด่านตรวจ Supabase
+  if (!supabase) {
+    return <div>ระบบไม่พร้อมใช้งาน</div>;
   }
 
-  const { category } = await params;
-
-  // ส่ง session และ category ไปยัง Client Component
-  return <CategoryClient session={session} category={category} />;
+  // 2. ดึง Session จาก Server-side
+  const { data: { session } } = await supabase.auth.getSession();
+  
+  // 3. ส่ง session ที่ดึงได้เข้าไปใช้งานใน Client Component
+  return <CategoryClient category={category} session={session} />;
 }

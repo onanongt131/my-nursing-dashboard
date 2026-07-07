@@ -1,19 +1,31 @@
-// src/app/update-password/page.tsx
 "use client";
 
-import { useState } from "react";
-import { createClient } from "@/utils/supabase/client";
-import { useRouter } from "next/navigation";
+import { useState, useEffect } from 'react';
+import { createBrowserClient } from '@supabase/ssr';
+
+export const dynamic = 'force-dynamic';
 
 export default function UpdatePasswordPage() {
-  const [password, setPassword] = useState("");
-  const [message, setMessage] = useState("");
-  const router = useRouter();
-  const supabase = createClient();
+  const [password, setPassword] = useState('');
+  const [message, setMessage] = useState('');
+  // 1. สร้าง State เป็น null ไว้ก่อน
+  const [supabase, setSupabase] = useState<any>(null);
+
+  // 2. ใช้ useEffect สร้าง Client หลังจากที่ Component โหลดใน Browser แล้วเท่านั้น
+  useEffect(() => {
+    const client = createBrowserClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
+    setSupabase(client);
+  }, []);
 
   async function handleUpdate(e: React.FormEvent) {
     e.preventDefault();
     
+    // 3. เช็คว่า client พร้อมหรือยังก่อนเรียกใช้งาน
+    if (!supabase) return;
+
     const { error } = await supabase.auth.updateUser({
       password: password,
     });
@@ -22,9 +34,6 @@ export default function UpdatePasswordPage() {
       setMessage("เกิดข้อผิดพลาด: " + error.message);
     } else {
       setMessage("เปลี่ยนรหัสผ่านสำเร็จ! กำลังนำคุณไปหน้า Dashboard...");
-      
-      // ใช้ window.location.href เพื่อบังคับ Reload และ Redirect ใหม่
-      // วิธีนี้จะทำให้ Middleware ทำงานใหม่และเช็คสถานะการล็อกอินอีกครั้งครับ
       setTimeout(() => {
         window.location.href = "/"; 
       }, 1500);
@@ -45,7 +54,7 @@ export default function UpdatePasswordPage() {
         <button type="submit" className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700">
           อัปเดตรหัสผ่าน
         </button>
-        {message && <p className="mt-4 text-sm text-center">{message}</p>}
+        {message && <p className="mt-4 text-sm text-center text-gray-700">{message}</p>}
       </form>
     </div>
   );

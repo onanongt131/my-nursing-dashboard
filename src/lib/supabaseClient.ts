@@ -1,15 +1,15 @@
 import { createClient } from '@supabase/supabase-js';
 
-// เปลี่ยนจากการใช้ ! เป็นการเช็คและ Log ค่าเพื่อดูว่า Vercel เห็นตัวแปรไหม
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-console.log('DEBUG_BUILD: URL is', supabaseUrl ? 'Set' : 'Missing');
-console.log('DEBUG_BUILD: Key is', supabaseAnonKey ? 'Set' : 'Missing');
+// สร้างตัวแปรไว้รับค่า client
+let client = null;
 
-if (!supabaseUrl || !supabaseAnonKey) {
-  // ไม่ให้พังทันที แต่ให้รู้ว่าค่าหาย
-  console.error('SUPABASE CONFIGURATION IS MISSING DURING BUILD');
+// ใส่ด่านตรวจที่เข้มงวดที่สุด: ต้องมีค่าจริงและไม่ใช่ค่าว่าง
+if (supabaseUrl && supabaseAnonKey) {
+  client = createClient(supabaseUrl, supabaseAnonKey);
 }
 
-export const supabase = createClient(supabaseUrl || '', supabaseAnonKey || '');
+// ส่งออกเป็น null หากไม่มีค่า เพื่อไม่ให้โปรเจกต์พังตอน Build
+export const supabase = client;

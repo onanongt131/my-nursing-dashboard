@@ -7,28 +7,29 @@ export default function RegisterPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
-  const [deptId, setDeptId] = useState(''); // เริ่มต้นเป็นค่าว่าง
-  const [departments, setDepartments] = useState<any[]>([]); // เพิ่ม state นี้
+  const [deptId, setDeptId] = useState(''); 
+  const [departments, setDepartments] = useState<any[]>([]); 
   const [loading, setLoading] = useState(false);
   const router = useRouter();
 
-  // เพิ่มส่วนนี้: ดึงข้อมูลหน่วยงานเมื่อหน้าเว็บโหลด
   useEffect(() => {
     async function fetchDepartments() {
-        const { data, error } = await supabase
-        .from('departments')
-        .select('id, Department') // เปลี่ยนจาก name เป็น Department
-        .order('Department', { ascending: true }); // เปลี่ยนการเรียงลำดับด้วย
+      // ด่านตรวจสำหรับ useEffect
+      if (!supabase) return;
 
-        if (error) {
-        // ใช้ JSON.stringify เพื่อให้เห็นรายละเอียดของ error object ทั้งหมด
+      const { data, error } = await supabase
+        .from('departments')
+        .select('id, Department')
+        .order('Department', { ascending: true });
+
+      if (error) {
         console.error('รายละเอียด Error:', JSON.stringify(error, null, 2));
-        } else {
+      } else {
         setDepartments(data || []);
-        }
+      }
     }
     fetchDepartments();
-    }, []);
+  }, []);
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,16 +37,22 @@ export default function RegisterPage() {
       alert('กรุณาเลือกหน่วยงาน');
       return;
     }
+
+    // ด่านตรวจสำหรับ handleSignUp
+    if (!supabase) {
+        alert('ระบบฐานข้อมูลยังไม่พร้อมใช้งาน');
+        return;
+    }
+
     setLoading(true);
 
-    // สมัครสมาชิกแค่ส่วนของ Auth เท่านั้น
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
         data: {
           full_name: fullName,
-          department_id: deptId, // เก็บไว้ใน metadata เพื่อให้ Trigger ดึงไปใช้
+          department_id: deptId,
         },
       },
     });
@@ -56,13 +63,12 @@ export default function RegisterPage() {
       return;
     }
 
-    // แค่แจ้งเตือนว่าสำเร็จ ไม่ต้องสั่ง insert profiles เอง
     alert('สมัครสมาชิกสำเร็จ! โปรดตรวจสอบอีเมลเพื่อยืนยันการใช้งาน');
     router.push('/login');
-    
     setLoading(false);
   };
 
+  // ... (ส่วน return เหมือนเดิม)
   return (
     <main className="flex min-h-screen items-center justify-center bg-gray-50 p-6">
       <form onSubmit={handleSignUp} className="bg-white p-8 rounded-3xl shadow-sm border w-full max-w-md">

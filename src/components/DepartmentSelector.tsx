@@ -1,13 +1,15 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabaseClient';
+import { supabase } from '@/lib/supabaseClient'; 
 
 export default function DepartmentSelector({ onSelect }: { onSelect: (id: number | null) => void }) {
   const [departments, setDepartments] = useState<any[]>([]);
 
   useEffect(() => {
     async function fetchDepartments() {
-      // แก้ไขตรงนี้: เปลี่ยนจาก 'name' เป็น 'Department'
+      // ด่านตรวจป้องกัน Error และทำให้ TypeScript ยอมรับได้
+      if (!supabase) return;
+
       const { data, error } = await supabase.from('departments').select('id, Department');
       
       if (error) {
@@ -26,7 +28,6 @@ export default function DepartmentSelector({ onSelect }: { onSelect: (id: number
     >
       <option value="">-- เลือกหน่วยงาน --</option>
       {departments.map((dept) => (
-        // แก้ไขตรงนี้: เปลี่ยนจาก dept.name เป็น dept.Department
         <option key={dept.id} value={dept.id}>{dept.Department}</option>
       ))}
     </select>

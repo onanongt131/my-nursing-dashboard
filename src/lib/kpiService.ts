@@ -1,6 +1,5 @@
 import { supabase } from '@/lib/supabaseClient';
 
-// กำหนด Type ของข้อมูลเพื่อความเป็นระเบียบ (TypeScript)
 interface KpiEntryPayload {
   kpi_id: number;
   year: number;
@@ -10,17 +9,18 @@ interface KpiEntryPayload {
   denominator?: number | null;
 }
 
-/**
- * ฟังก์ชันบันทึกข้อมูลตัวชี้วัด
- * ได้รับการปรับปรุงให้รองรับทั้งแบบจำนวน (Count) และร้อยละ (Percent)
- */
 export const saveKpiEntry = async (payload: KpiEntryPayload) => {
-  // 1. ตรวจสอบข้อมูลเบื้องต้นก่อนส่ง (Basic Validation)
+  // 1. ด่านตรวจ: ตรวจสอบว่า supabase พร้อมใช้งานหรือไม่
+  if (!supabase) {
+    throw new Error('ระบบฐานข้อมูลยังไม่พร้อมใช้งาน (Supabase client not initialized)');
+  }
+
+  // 2. ตรวจสอบข้อมูลเบื้องต้นก่อนส่ง (Basic Validation)
   if (!payload.kpi_id || !payload.year || !payload.month) {
     throw new Error('ข้อมูลไม่ครบถ้วน: กรุณาระบุ KPI ID, ปี และเดือน');
   }
 
-  // 2. ส่งข้อมูลไปยัง Supabase
+  // 3. ส่งข้อมูลไปยัง Supabase
   const { data, error } = await supabase
     .from('kpi_entries')
     .insert([
@@ -33,9 +33,9 @@ export const saveKpiEntry = async (payload: KpiEntryPayload) => {
         denominator: payload.denominator,
       }
     ])
-    .select(); // เพิ่ม .select() เพื่อให้ได้ข้อมูลที่บันทึกกลับมาตรวจสอบ
+    .select();
 
-  // 3. จัดการ Error
+  // 4. จัดการ Error
   if (error) {
     console.error("Supabase Error:", error);
     throw new Error(`บันทึกข้อมูลไม่สำเร็จ: ${error.message}`);

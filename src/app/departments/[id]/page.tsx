@@ -16,7 +16,22 @@ export default function DepartmentDetailPage({ params }: { params: Promise<{ id:
     setLoading(true);
     
     // ดึงชื่อหน่วยงาน
-    const { data: deptData } = await supabase.from('departments').select('*').eq('id', id).single();
+    if (!supabase) {
+      console.error("Supabase client is not initialized.");
+      return; 
+    }
+
+    const { data: deptData, error: deptError } = await supabase
+      .from('departments')
+      .select('*')
+      .eq('id', id)
+      .single(); // แนะนำให้เติม .single() ถ้าดึงมาแค่ 1 record นะครับ
+
+    if (deptError) {
+        console.error("Error fetching department:", deptError);
+        return;
+    }
+
     setDepartment(deptData);
 
     // ดึงเฉพาะ KPI ที่ผูกกับหน่วยงานนี้ (ที่มีค่า departments_id ตรงกับ ID หน่วยงาน)

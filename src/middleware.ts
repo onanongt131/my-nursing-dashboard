@@ -2,29 +2,20 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 export async function middleware(request: NextRequest) {
-  // เปลี่ยนมาเช็คจาก Cookie แทนการเรียก auth()
-  // ตรวจสอบชื่อคุกกี้ที่แท้จริงใน Browser ของคุณ (เช่น better-auth.session_token)
-  const sessionToken = request.cookies.get("better-auth.session_token"); 
-
+  // ดึง Session จาก Cookie โดยตรง (ชื่อคุกกี้อาจเป็น 'better-auth.session_token' หรือตามที่คุณตั้ง)
+  const sessionToken = request.cookies.get("better-auth.session_token")?.value;
   const { pathname } = request.nextUrl;
 
   const isPublicPage =
     pathname.startsWith('/login') ||
     pathname.startsWith('/register') ||
     pathname.startsWith('/api/auth') ||
-    pathname.startsWith('/update-password') ||
     pathname.startsWith('/forgot-password') ||
-    pathname.startsWith('/auth/callback');
+    pathname.startsWith('/update-password');
 
-  // ตรวจสอบสถานะการล็อกอิน
-  const isAuthenticated = !!sessionToken;
-
-  if (!isPublicPage && !isAuthenticated) {
+  // ถ้าไม่มี Session Token และไม่ใช่หน้า Public ให้ดีดไป login
+  if (!isPublicPage && !sessionToken) {
     return NextResponse.redirect(new URL('/login', request.url));
-  }
-
-  if (isPublicPage && isAuthenticated && pathname === '/login') {
-    return NextResponse.redirect(new URL('/', request.url));
   }
 
   return NextResponse.next();

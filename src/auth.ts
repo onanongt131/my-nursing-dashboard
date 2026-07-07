@@ -2,23 +2,37 @@ import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
 import { createClient } from "@supabase/supabase-js";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!, 
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+// 1. ดึงค่าตัวแปรโดยไม่มี ! (และไม่ต้องรีบเรียก createClient)
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-const adminSupabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// 2. สร้าง Function เพื่อดึง Client (Lazy Initialization) 
+// เพื่อให้แน่ใจว่ามันจะทำงานเฉพาะตอนที่แอปทำงานจริง (Runtime) เท่านั้น
+const getSupabase = () => {
+  if (!supabaseUrl || !supabaseAnonKey) return null;
+  return createClient(supabaseUrl, supabaseAnonKey);
+};
+
+const getAdminSupabase = () => {
+  if (!supabaseUrl || !supabaseServiceKey) return null;
+  return createClient(supabaseUrl, supabaseServiceKey);
+};
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   providers: [
     Credentials({
       async authorize(credentials) {
-        console.log("DEBUG: authorize function start"); // <--- ตรงนี้สำคัญ
+        // ดึง client ออกมาใช้งานภายในฟังก์ชัน (Runtime)
+        const supabase = getSupabase();
+        const adminSupabase = getAdminSupabase();
+        
+        if (!supabase || !adminSupabase) {
+            console.error("Supabase client not initialized");
+            return null;
+        }
+
         if (!credentials?.email || !credentials?.password) {
-            console.log("DEBUG: Missing email/password");
             return null;
         }
 
@@ -27,25 +41,17 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
             password: credentials.password as string,
         });
 
-        if (error) {
-            console.log("DEBUG: Auth error:", error.message);
-            return null;
-        }
+        if (error) return null;
 
-        console.log("DEBUG: User login success, ID:", data.user.id);
-
+        // เรียกใช้ adminSupabase ตรงนี้ได้เลย
         const { data: profile, error: profileError } = await adminSupabase
             .from('profiles')
             .select('*')
             .eq('id', data.user.id)
             .single();
 
-        if (profileError) {
-            console.log("DEBUG: Profile fetch error:", profileError.message);
-            return null;
-        }
+        if (profileError) return null;
 
-        console.log("DEBUG: Profile found, success!");
         return {
             id: data.user.id,
             email: data.user.email,
@@ -54,28 +60,22 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       }
     }),
   ],
+  // ... callbacks และ configuration ที่เหลือเหมือนเดิม
   callbacks: {
-    // 1. นำข้อมูลจาก authorize มาใส่ใน token
-    async jwt({ token, user }) {
-      if (user) {
-        token.profile = user;
-      }
-      return token;
-    },
-    // 2. นำข้อมูลจาก token มาใส่ใน session
-    async session({ session, token }) {
-      session.user = token.profile as any;
-      return session;
-    },
-    // 3. ตัวนี้คือ Guard (Middleware)
-    authorized({ auth, request: { nextUrl } }) {
-      const isLoggedIn = !!auth?.user;
-      const isLoginPage = nextUrl.pathname === "/login";
-
-      if (isLoggedIn && isLoginPage) {
-        return Response.redirect(new URL("/", nextUrl));
-      }
-      return isLoggedIn; // คืนค่า boolean ได้เลย
-    },
+     // (คงเดิมไว้ได้เลยครับ)
+     async jwt({ token, user }) {
+        if (user) { token.profile = user; }
+        return token;
+     },
+     async session({ session, token }) {
+        session.user = token.profile as any;
+        return session;
+     },
+     authorized({ auth, request: { nextUrl } }) {
+        const isLoggedIn = !!auth?.user;
+        const isLoginPage = nextUrl.pathname === "/login";
+        if (isLoggedIn && isLoginPage) { return Response.redirect(new URL("/", nextUrl)); }
+        return isLoggedIn;
+     },
   },
 });

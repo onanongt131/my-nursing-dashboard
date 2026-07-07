@@ -1,7 +1,7 @@
 import { auth } from "@/auth";
-import type { NextRequest } from "next/server"; // Import เพิ่ม
+import { NextResponse } from "next/server";
 
-export default auth((req: NextRequest & { auth: any }) => {
+export default auth((req: any) => {
   const { nextUrl } = req;
   const isLoggedIn = !!req.auth;
 

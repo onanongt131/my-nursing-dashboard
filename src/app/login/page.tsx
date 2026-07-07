@@ -1,78 +1,30 @@
-// src/app/login/page.tsx
-import { redirect } from 'next/navigation';
-import { signIn } from "@/auth";
-import Link from 'next/link';
-import { SubmitButton } from "@/components/SubmitButton"; // import ปุ่มที่เราสร้างใหม่
+"use client";
 
-export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
-  const { error } = await searchParams;
+import { loginAction } from "./actions";
+import { useActionState } from "react"; // ตรวจสอบว่าใช้ React 19 หรือใช้ useFormState ในรุ่นเก่ากว่า
+
+export default function LoginPage() {
+  // รับค่าสถานะการ login
+  const [state, action, isPending] = useActionState(loginAction, undefined);
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-gray-50">
-      <h1 className="text-2xl font-bold mb-6 text-gray-800">เข้าสู่ระบบ Dashboard พยาบาล</h1>
+    <form action={action} className="flex flex-col gap-4 max-w-sm mx-auto mt-20">
+      <h1 className="text-xl font-bold">เข้าสู่ระบบ</h1>
       
-      {error && (
-        <div className="mb-4 p-3 bg-red-100 text-red-700 rounded-lg w-full max-w-sm text-center text-sm">
-          อีเมลหรือรหัสผ่านไม่ถูกต้อง
-        </div>
+      {state?.error && (
+        <p className="text-red-500 text-sm">{state.error}</p>
       )}
 
-      <form
-        action={async (formData) => {
-          "use server";
-          try {
-            await signIn("credentials", formData, { redirectTo: "/" });
-          } catch (error: any) {
-            // **ส่วนนี้สำคัญมาก**
-            // Auth.js จะโยน error ชนิดหนึ่งเพื่อสั่ง Redirect
-            // เราต้องเช็คก่อนว่าใช่ error การ Redirect หรือไม่
-            if (error?.type === "CredentialsSignin") {
-              return redirect("/login?error=true");
-            }
-            
-            // ถ้าเป็น redirect error (ซึ่งไม่ใช่ error จริงๆ) ให้ re-throw ให้ระบบทำงานต่อ
-            if (error instanceof Error && error.message === "NEXT_REDIRECT") {
-              throw error;
-            }
-            
-            // ถ้าเป็น error อื่นๆ ให้ throw
-            throw error;
-          }
-        }}
-        className="flex flex-col gap-4 w-full max-w-sm bg-white p-6 rounded-2xl shadow-sm border"
-      >
-        <input 
-          name="email" 
-          type="email" 
-          placeholder="อีเมล" 
-          required 
-          className="p-3 border rounded-xl"
-        />
-        <input 
-          name="password" 
-          type="password" 
-          placeholder="รหัสผ่าน" 
-          required 
-          className="p-3 border rounded-xl"
-        />
-        
-        {/* ใช้ SubmitButton แทนปุ่มแบบเดิม */}
-        <SubmitButton />
-        
-        {/* ลิงก์ลืมรหัสผ่าน */}
-        <Link href="/forgot-password" className="text-sm text-blue-600 text-center hover:underline">
-          ลืมรหัสผ่าน?
-        </Link>
-      </form>
+      <input name="email" type="email" placeholder="อีเมล" required className="p-2 border rounded" />
+      <input name="password" type="password" placeholder="รหัสผ่าน" required className="p-2 border rounded" />
       
-      <div className="mt-6 text-center">
-        <p className="text-sm text-gray-600">
-          ยังไม่มีบัญชี? {' '}
-          <Link href="/register" className="text-blue-600 font-bold hover:underline">
-            สมัครสมาชิกที่นี่
-          </Link>
-        </p>
-      </div>
-    </div>
+      <button 
+        type="submit" 
+        disabled={isPending}
+        className="bg-blue-600 text-white p-2 rounded disabled:bg-gray-400"
+      >
+        {isPending ? "กำลังเข้าสู่ระบบ..." : "เข้าสู่ระบบ"}
+      </button>
+    </form>
   );
 }

@@ -1,7 +1,7 @@
 import { auth } from "@/auth";
 import { NextResponse } from "next/server";
 
-export default auth((req:any) => {
+export default auth((req) => {
   const { nextUrl } = req;
   const isLoggedIn = !!req.auth;
   
@@ -27,9 +27,6 @@ export default auth((req:any) => {
   return NextResponse.next();
 });
 
-// ปรับปรุง Matcher ให้เลี่ยงเส้นทาง API Auth ของ NextAuth อย่างชัดเจน
 export const config = {
-  matcher: [
-    "/((?!api/auth|_next/static|_next/image|favicon.ico).*)",
-  ],
+  matcher: ["/((?!api|_next/static|_next/image|favicon.ico).*)"],
 };

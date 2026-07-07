@@ -1,7 +1,7 @@
 import { auth } from "@/auth";
-import { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 
-export default auth((req: any) => { 
+export default auth((req:any) => {
   const { nextUrl } = req;
   const isLoggedIn = !!req.auth;
   
@@ -15,7 +15,7 @@ export default auth((req: any) => {
 
   // 1. ถ้าล็อกอินแล้ว แต่พยายามเข้าหน้า Login หรือ Register ให้ดีดไปหน้า Dashboard (หรือหน้าแรก)
   if (isLoggedIn && isPublicPage) {
-    return NextResponse.redirect(new URL("/dashboard", nextUrl));
+     return NextResponse.redirect(new URL("/dashboard", nextUrl));
   }
 
   // 2. ถ้ายังไม่ล็อกอิน และพยายามเข้าหน้าอื่นๆ ที่ไม่ใช่ Public ให้ดีดไปหน้า Login

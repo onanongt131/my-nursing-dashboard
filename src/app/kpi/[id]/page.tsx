@@ -1,42 +1,25 @@
 import { supabase } from '@/lib/supabaseClient';
-import KpiCard from '@/components/KpiCard';
-import { processDataForChart } from '@/lib/chartUtils';
-import { notFound } from 'next/navigation';
+import LogoutButton from '@/components/LogoutButton';
 import Link from 'next/link';
 import { Home } from 'lucide-react';
-import LogoutButton from '@/components/LogoutButton';
 
-interface KpiPageProps {
-  params: Promise<{ id: string }>;
-}
-
-export default async function KpiDetailPage({ params }: KpiPageProps) {
+export default async function KpiDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
 
-  const categoryMap: { [key: string]: string } = {
-    '1': 'หมวด 1 ผลลัพธ์ด้านการนำองค์กร', '2': 'หมวด 2 ผลลัพธ์ด้านกลยุทธ์',
-    '3': 'หมวด 3 ผลลัพธ์ด้านผู้ใช้บริการ', '4': 'หมวด 4 ผลลัพธ์ด้านการวัดวิเคราะห์ฯ',
-    '5': 'หมวด 5 ผลลัพธ์ด้านบุคลากร', '6': 'หมวด 6 ผลลัพธ์ด้านการปฏิบัติการพยาบาล'
-  };
-  
-  const categoryName = categoryMap[id];
-  if (!categoryName) notFound();
-
-  const { data: kpis, error } = await supabase
+  // ตรวจสอบข้อมูลใน Console ของ Vercel หรือ Terminal
+  const { data: kpi, error } = await supabase
     .from('kpis')
     .select('*, kpi_entries(*)')
-    .eq('category', categoryName);
+    .eq('id', id) // ตรวจสอบว่าคอลัมน์ใน DB คือ 'id' จริงๆ หรือไม่
+    .single();
 
-  if (error) return <div className="p-8 text-red-600">เกิดข้อผิดพลาดในการดึงข้อมูล</div>;
-
-  const processedKpis = (kpis || []).map((kpi) => ({
-    ...kpi,
-    processedChartData: processDataForChart(kpi.kpi_entries || [], kpi.Type)
-  }));
+  if (error) {
+    console.error("Supabase Error details:", error);
+    return <div className="p-10 text-red-600">Error: {error.message}</div>;
+  }
 
   return (
     <main className="min-h-screen bg-gray-50">
-      {/* Header เลียนแบบ Dashboard */}
       <header className="flex justify-between items-center px-6 py-4 bg-white border-b shadow-sm">
         <h2 className="font-bold text-lg text-gray-700">KPI Detail</h2>
         <div className="flex gap-2">
@@ -46,14 +29,8 @@ export default async function KpiDetailPage({ params }: KpiPageProps) {
           <LogoutButton />
         </div>
       </header>
-
       <div className="p-8">
-        <h1 className="text-2xl font-bold mb-8 text-gray-800">{categoryName}</h1>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {processedKpis.map((kpi) => (
-            <KpiCard key={kpi.id} kpi={kpi} chartData={kpi.processedChartData} />
-          ))}
-        </div>
+        <h1>{kpi.Name}</h1> {/* ตรวจสอบชื่อคอลัมน์ให้ตรงกับฐานข้อมูล */}
       </div>
     </main>
   );

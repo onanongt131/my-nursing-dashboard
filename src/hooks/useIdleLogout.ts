@@ -1,10 +1,8 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabaseClient';
-import { useRouter } from 'next/navigation';
+import { signOut } from 'next-auth/react'; // เปลี่ยนมาใช้ตัวนี้
 
 export const useIdleLogout = (timeoutInMinutes: number = 15) => {
-  const router = useRouter();
   const [showWarning, setShowWarning] = useState(false);
   const timeoutMs = timeoutInMinutes * 60 * 1000;
 
@@ -13,33 +11,40 @@ export const useIdleLogout = (timeoutInMinutes: number = 15) => {
     let warningTimer: NodeJS.Timeout;
 
     const logout = async () => {
-      await supabase.auth.signOut();
-      router.replace('/login');
+      // ใช้ signOut ของ Next-Auth เพื่อเคลียร์คุกกี้ทั้งหมด
+      await signOut({ callbackUrl: '/login' });
     };
 
     const resetTimer = () => {
       clearTimeout(idleTimer);
       clearTimeout(warningTimer);
-      setShowWarning(false); // ซ่อนเตือนถ้ามีการขยับเมาส์
+      setShowWarning(false);
 
-      // เตือนก่อน 1 นาที (ลบ 1 นาทีจากเวลาจริง)
-      warningTimer = setTimeout(() => setShowWarning(true), timeoutMs - 60000);
+      // เตือนก่อน 1 นาที
+      // ใช้ Math.max เพื่อป้องกันกรณีตั้งเวลาสั้นกว่า 1 นาที
+      const warningTime = Math.max(0, timeoutMs - 60000);
+      warningTimer = setTimeout(() => setShowWarning(true), warningTime);
       
       // Logout จริงเมื่อครบเวลา
       idleTimer = setTimeout(logout, timeoutMs);
     };
 
-    window.addEventListener('mousemove', resetTimer);
-    window.addEventListener('keypress', resetTimer);
+    const events = ['mousemove', 'mousedown', 'keypress', 'scroll', 'touchstart'];
+    
+    events.forEach((event) => {
+      window.addEventListener(event, resetTimer);
+    });
+
     resetTimer();
 
     return () => {
-      window.removeEventListener('mousemove', resetTimer);
-      window.removeEventListener('keypress', resetTimer);
+      events.forEach((event) => {
+        window.removeEventListener(event, resetTimer);
+      });
       clearTimeout(idleTimer);
       clearTimeout(warningTimer);
     };
-  }, [timeoutMs, router]);
+  }, [timeoutMs]);
 
   return { showWarning, setShowWarning };
 };

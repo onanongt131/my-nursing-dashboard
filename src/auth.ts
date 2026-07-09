@@ -20,24 +20,22 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   providers: [
     Credentials({
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) return null;
+        // 1. ตรวจสอบผ่าน Supabase Auth โดยตรง (ไม่ต้อง Query ตาราง profiles เพื่อหา password)
+        const { data, error } = await supabase.auth.signInWithPassword({
+          email: credentials.email as string,
+          password: credentials.password as string,
+        });
 
-        const email = credentials.email as string;
-        const password = credentials.password as string;
-        // 1. ค้นหา user จาก table 'users' (หรือชื่อตารางที่คุณใช้ใน Supabase)
-        const { data: user, error } = await supabase
-          .from("profiles") // เปลี่ยนจาก "users" เป็น "profiles"
+        if (error || !data.user) return null;
+
+        // 2. ถ้าผ่านแล้ว ค่อยไปดึงข้อมูล profile (ชื่อ/แผนก) จากตาราง profiles มาประกอบ
+        const { data: profile } = await supabase
+          .from("profiles")
           .select("*")
-          .eq("email", email) // ตรวจสอบว่าในตาราง profiles มีคอลัมน์ email หรือยัง?
+          .eq("id", data.user.id)
           .single();
 
-        if (error || !user) return null;
-
-        // ตรวจสอบรหัสผ่าน (ต้องมั่นใจว่าในตาราง profiles มีคอลัมน์ password ที่เก็บแบบ hash)
-        const passwordsMatch = await bcrypt.compare(password, user.password);
-        if (!passwordsMatch) return null;
-
-        return { id: user.id, email: user.email };
+        return { id: data.user.id, email: data.user.email, name: profile?.full_name };
       },
     }),
   ],

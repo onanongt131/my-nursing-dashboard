@@ -3,16 +3,20 @@ import type { NextRequest } from 'next/server';
 import { auth } from '@/auth';
 
 export async function middleware(request: NextRequest) {
-  const session = await auth(); // ดึงสถานะการ Login
+  const session = await auth();
   const { pathname } = request.nextUrl;
 
-  // 1. ถ้ายังไม่มี session และไม่ได้อยู่ในหน้า login หรือ register ให้พาไปที่ login
-  if (!session && pathname !== '/login' && pathname !== '/register') {
+  // 1. ตรวจสอบการเข้าถึงหน้า Dashboard (Protected Routes)
+  const isProtectedRoute = pathname.startsWith('/dashboard') || pathname.startsWith('/kpi') || pathname.startsWith('/departments');
+  const isAuthRoute = pathname === '/login' || pathname === '/register';
+
+  // ถ้าไม่มี session แล้วพยายามเข้าหน้า protected ให้ไป login
+  if (isProtectedRoute && !session) {
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
-  // 2. ถ้ามี session แล้ว แต่พยายามเข้าหน้า login หรือ register ให้พาไปหน้า dashboard
-  if (session && (pathname === '/login' || pathname === '/register')) {
+  // ถ้ามี session แล้ว แต่พยายามเข้าหน้า login ให้กลับไป dashboard
+  if (isAuthRoute && session) {
     return NextResponse.redirect(new URL('/dashboard', request.url));
   }
 
@@ -20,6 +24,13 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // กรองไฟล์ที่ไม่ต้องการให้ตรวจสอบ
-  matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'],
-};
+  // กรองให้ทำงานเฉพาะ Path ที่สำคัญ
+  // ยกเว้น: api, _next/static, _next/image, favicon.ico และไฟล์อื่นๆ ใน public
+  matcher: [
+    '/dashboard/:path*',
+    '/kpi/:path*',
+    '/departments/:path*',
+    '/login',
+    '/register'
+  ],
+}

@@ -50,7 +50,8 @@ export default function RegisterPage() {
     setLoading(true);
 
     try {
-      const { error } = await supabase.auth.signUp({
+      // ใน handleSignUp function
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -62,8 +63,11 @@ export default function RegisterPage() {
       });
 
       if (error) {
-        // จัดการ Error ให้แสดงผลเป็นข้อความที่อ่านรู้เรื่อง
-        throw new Error(error.message || 'เกิดข้อผิดพลาดในการสมัครสมาชิก');
+        // แก้ไขตรงนี้: ดึงข้อความจาก Error มาแสดงแบบปลอดภัย
+        const errorMessage = error.message || JSON.stringify(error);
+        setErrorMsg(errorMessage); 
+        setLoading(false);
+        return;
       }
 
       setSuccessMsg('สมัครสมาชิกสำเร็จ! โปรดตรวจสอบอีเมลของคุณเพื่อยืนยันการใช้งาน');

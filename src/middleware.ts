@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
+import { NextRequest } from 'next/server';
 import { auth } from '@/auth';
 
 // 1. แยก Middleware ออกมาเป็นฟังก์ชันชื่อ middleware ตรงๆ ตามที่ Next.js คาดหวัง
 export async function middleware(request: NextRequest) {
   // เรียกใช้ auth() และรับ response
-  return await auth((req) => {
+  return await auth((req: any) => {
     // ใส่ Logic ของคุณที่นี่ (ถ้ามี)
     return NextResponse.next();
   })(request);

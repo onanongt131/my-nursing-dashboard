@@ -6,20 +6,14 @@ export async function middleware(request: NextRequest) {
   const session = await auth();
   const { pathname } = request.nextUrl;
 
-  // ป้องกัน Loop ในกรณีที่ session เป็น null/undefined
-  const isProtectedRoute = 
-    pathname.startsWith('/dashboard') || 
-    pathname.startsWith('/kpi') || 
-    pathname.startsWith('/departments');
-
-  const isAuthRoute = pathname === '/login' || pathname === '/register';
-
-  if (isProtectedRoute && !session) {
-    return NextResponse.redirect(new URL('/login', request.url));
+  // ถ้าเข้าหน้า login หรือ register ให้ผ่านไปเลยโดยไม่ต้องเช็ค session
+  if (pathname === '/login' || pathname === '/register') {
+    return NextResponse.next();
   }
 
-  if (isAuthRoute && session) {
-    return NextResponse.redirect(new URL('/dashboard', request.url));
+  // ถ้าไม่มี session แล้วพยายามเข้าหน้า dashboard หรือ path อื่นๆ ให้ส่งไป login
+  if (!session) {
+    return NextResponse.redirect(new URL('/login', request.url));
   }
 
   return NextResponse.next();

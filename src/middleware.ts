@@ -6,16 +6,18 @@ export async function middleware(request: NextRequest) {
   const session = await auth();
   const { pathname } = request.nextUrl;
 
-  // 1. ตรวจสอบการเข้าถึงหน้า Dashboard (Protected Routes)
-  const isProtectedRoute = pathname.startsWith('/dashboard') || pathname.startsWith('/kpi') || pathname.startsWith('/departments');
+  // ป้องกัน Loop ในกรณีที่ session เป็น null/undefined
+  const isProtectedRoute = 
+    pathname.startsWith('/dashboard') || 
+    pathname.startsWith('/kpi') || 
+    pathname.startsWith('/departments');
+
   const isAuthRoute = pathname === '/login' || pathname === '/register';
 
-  // ถ้าไม่มี session แล้วพยายามเข้าหน้า protected ให้ไป login
   if (isProtectedRoute && !session) {
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
-  // ถ้ามี session แล้ว แต่พยายามเข้าหน้า login ให้กลับไป dashboard
   if (isAuthRoute && session) {
     return NextResponse.redirect(new URL('/dashboard', request.url));
   }
@@ -24,13 +26,9 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // กรองให้ทำงานเฉพาะ Path ที่สำคัญ
-  // ยกเว้น: api, _next/static, _next/image, favicon.ico และไฟล์อื่นๆ ใน public
+  // หัวใจสำคัญ: ใช้การยกเว้นด้วย (?!...) ใน matcher 
+  // เพื่อให้มั่นใจว่า Middleware จะไม่ไปยุ่งกับ static files, images หรือ api
   matcher: [
-    '/dashboard/:path*',
-    '/kpi/:path*',
-    '/departments/:path*',
-    '/login',
-    '/register'
+    '/((?!api|_next/static|_next/image|favicon.ico).*)',
   ],
-}
+};

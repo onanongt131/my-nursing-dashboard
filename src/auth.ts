@@ -15,5 +15,6 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       clientId: process.env.AUTH_GITHUB_ID || "",
       clientSecret: process.env.AUTH_GITHUB_SECRET || "",
     }),
+    // ไม่ต้องใส่ CredentialsProvider แล้ว!
   ],
 });

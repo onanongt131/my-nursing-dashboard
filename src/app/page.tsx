@@ -131,7 +131,7 @@ export default function DashboardPage() {
           const { total, passed, percent } = getCategoryProgress(cat.name);
           return (
             <Link href={`/kpi/${cat.id}`} key={cat.id}>
-              <div className="bg-white p-6 rounded-7xl border shadow-sm hover:shadow-md transition cursor-pointer">
+              <div className="dashboard-card dashboard-card-hover">
                 <div className="flex items-center gap-2 mb-2">
                   <span className="text-4xl">{cat.icon}</span>
                   <h3 className="font-semibold text-gray-800">{cat.name}</h3>
@@ -158,7 +158,7 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {departments.map((dept: any) => (
           <Link href={`/departments/${dept.id}`} key={dept.id}>
-            <div className="bg-white p-6 rounded-2xl border hover:shadow-md transition cursor-pointer">
+            <div className="dashboard-card dashboard-card-hover">
               <h3 className="font-semibold">{dept.Department}</h3>
               <p className="text-sm text-gray-500">มี KPI</p>
             </div>

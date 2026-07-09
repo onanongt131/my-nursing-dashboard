@@ -15,11 +15,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         
         // 2. เรียก signOut ของ Next-Auth เพื่อเคลียร์ Memory
         try {
-            await signOut({ redirect: false });
+            await signOut({ callbackUrl: '/login' });
         } catch (e) {
             console.error("Signout failed, forcing redirect");
         }
         
+        document.cookie.split(";").forEach(c => { 
+            document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/"); 
+        });
         // 3. บังคับย้ายหน้าไปยัง /login
         window.location.href = '/login';
         };

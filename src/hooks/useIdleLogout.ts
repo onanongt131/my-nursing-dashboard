@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { signOut } from 'next-auth/react'; // เปลี่ยนมาใช้ตัวนี้
 
-export const useIdleLogout = (timeoutInMinutes: number = 15) => {
+export const useIdleLogout = (timeoutInMinutes: number = 5) => {
   const [showWarning, setShowWarning] = useState(false);
   const timeoutMs = timeoutInMinutes * 60 * 1000;
 

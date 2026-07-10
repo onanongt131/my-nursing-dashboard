@@ -12,9 +12,9 @@ export default function DashboardPage() {
 
   // 1. นิยาม categories ภายใน Component
   const categories = [
-    { id: '1', name: 'กลยุทธ์ 1 พัฒนาระบบบริการพยาบาลให้เป็นเลิศในการดูแลผู้ป่วยกลุ่มโรคสำคัญ', icon: '🏛️' },
-    { id: '2', name: 'กลยุทธ์ 2 พัฒนาแอปพลิเคชั่นในการดูแลสุขภาพ', icon: '🎯' },
-    { id: '3', name: 'กลยุทธ์ 3 พัฒนาคุณภาพบริการพยาบาลเฉพาะทางกลุ่มโรค NCD โรคอุบัติใหม่-อุบัติซ้ำ และจิตเวช', icon: '👥' },
+    { id: '1', name: 'หมวด 1 ผลลัพธ์ด้านการนำองค์กร', icon: '🏛️' },
+    { id: '2', name: 'หมวด 2 ผลลัพธ์ด้านกลยุทธ์', icon: '🎯' },
+    { id: '3', name: 'หมวด 3 ผลลัพธ์ด้านผู้ใช้ผู้บริการ', icon: '👥' },
     { id: '4', name: 'หมวด 4 ผลลัพธ์ด้านการวัดวิเคราะห์ฯ', icon: '📊' },
     { id: '5', name: 'หมวด 5 ผลลัพธ์ด้านบุคลากร', icon: '👥' },
     { id: '6', name: 'หมวด 6 ผลลัพธ์ด้านการปฏิบัติการพยาบาล', icon: '📋' },
@@ -80,23 +80,23 @@ export default function DashboardPage() {
 
       {/* ส่วนหัว 3 กล่อง */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-white p-6 rounded-2xl shadow-sm border text-center">
+        <div className="bg-white p-6 rounded-xl shadow-sm border text-center">
           <p className="text-gray-800 mb-2">KPI ทั้งหมด</p>
-          <p className="text-9xl font-bold text-purple-600">{groupKpis.length}</p>
+          <p className="text-9xl font-bold text-blue-600">{groupKpis.length}</p>
         </div>
 
         <div className="bg-white p-6 rounded-xl shadow-sm border flex items-center justify-around">
           <div className="flex items-center gap-3">
             <CheckCircle className="text-green-600 w-10 h-10" />
-            <span className="text-9xl font-bold text-green-600">{passedCount}</span>
+            <span className="text-7xl font-bold text-green-600">{passedCount}</span>
           </div>
           <div className="flex items-center gap-3">
             <XCircle className="text-red-600 w-10 h-10" />
-            <span className="text-7xl font-bold text-red-600">{failedCount}</span>
+            <span className="text-5xl font-bold text-red-600">{failedCount}</span>
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-3xl shadow-sm border flex flex-col items-center">
+        <div className="bg-white p-6 rounded-xl shadow-sm border flex flex-col items-center">
            <p className="text-gray-500 text-sm mb-3">สัดส่วนการผ่านเกณฑ์</p>
            <div className="h-32 w-full relative">
              <ResponsiveContainer width="100%" height="100%">
@@ -112,7 +112,7 @@ export default function DashboardPage() {
                   cx="50%"   // จัดให้อยู่กึ่งกลางแนวนอน
                   cy="100%"  // ดันจุดศูนย์กลางลงไปอยู่ที่ขอบล่างของกล่อง เพื่อให้ครึ่งวงกลมแสดงผลอยู่ด้านบน
                 >
-                  <Cell fill="#22c55e" />
+                  <Cell fill="#083819" />
                   <Cell fill="#ef4444" />
                 </Pie>
                </PieChart>

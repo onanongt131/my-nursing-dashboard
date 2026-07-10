@@ -1,28 +1,28 @@
-import { NextResponse } from 'next/server';
-import type { NextRequest } from 'next/server';
-import { auth } from '@/auth';
+import { NextRequest, NextResponse } from 'next/server';
+import { getToken } from 'next-auth/jwt';
 
-export async function middleware(request: NextRequest) {
-  const session = await auth();
-  const { pathname } = request.nextUrl;
+export async function middleware(req: NextRequest) {
+  const token = await getToken({ 
+    req, 
+    secret: process.env.NEXTAUTH_SECRET 
+  });
 
-  // ถ้าเข้าหน้า login หรือ register ให้ผ่านไปเลยโดยไม่ต้องเช็ค session
-  if (pathname === '/login' || pathname === '/register') {
-    return NextResponse.next();
-  }
+  const { pathname } = req.nextUrl;
 
-  // ถ้าไม่มี session แล้วพยายามเข้าหน้า dashboard หรือ path อื่นๆ ให้ส่งไป login
-  if (!session) {
-    return NextResponse.redirect(new URL('/login', request.url));
-  }
+  // 1. ถ้าพยายามเข้าหน้า Dashboard แต่ไม่มี Token ให้เด้งไปหน้า Login
+  if (pathname.startsWith('/dashboard') && !token) {
+    return NextResponse.redirect(new URL('/login', req.url));
+  }
 
-  return NextResponse.next();
+  // 2. ถ้ามี Token อยู่แล้วแต่พยายามเข้าหน้า Login ให้เด้งไป Dashboard
+  if (pathname === '/login' && token) {
+    return NextResponse.redirect(new URL('/dashboard', req.url));
+  }
+
+  return NextResponse.next();
 }
 
+// ระบุว่าให้ Middleware ทำงานที่ Path ไหนบ้าง
 export const config = {
-  // หัวใจสำคัญ: ใช้การยกเว้นด้วย (?!...) ใน matcher 
-  // เพื่อให้มั่นใจว่า Middleware จะไม่ไปยุ่งกับ static files, images หรือ api
-  matcher: [
-    '/((?!api|_next/static|_next/image|favicon.ico).*)',
-  ],
+  matcher: ['/dashboard/:path*', '/login'],
 };

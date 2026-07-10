@@ -82,16 +82,16 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
         <div className="bg-white p-6 rounded-xl shadow-sm border text-center">
           <p className="text-gray-800 mb-2">KPI ทั้งหมด</p>
-          <p className="text-9xl font-bold text-blue-600">{groupKpis.length}</p>
+          <p className="text-6xl font-bold text-green-800">{groupKpis.length}</p>
         </div>
 
         <div className="bg-white p-6 rounded-xl shadow-sm border flex items-center justify-around">
           <div className="flex items-center gap-3">
-            <CheckCircle className="text-green-600 w-10 h-10" />
+            <CheckCircle className="text-green-800 w-10 h-10" />
             <span className="text-7xl font-bold text-green-600">{passedCount}</span>
           </div>
           <div className="flex items-center gap-3">
-            <XCircle className="text-red-600 w-10 h-10" />
+            <XCircle className="text-red-500 w-10 h-10" />
             <span className="text-5xl font-bold text-red-600">{failedCount}</span>
           </div>
         </div>

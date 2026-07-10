@@ -1,16 +1,15 @@
+// src/components/LogoutButton.tsx
 'use client';
 import { signOut } from 'next-auth/react';
+import { LogOut } from 'lucide-react';
 
 export default function LogoutButton() {
-  const handleLogout = async () => {
-    // วิธีนี้ Auth.js จะส่ง Request ไปลบ Session ที่ Server และล้างคุกกี้ให้เอง
-    await signOut({ 
-      callbackUrl: '/login',
-      redirect: true 
-    });
-  };
-
   return (
-    <button onClick={handleLogout}>ออกจากระบบ</button>
+    <button 
+      onClick={() => signOut({ callbackUrl: '/login' })}
+      className="flex items-center gap-2 text-red-600"
+    >
+      <LogOut className="w-4 h-4" /> ออกจากระบบ
+    </button>
   );
 }

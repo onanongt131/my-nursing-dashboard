@@ -1,18 +1,27 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
-import { auth } from '@/auth';
+import { getToken } from 'next-auth/jwt';
 
 export async function middleware(request: NextRequest) {
-  const session = await auth();
-  const { pathname } = request.nextUrl;
+  // 1. ใช้ getToken แทน auth() เพื่อให้ทำงานใน Edge Runtime ได้รวดเร็ว
+  const token = await getToken({ 
+    req: request, 
+    secret: process.env.AUTH_SECRET // ตรวจสอบว่าใน .env หรือ Vercel มีตัวนี้
+  });
 
-  // ถ้าเข้าหน้า login หรือ register ให้ผ่านไปเลยโดยไม่ต้องเช็ค session
-  if (pathname === '/login' || pathname === '/register') {
+  const { pathname } = request.nextUrl;
+  const isAuthPage = pathname === '/login' || pathname === '/register';
+
+  // 2. ถ้าเข้าหน้า Login/Register แต่มี Token อยู่แล้ว ให้เด้งไป Dashboard
+  if (isAuthPage) {
+    if (token) {
+      return NextResponse.redirect(new URL('/dashboard', request.url));
+    }
     return NextResponse.next();
   }
 
-  // ถ้าไม่มี session แล้วพยายามเข้าหน้า dashboard หรือ path อื่นๆ ให้ส่งไป login
-  if (!session) {
+  // 3. ถ้าไม่มี Token และพยายามเข้าหน้า Dashboard ให้เด้งไป Login
+  if (!token) {
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
@@ -20,9 +29,6 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // หัวใจสำคัญ: ใช้การยกเว้นด้วย (?!...) ใน matcher 
-  // เพื่อให้มั่นใจว่า Middleware จะไม่ไปยุ่งกับ static files, images หรือ api
-  matcher: [
-    '/((?!api|_next/static|_next/image|favicon.ico).*)',
-  ],
+  // matcher ที่ดีและครอบคลุม
+  matcher: ['/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)'],
 };

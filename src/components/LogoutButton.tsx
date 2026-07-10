@@ -24,19 +24,15 @@ export default function LogoutButton() {
   };
 
   const handleLogout = async () => {
+    setIsLoggingOut(true);
     try {
-      setIsLoggingOut(true);
-      // เปลี่ยนไปใช้ signOut แบบไม่มี redirect: false ถ้าอยากคุมการนำทางเอง
-      // แต่การตั้งค่าตามนี้ถือว่ามาตรฐานที่สุดครับ
-      await signOut({ 
-        callbackUrl: '/login',
-        redirect: true 
-      });
+        // signOut แบบ redirect: true จะแจ้งให้เซิร์ฟเวอร์ลบเซสชันและลบคุกกี้ที่เกี่ยวข้องออกให้
+        await signOut({ callbackUrl: '/login', redirect: true });
     } catch (error) {
-      console.error("Logout failed:", error);
-      setIsLoggingOut(false);
+        console.error("Logout failed:", error);
+        setIsLoggingOut(false);
     }
-  };
+    };
 
   return (
     <button 

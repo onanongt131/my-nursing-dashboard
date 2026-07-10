@@ -2,27 +2,45 @@
 
 import { useState } from 'react';
 import { signOut } from 'next-auth/react';
-import { LogOut, Loader2 } from 'lucide-react'; // เพิ่มไอคอน Loading
+import { LogOut, Loader2 } from 'lucide-react';
 
 export default function LogoutButton() {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
+  // 1. นำฟังก์ชันล้างคุกกี้มาวางไว้ตรงนี้
+  const clearAuthCookies = () => {
+    const cookies = document.cookie.split(";");
+    for (let i = 0; i < cookies.length; i++) {
+      const cookie = cookies[i];
+      const eqPos = cookie.indexOf("=");
+      const name = eqPos > -1 ? cookie.substr(0, eqPos).trim() : cookie.trim();
+      
+      // ลบคุกกี้ Auth ทั้งหมด
+      if (name.includes("authjs.session-token") || name.includes("next-auth.session-token") || name.startsWith("__Secure-")) {
+        document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;domain=" + window.location.hostname;
+        document.cookie = name + "=;expires=Thu, 01 Jan 1970 00:00:00 GMT;path=/;";
+      }
+    }
+  };
+
   const handleLogout = async () => {
     try {
       setIsLoggingOut(true);
-      // การใช้ redirect: true คือมาตรฐานเพื่อให้ระบบพาไปที่หน้า callbackUrl ทันที
+      // เปลี่ยนไปใช้ signOut แบบไม่มี redirect: false ถ้าอยากคุมการนำทางเอง
+      // แต่การตั้งค่าตามนี้ถือว่ามาตรฐานที่สุดครับ
       await signOut({ 
         callbackUrl: '/login',
         redirect: true 
       });
     } catch (error) {
       console.error("Logout failed:", error);
-      setIsLoggingOut(false); // ปิดสถานะโหลดถ้าเกิด Error
+      setIsLoggingOut(false);
     }
   };
 
   return (
     <button 
+      type="button" // เพิ่ม type เพื่อความปลอดภัย
       onClick={handleLogout}
       disabled={isLoggingOut}
       className={`flex items-center gap-2 px-4 py-2 text-sm rounded-lg transition-all
@@ -33,11 +51,13 @@ export default function LogoutButton() {
     >
       {isLoggingOut ? (
         <>
-          <Loader2 className="w-4 h-4 animate-spin" /> กำลังออก...
+          <Loader2 className="w-4 h-4 animate-spin" /> 
+          <span className="hidden sm:inline">กำลังออก...</span>
         </>
       ) : (
         <>
-          <LogOut className="w-4 h-4" /> ออกจากระบบ
+          <LogOut className="w-4 h-4" /> 
+          <span className="hidden sm:inline">ออกจากระบบ</span>
         </>
       )}
     </button>

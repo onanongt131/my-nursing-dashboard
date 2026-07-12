@@ -1,9 +1,14 @@
-// ในไฟล์ middleware.ts เท่านั้น (ตัวที่อยู่ชั้นนอกสุดของโปรเจกต์)
+// ในไฟล์ src/middleware.ts
+import { auth } from "@/auth";
+import { NextResponse } from "next/server";
 
-// 1. ดึงโมดูลตรวจสอบสิทธิ์สำเร็จรูปจากไฟล์ auth.ts ที่เราย้ายตรรกะเช็คสิทธิ์ไปคุมไว้แล้ว
-export { auth as default } from "@/auth";
+// 1. เขียนฟังก์ชัน middleware แบบมาตรฐานที่ Next.js บังคับตรวจเช็ค
+export default auth((req) => {
+  // ระบบจะใช้เงื่อนไขตรวจสอบจาก callbacks.authorized ใน auth.ts อัตโนมัติ
+  return NextResponse.next();
+});
 
-// 2. กำหนดจุดตรวจค้น: บังคับให้ Middleware สแกนสิทธิ์เฉพาะหน้าล็อกอินและหน้าแดชบอร์ดระบบ KPI ทั้งหมด
+// 2. ล็อกเป้าหมายตรวจเช็คเฉพาะหน้า Login และหน้าระบบหลังบ้าน
 export const config = {
   matcher: ["/dashboard/:path*", "/login"],
 };

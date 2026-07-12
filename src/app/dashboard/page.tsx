@@ -1,8 +1,8 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react'; // ต้องมี useMemo ในนี้
 import { supabase } from '@/lib/supabaseClient'; 
 import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts';
-import { CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { CheckCircle, XCircle, Loader2, ArrowLeft, LayoutDashboard } from 'lucide-react'; // ต้องมี ArrowLeft, LayoutDashboard ในนี้
 import Link from 'next/link';
 
 // นิยามประเภทข้อมูล (TypeScript Types) เพื่อป้องกันโค้ดเอ๋อ
@@ -28,6 +28,7 @@ export default function DashboardPage() {
   const [groupKpis, setGroupKpis] = useState<Kpi[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState('part1');
 
   const categories = [
     { id: '1', name: 'หมวด 1 ผลลัพธ์ด้านการนำองค์กร', icon: '🏛️' },
@@ -39,119 +40,76 @@ export default function DashboardPage() {
   ];
 
   // ปรับปรุง: คัดลอก Array ก่อน Sort ป้องกันข้อมูลจริงรวน
-  const getCategoryProgress = (catName: string) => {
-    const kpisInCategory = groupKpis.filter(k => k.category === catName);
-    const total = kpisInCategory.length;
-    
-    const passed = kpisInCategory.filter(kpi => {
-      if (!kpi.kpi_entries || kpi.kpi_entries.length === 0) return false;
+  // คำนวณ Stats ให้สะอาดด้วย useMemo
+  const stats = useMemo(() => {
+    const passed = groupKpis.filter(kpi => {
+      if (!kpi.kpi_entries?.length) return false;
       const latest = [...kpi.kpi_entries].sort((a, b) => b.year - a.year)[0];
       return latest && latest.value >= (kpi.target_value || 0);
     }).length;
-    
-    const percent = total > 0 ? (passed / total) * 100 : 0;
-    return { total, passed, percent };
-  };
+
+    return {
+      total: groupKpis.length,
+      passed,
+      failed: groupKpis.length - passed,
+      percent: groupKpis.length > 0 ? Math.round((passed / groupKpis.length) * 100) : 0
+    };
+  }, [groupKpis]);
 
   useEffect(() => {
     async function fetchData() {
-      if (!supabase) {
-        console.error("Supabase client is not initialized.");
-        setLoading(false);
-        return;
-      }
-
       setLoading(true);
-      try {
-        const { data: allKpis } = await supabase.from('kpis').select('*, kpi_entries(*)');
-        const { data: depts } = await supabase.from('departments').select('*');
-        
-        if (allKpis) setGroupKpis(allKpis.filter((k: any) => k.departments_id === null));
-        if (depts) setDepartments(depts);
-      } catch (error) {
-        console.error("Error fetching data:", error);
-      } finally {
-        setLoading(false);
-      }
+      const { data: allKpis } = await supabase.from('kpis').select('*, kpi_entries(*)');
+      const { data: depts } = await supabase.from('departments').select('*');
+      if (allKpis) setGroupKpis(allKpis.filter((k: any) => k.departments_id === null));
+      if (depts) setDepartments(depts);
+      setLoading(false);
     }
     fetchData();
   }, []);
 
-  // คำนวณ Pass/Fail รวม (แก้ไขให้ปลอดภัยขึ้น)
-  const passedCount = groupKpis.filter(kpi => {
-    if (!kpi.kpi_entries || kpi.kpi_entries.length === 0) return false;
-    const latest = [...kpi.kpi_entries].sort((a, b) => b.year - a.year)[0];
-    return latest && latest.value >= (kpi.target_value || 0);
-  }).length;
-
-  const failedCount = groupKpis.length - passedCount;
-  const passPercent = groupKpis.length > 0 ? Math.round((passedCount / groupKpis.length) * 100) : 0;
-
-  // ข้อมูลสำหรับกราฟครึ่งวงกลม ดักกรณีที่ไม่มีข้อมูลเพื่อไม่ให้ Recharts บั๊ก
-  const chartData = groupKpis.length > 0 
-    ? [{ value: passedCount }, { value: failedCount }]
-    : [{ value: 0 }, { value: 1 }]; // ถ้าไม่มีข้อมูล ให้แสดงสัดส่วนว่างเปล่าไว้ก่อน
-
-  // เพิ่มด่านตรวจสถานะ Loading หน้าเว็บจะดูโปรขึ้นมากครับ
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50">
-        <Loader2 className="w-12 h-12 text-purple-600 animate-spin mb-4" />
-        <p className="text-gray-600 font-medium">กำลังโหลดข้อมูลระบบ Dashboard...</p>
-      </div>
-    );
-  }
+  if (loading) return (
+    <div className="flex flex-col items-center justify-center min-h-screen">
+      <Loader2 className="w-12 h-12 text-purple-600 animate-spin" />
+    </div>
+  );
 
   return (
     <main className="p-4 md:p-8 bg-gray-50 min-h-screen">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">กลุ่มภารกิจด้านการพยาบาล</h1>
-        <p className="text-gray-500 mt-1">ผลการติดตามตัวชี้วัดภาพรวม ({groupKpis.length} ตัวชี้วัด)</p>
+      {/* Header & Tab Navigation */}
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between border-b pb-4 mb-6 gap-4">
+        <div>
+          <button className="flex items-center text-xs text-gray-500 hover:text-gray-700 font-medium mb-1">
+            <ArrowLeft className="w-4 h-4 mr-1" /> กลับหน้าหลัก
+          </button>
+          <h1 className="text-2xl font-bold text-gray-800">กลุ่มภารกิจด้านการพยาบาล</h1>
+          <p className="text-sm text-gray-500">ผลการติดตามตัวชี้วัดภาพรวม ({stats.total} ตัวชี้วัด)</p>
+        </div>
+
+        <div className="flex bg-white p-1 rounded-xl border shadow-sm">
+          <button 
+            onClick={() => setActiveTab('part1')} 
+            className={`px-4 py-2 text-xs font-bold rounded-lg flex items-center space-x-1.5 ${activeTab === 'part1' ? 'bg-purple-600 text-white' : 'text-gray-600'}`}
+          >
+            <LayoutDashboard className="w-3.5 h-3.5" />
+            <span>ส่วนที่ 1: Dashboard ภาพรวม</span>
+          </button>
+        </div>
       </div>
  
-      {/* ส่วนหัว 3 กล่อง (ปรับขนาด font บนมือถือไม่ให้ล้นกล่อง) */}
+      {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-white p-6 rounded-2xl shadow-sm border text-center flex flex-col justify-center">
+        <div className="bg-white p-6 rounded-2xl shadow-sm border text-center">
           <p className="text-gray-500 font-medium mb-2">KPI ทั้งหมด</p>
-          <p className="text-6xl md:text-7xl font-bold text-purple-600">{groupKpis.length}</p>
+          <p className="text-6xl font-bold text-purple-600">{stats.total}</p>
         </div>
-
         <div className="bg-white p-6 rounded-2xl shadow-sm border flex items-center justify-around">
-          <div className="flex items-center gap-2">
-            <CheckCircle className="text-green-500 w-8 h-8 md:w-10 md:h-10" />
-            <span className="text-5xl md:text-6xl font-bold text-green-500">{passedCount}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <XCircle className="text-red-500 w-8 h-8 md:w-10 md:h-10" />
-            <span className="text-5xl md:text-6xl font-bold text-red-500">{failedCount}</span>
-          </div>
+          <div className="flex items-center gap-2"><CheckCircle className="text-green-500 w-8 h-8" /><span className="text-5xl font-bold text-green-500">{stats.passed}</span></div>
+          <div className="flex items-center gap-2"><XCircle className="text-red-500 w-8 h-8" /><span className="text-5xl font-bold text-red-500">{stats.failed}</span></div>
         </div>
-
-        <div className="bg-white p-6 rounded-2xl shadow-sm border flex flex-col items-center justify-center min-h-[160px]">
+        <div className="bg-white p-6 rounded-2xl shadow-sm border flex flex-col items-center justify-center">
           <p className="text-gray-500 text-sm mb-1">สัดส่วนการผ่านเกณฑ์</p>
-          <div className="h-28 w-full relative">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <Pie 
-                  data={chartData} 
-                  startAngle={180} 
-                  endAngle={0} 
-                  innerRadius={50} 
-                  outerRadius={80} 
-                  paddingAngle={3} 
-                  dataKey="value"
-                  cx="50%" 
-                  cy="100%"
-                >
-                  <Cell fill="#22c55e" />
-                  <Cell fill="#ef4444" />
-                </Pie>
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="absolute bottom-0 inset-x-0 flex items-center justify-center">
-              <span className="text-2xl md:text-3xl font-bold text-gray-800">{passPercent}%</span>
-            </div>
-          </div>
+          <span className="text-3xl font-bold text-gray-800">{stats.percent}%</span>
         </div>
       </div>
  

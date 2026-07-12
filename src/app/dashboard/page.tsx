@@ -31,108 +31,174 @@ export default function DashboardPage() {
   const [groupKpis, setGroupKpis] = useState<Kpi[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null); 
 
-  // ใช้ useMemo เพื่อคำนวณข้อมูลเพียงครั้งเดียวเมื่อ groupKpis เปลี่ยน
-  const stats = useMemo(() => {
-    const passed = groupKpis.filter(kpi => {
-      if (!kpi.kpi_entries?.length) return false;
+  const categories = [
+    { id: '1', name: 'หมวด 1 ผลลัพธ์ด้านการนำองค์กร', icon: '🏛️' },
+    { id: '2', name: 'หมวด 2 ผลลัพธ์ด้านกลยุทธ์', icon: '🎯' },
+    { id: '3', name: 'หมวด 3 ผลลัพธ์ด้านผู้ใช้บริการ', icon: '👥' },
+    { id: '4', name: 'หมวด 4 ผลลัพธ์ด้านการวัดวิเคราะห์ฯ', icon: '📊' },
+    { id: '5', name: 'หมวด 5 ผลลัพธ์ด้านบุคลากร', icon: '👥' },
+    { id: '6', name: 'หมวด 6 ผลลัพธ์ด้านการปฏิบัติการพยาบาล', icon: '📋' },
+  ];
+
+  // ปรับปรุง: คัดลอก Array ก่อน Sort ป้องกันข้อมูลจริงรวน
+  const getCategoryProgress = (catName: string) => {
+    const kpisInCategory = groupKpis.filter(k => k.category === catName);
+    const total = kpisInCategory.length;
+    
+    const passed = kpisInCategory.filter(kpi => {
+      if (!kpi.kpi_entries || kpi.kpi_entries.length === 0) return false;
       const latest = [...kpi.kpi_entries].sort((a, b) => b.year - a.year)[0];
       return latest && latest.value >= (kpi.target_value || 0);
     }).length;
     
-    return {
-      passed,
-      failed: groupKpis.length - passed,
-      percent: groupKpis.length > 0 ? Math.round((passed / groupKpis.length) * 100) : 0
-    };
-  }, [groupKpis]);
+    const percent = total > 0 ? (passed / total) * 100 : 0;
+    return { total, passed, percent };
+  };
 
   useEffect(() => {
     async function fetchData() {
+      if (!supabase) {
+        console.error("Supabase client is not initialized.");
+        setLoading(false);
+        return;
+      }
+
+      setLoading(true);
       try {
-        setLoading(true);
-        setError(null);
-
-        // 1. ดึงข้อมูลจากฐานข้อมูล Supabase (ตอนนี้เรียกตัวแปร supabase ด้านบนได้แล้ว ไม่พังแน่นอน)
-        const { data: allKpis, error: kpiError } = await supabase
-          .from('kpis')
-          .select('*, kpi_entries(*)');
-
-        if (kpiError) {
-          throw new Error(kpiError.message);
-        }
-
-        // 2. นำข้อมูลที่ได้ไปอัปเดตลงใน State
-        setGroupKpis(allKpis || []);
-
-      } catch (err: any) {
-        console.error("Dashboard fetch error:", err);
-        setError(err?.message || "ไม่สามารถเชื่อมต่อฐานข้อมูล KPI ได้");
+        const { data: allKpis } = await supabase.from('kpis').select('*, kpi_entries(*)');
+        const { data: depts } = await supabase.from('departments').select('*');
+        
+        if (allKpis) setGroupKpis(allKpis.filter((k: any) => k.departments_id === null));
+        if (depts) setDepartments(depts);
+      } catch (error) {
+        console.error("Error fetching data:", error);
       } finally {
         setLoading(false);
       }
     }
-
     fetchData();
   }, []);
 
+  // คำนวณ Pass/Fail รวม (แก้ไขให้ปลอดภัยขึ้น)
+  const passedCount = groupKpis.filter(kpi => {
+    if (!kpi.kpi_entries || kpi.kpi_entries.length === 0) return false;
+    const latest = [...kpi.kpi_entries].sort((a, b) => b.year - a.year)[0];
+    return latest && latest.value >= (kpi.target_value || 0);
+  }).length;
+
+  const failedCount = groupKpis.length - passedCount;
+  const passPercent = groupKpis.length > 0 ? Math.round((passedCount / groupKpis.length) * 100) : 0;
+
+  // ข้อมูลสำหรับกราฟครึ่งวงกลม ดักกรณีที่ไม่มีข้อมูลเพื่อไม่ให้ Recharts บั๊ก
+  const chartData = groupKpis.length > 0 
+    ? [{ value: passedCount }, { value: failedCount }]
+    : [{ value: 0 }, { value: 1 }]; // ถ้าไม่มีข้อมูล ให้แสดงสัดส่วนว่างเปล่าไว้ก่อน
+
+  // เพิ่มด่านตรวจสถานะ Loading หน้าเว็บจะดูโปรขึ้นมากครับ
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[50vh] bg-gray-50">
+      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50">
         <Loader2 className="w-12 h-12 text-purple-600 animate-spin mb-4" />
         <p className="text-gray-600 font-medium">กำลังโหลดข้อมูลระบบ Dashboard...</p>
       </div>
     );
   }
 
-  if (error) return <div className="p-8 text-red-600 font-bold bg-red-50 rounded-xl border border-red-200">{error}</div>; 
-
   return (
-    <div className="space-y-6">
-      {/* 📊 บล็อกแสดงผลสถิติส่วนบน (KPI Cards Summaries) */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <div className="bg-white p-6 rounded-2xl border shadow-sm flex items-center space-x-4">
-          <div className="p-3 bg-green-50 rounded-xl text-green-600"><CheckCircle /></div>
-          <div>
-            <p className="text-sm font-medium text-gray-500">KPI ที่ผ่านเกณฑ์</p>
-            <h3 className="text-2xl font-bold text-gray-800">{stats.passed} รายการ</h3>
+    <main className="p-4 md:p-8 bg-gray-50 min-h-screen">
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-gray-800">กลุ่มภารกิจด้านการพยาบาล</h1>
+        <p className="text-gray-500 mt-1">ผลการติดตามตัวชี้วัดภาพรวม ({groupKpis.length} ตัวชี้วัด)</p>
+      </div>
+ 
+      {/* ส่วนหัว 3 กล่อง (ปรับขนาด font บนมือถือไม่ให้ล้นกล่อง) */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        <div className="bg-white p-6 rounded-2xl shadow-sm border text-center flex flex-col justify-center">
+          <p className="text-gray-500 font-medium mb-2">KPI ทั้งหมด</p>
+          <p className="text-6xl md:text-7xl font-bold text-purple-600">{groupKpis.length}</p>
+        </div>
+
+        <div className="bg-white p-6 rounded-2xl shadow-sm border flex items-center justify-around">
+          <div className="flex items-center gap-2">
+            <CheckCircle className="text-green-500 w-8 h-8 md:w-10 md:h-10" />
+            <span className="text-5xl md:text-6xl font-bold text-green-500">{passedCount}</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <XCircle className="text-red-500 w-8 h-8 md:w-10 md:h-10" />
+            <span className="text-5xl md:text-6xl font-bold text-red-500">{failedCount}</span>
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-2xl border shadow-sm flex items-center space-x-4">
-          <div className="p-3 bg-red-50 rounded-xl text-red-600"><XCircle /></div>
-          <div>
-            <p className="text-sm font-medium text-gray-500">KPI ที่ไม่ผ่านเกณฑ์</p>
-            <h3 className="text-2xl font-bold text-gray-800">{stats.failed} รายการ</h3>
-          </div>
-        </div>
-
-        <div className="bg-white p-6 rounded-2xl border shadow-sm flex items-center space-x-4">
-          <div className="p-3 bg-purple-50 rounded-xl text-purple-600">📊</div>
-          <div>
-            <p className="text-sm font-medium text-gray-500">คิดเป็นเปอร์เซ็นต์</p>
-            <h3 className="text-2xl font-bold text-purple-600">{stats.percent}%</h3>
+        <div className="bg-white p-6 rounded-2xl shadow-sm border flex flex-col items-center justify-center min-h-[160px]">
+          <p className="text-gray-500 text-sm mb-1">สัดส่วนการผ่านเกณฑ์</p>
+          <div className="h-28 w-full relative">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie 
+                  data={chartData} 
+                  startAngle={180} 
+                  endAngle={0} 
+                  innerRadius={50} 
+                  outerRadius={80} 
+                  paddingAngle={3} 
+                  dataKey="value"
+                  cx="50%" 
+                  cy="100%"
+                >
+                  <Cell fill="#22c55e" />
+                  <Cell fill="#ef4444" />
+                </Pie>
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="absolute bottom-0 inset-x-0 flex items-center justify-center">
+              <span className="text-2xl md:text-3xl font-bold text-gray-800">{passPercent}%</span>
+            </div>
           </div>
         </div>
       </div>
-
-      {/* 🏛️ ตารางแสดงข้อมูลตัวชี้วัดของกลุ่มภารกิจด้านการพยาบาล */}
-      <div className="bg-white p-6 rounded-2xl border shadow-sm">
-        <h2 className="text-lg font-bold text-gray-800 mb-4">รายการตัวชี้วัดทั้งหมด (KPI List)</h2>
-        {groupKpis.length === 0 ? (
-          <p className="text-gray-500 text-sm">ยังไม่มีข้อมูลตัวชี้วัดในระบบฐานข้อมูล</p>
-        ) : (
-          <div className="divide-y text-sm">
-            {groupKpis.map((kpi: any) => (
-              <div key={kpi.id} className="py-3 flex justify-between items-center">
-                <span className="font-medium text-gray-700">{kpi.name || `รหัสตัวชี้วัด ${kpi.id}`}</span>
-                <span className="text-gray-500">เป้าหมาย: <strong className="text-gray-800">{kpi.target_value}</strong></span>
+ 
+      {/* ส่วนแยกหมวดหมู่ */}
+      <h2 className="text-xl font-bold mb-4 text-gray-800">แยกตามหมวดหมู่</h2>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        {categories.map((cat) => {
+          const { total, passed, percent } = getCategoryProgress(cat.name);
+          return (
+            <Link href={`/kpi/${cat.id}`} key={cat.id} className="block">
+              <div className="bg-white p-6 rounded-2xl border shadow-sm hover:shadow-md transition duration-200 cursor-pointer h-full">
+                <div className="flex items-start gap-3 mb-2">
+                  <span className="text-3xl mt-1">{cat.icon}</span>
+                  <h3 className="font-semibold text-gray-800 leading-snug">{cat.name}</h3>
+                </div>
+                <p className="text-xs text-gray-400 mb-4">(มี {total} ตัวชี้วัด)</p>
+                
+                <div className="flex justify-between text-xs mb-1.5">
+                  <span className="text-gray-500">ผลลัพธ์การดำเนินงาน</span>
+                  <span className="font-bold text-gray-700">{passed} / {total}</span>
+                </div>
+                
+                <div className="w-full bg-gray-100 h-2 rounded-full overflow-hidden flex">
+                  <div className="bg-green-500 h-full transition-all duration-500" style={{ width: `${percent}%` }}></div>
+                  <div className="bg-red-500 h-full transition-all duration-500" style={{ width: `${total > 0 ? 100 - percent : 0}%` }}></div>
+                </div>
               </div>
-            ))}
-          </div>
-        )}
+            </Link>
+          );
+        })}
       </div>
-    </div>
+ 
+      {/* ส่วนแยกตามหน่วยงาน */}
+      <h2 className="text-xl font-bold mb-4 text-gray-800">แยกตามหน่วยงาน</h2>
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+        {departments.map((dept) => (
+          <Link href={`/departments/${dept.id}`} key={dept.id} className="block">
+            <div className="bg-white p-5 rounded-2xl border shadow-sm hover:shadow-md transition duration-200 cursor-pointer h-full flex flex-col justify-between">
+              <h3 className="font-semibold text-gray-800 mb-2">{dept.Department}</h3>
+              <p className="text-xs text-purple-600 font-medium">คลิกเพื่อดูรายงานเฉพาะหน่วยงาน →</p>
+            </div>
+          </Link>
+        ))}
+      </div>
+    </main>
   );
 }

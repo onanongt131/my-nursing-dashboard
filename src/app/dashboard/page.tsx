@@ -28,22 +28,37 @@ export default function DashboardPage() {
   }, [groupKpis]);
 
   // ใน src/app/dashboard/page.tsx
-    useEffect(() => {
-      async function fetchData() {
-        // 1. เพิ่มการเช็คเพื่อป้องกัน Error ตอน Prerendering
-        if (typeof window === 'undefined') return; 
+      // ใน src/app/dashboard/page.tsx - เวอร์ชันแก้ไขปัญหาค้างหน้า Loading
+  useEffect(() => {
+    async function fetchData() {
+      try {
+        setLoading(true);
+        setError(null);
 
-        try {
-          setLoading(true);
-          // ... โค้ดดึงข้อมูล Supabase เดิมของคุณ
-          const { data: allKpis, error: kpiError } = await supabase.from('kpis').select('*, kpi_entries(*)');
-          // ...
-        } catch (err) {
-          // ...
+        // 1. ดึงข้อมูลจากฐานข้อมูล Supabase
+        const { data: allKpis, error: kpiError } = await supabase
+          .from('kpis')
+          .select('*, kpi_entries(*)');
+
+        if (kpiError) {
+          throw new Error(kpiError.message);
         }
+
+        // 2. นำข้อมูลที่ได้ไปอัปเดตลงใน State เพื่อส่งต่อให้ stats (useMemo) คำนวณ
+        setGroupKpis(allKpis || []);
+
+      } catch (err: any) {
+        console.error("Dashboard fetch error:", err);
+        setError(err?.message || "ไม่สามารถเชื่อมต่อฐานข้อมูล KPI ได้");
+      } finally {
+        // 3. จุดสำคัญ: ปิดสถานะการโหลด ไม่ว่าจะดึงสำเร็จหรือพัง เพื่อให้หน้าจอแสดงเนื้อหาหลัก
+        setLoading(false);
       }
-      fetchData();
-    }, []);
+    }
+
+    fetchData();
+  }, []);
+
 
       // ถ้าติด Loading ให้แสดงตัวนี้แทนการเรียก LoadingComponent
       if (loading) {

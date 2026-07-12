@@ -27,6 +27,7 @@ export async function registerUser(prevState: any, formData: FormData) {
 }
 
 // 2. ฟังก์ชันเข้าสู่ระบบ (Login)
+// 2. ฟังก์ชันเข้าสู่ระบบ (Login) - เวอร์ชันแก้ไขเพื่อป้องกันอาการค้าง
 export async function authenticate(prevState: any, formData: FormData) {
   try {
     await signIn("credentials", {
@@ -38,6 +39,16 @@ export async function authenticate(prevState: any, formData: FormData) {
     if (error instanceof AuthError) {
       return "ชื่อผู้ใช้งานหรือรหัสผ่านไม่ถูกต้อง";
     }
-    throw error;
+    
+    // 🔥 จุดสำคัญ: เช็คว่าถ้าเป็นคำสั่งดีดหน้า (Redirect) ให้ปล่อยผ่านไปเลย ห้าม throw error
+    if (error instanceof Error && error.message === 'NEXT_REDIRECT') {
+      throw error;
+    }
+    if ((error as any)?.NEXT_REDIRECT) {
+      throw error;
+    }
+
+    // หากเป็นข้อผิดพลาดอื่นๆ ค่อยส่งข้อความเตือน
+    return "เกิดข้อผิดพลาดในการเชื่อมต่อระบบ";
   }
 }

@@ -21,15 +21,18 @@ export async function middleware(request: NextRequest) {
     secret: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET
   });
 
-  // 3. ถ้าเข้าหน้า dashboard แต่ไม่มี Token ให้ดีดไปหน้า /login
-  if (pathname.startsWith("/dashboard") && !token) {
-    return NextResponse.redirect(new URL("/login", request.url));
+    // 3. ป้องกันหน้า dashboard: ถ้าพยายามเข้าหน้าระบบแต่ไม่มี Token ให้ส่งไปหน้า /login
+  if (pathname.startsWith("/dashboard")) {
+    if (!token) {
+      return NextResponse.redirect(new URL("/login", request.url));
+    }
   }
 
-  // 4. ถ้าล็อกอินแล้ว แต่ยังอยู่ที่หน้า login ให้ส่งไปที่ dashboard
-  if (pathname === "/login" && token) {
+  // 4. ป้องกันหน้า login: ถ้าเข้าหน้าล็อกอินแต่ระบบพบว่ามี Token อยู่แล้ว ให้ส่งไปที่หน้า dashboard ทันที
+  if (pathname.startsWith("/login") && token) {
     return NextResponse.redirect(new URL("/dashboard", request.url));
   }
+
 
   return NextResponse.next();
 }

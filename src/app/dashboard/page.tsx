@@ -26,10 +26,13 @@ interface Kpi {
   kpi_entries?: KpiEntry[];
 }
 
+// เปลี่ยนโครงสร้างให้ตรงกับหัวตารางใน Supabase จริง
 interface Department {
-  id: string;
-  department_name: string;
+  id: number;          // เปลี่ยนจาก string เป็น number เพราะในรูป id เป็น Int8 (ตัวเลข)
+  Department: string;  // เปลี่ยนจาก department_name เป็น Department (D ตัวใหญ่ตามรูป)
+  code: string;        // เพิ่มคอลัมน์ code เข้ามาเผื่อนำไปอ้างอิงสิทธิ์
 }
+
 
 interface UserProfile {
   id: string;
@@ -139,7 +142,11 @@ export default function DashboardPage() {
 
   if (error) return <div className="p-8 text-red-600 font-bold bg-red-50 border rounded-xl">{error}</div>;
 
-  const myDepartmentName = departments.find(d => d.id === userProfile?.department_id)?.department_name || 'ไม่ระบุหน่วยงาน';
+  // เปลี่ยนไปดึงค่าจากคอลัมน์ .Department แทนของเดิม
+const myDepartmentName = (departments && departments.length > 0 && userProfile?.department_id)
+  ? (departments.find(d => String(d.id) === String(userProfile.department_id))?.Department || 'ไม่ระบุหน่วยงาน')
+  : 'กำลังโหลดข้อมูลหน่วยงาน...';
+
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto p-4">

@@ -16,31 +16,42 @@ export default function AddEntryForm({ kpiId, type, onSuccess }: { kpiId: string
   const [isSaving, setIsSaving] = useState(false);
 
   const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSaving(true);
-    
-    let finalValue = formData.value;
-    if (type === 'percent' && formData.numerator && formData.denominator) {
-      finalValue = ((parseFloat(formData.numerator) / parseFloat(formData.denominator)) * 100).toFixed(2);
-    }
-
-    try {
-      await submitEntry(kpiId, { 
-        ...formData, 
-        value: finalValue,
-        numerator: type === 'percent' ? parseFloat(formData.numerator) : null,
-        denominator: type === 'percent' ? parseFloat(formData.denominator) : null
-      });
-      onSuccess();
-      setIsOpen(false);
-      // รีเซ็ตฟอร์มหลังจากบันทึกสำเร็จ
-      setFormData({ year: new Date().getFullYear().toString(), month: 'Jan', numerator: '', denominator: '', value: '' });
-    } catch (error) {
-      alert('เกิดข้อผิดพลาดในการบันทึกข้อมูล');
-    } finally {
-      setIsSaving(false);
-    }
+  e.preventDefault();
+  setIsSaving(true);
+  
+  // เตรียมข้อมูล
+  const payload: any = { 
+    kpi_id: kpiId,
+    year: parseInt(formData.year),
+    month: formData.month,
   };
+
+  if (type === 'percent') {
+    const num = parseFloat(formData.numerator);
+    const den = parseFloat(formData.denominator);
+    payload.value = den !== 0 ? ((num / den) * 100).toFixed(2) : '0';
+    payload.numerator = num;     // ส่งค่าตัวเลข
+    payload.denominator = den;   // ส่งค่าตัวเลข
+  } else {
+    payload.value = parseFloat(formData.value) || 0;
+    // ไม่ต้องระบุ numerator และ denominator ใน payload 
+    // หรือระบุเป็น null ให้ชัดเจน
+    payload.numerator = null;    
+    payload.denominator = null;
+  }
+
+  try {
+    await submitEntry(kpiId, payload); // ส่ง payload ที่จัดรูปมาแล้ว
+    onSuccess();
+    setIsOpen(false);
+    setFormData({ year: new Date().getFullYear().toString(), month: 'Jan', numerator: '', denominator: '', value: '' });
+  } catch (error) {
+    console.error(error);
+    alert('เกิดข้อผิดพลาดในการบันทึกข้อมูล');
+  } finally {
+    setIsSaving(false);
+  }
+};
 
   return (
     <div className="mt-4 border-t pt-4">

@@ -1,44 +1,15 @@
-import { saveKpiEntry } from '../lib/kpiService';
+import { saveKpiEntry } from '../lib/kpiService'; // ตรวจสอบ Path ให้ถูกต้องตามโครงสร้างโปรเจกต์ของคุณ
 
 export const useKpiSubmission = () => {
-  const submitEntry = async (type: string, formData: any) => {
+  const submitEntry = async (kpiId: string, formData: any) => { // ปรับรับค่าเป็น formData
     try {
-      let payload;
-
-      // จัดเตรียมข้อมูลพื้นฐานให้ครบถ้วนตาม Schema ตาราง kpi_entries[cite: 1]
-      const baseData = {
-        kpi_id: formData.kpi_id,
-        year: parseInt(formData.year),
-        month: formData.month,
-      };
-
-      if (type === 'count') {
-        payload = { 
-          ...baseData, 
-          value: Number(formData.value), 
-          numerator: null, 
-          denominator: null 
-        };
-      } else {
-        // เพิ่มการตรวจสอบค่าป้องกันหารด้วยศูนย์
-        const num = Number(formData.numerator);
-        const den = Number(formData.denominator);
-        const calculatedValue = den !== 0 ? (num / den) * 100 : 0;
-
-        payload = { 
-          ...baseData, 
-          value: parseFloat(calculatedValue.toFixed(2)), // เก็บค่าทศนิยม 2 ตำแหน่ง
-          numerator: num, 
-          denominator: den 
-        };
-      }
-
-      return await saveKpiEntry(payload);
+      // ไม่ต้องประกาศ payload ข้างนอกแล้ว เพราะเราส่งมาให้ครบจาก AddEntryForm แล้ว
+      // ให้ส่ง formData ไปยัง saveKpiEntry ตรงๆ ได้เลย
+      return await saveKpiEntry(formData);
     } catch (error) {
       console.error("Error submitting KPI:", error);
-      throw error; // ส่งต่อ error ให้ Component จัดการ (เช่น แสดง Alert)
+      throw error;
     }
   };
-
   return { submitEntry };
 };

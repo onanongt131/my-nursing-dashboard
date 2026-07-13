@@ -27,8 +27,6 @@ export async function registerUser(prevState: any, formData: FormData) {
   return "สมัครสมาชิกสำเร็จ";
 }
 
-// 2. ฟังก์ชันเข้าสู่ระบบ (Login)
-// 2. ฟังก์ชันเข้าสู่ระบบ (Login) - เวอร์ชันแก้ไขเพื่อป้องกันอาการค้าง
 export async function authenticate(prevState: any, formData: FormData) {
   try {
     await signIn("credentials", {

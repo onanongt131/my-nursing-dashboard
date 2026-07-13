@@ -53,42 +53,46 @@ export default function DashboardPage() {
 
   return (
     <main className="p-4 md:p-8 bg-gray-50 min-h-screen">
-      <header className="bg-white border p-6 rounded-2xl shadow-sm mb-8">
-  {/* ปรับให้ flex เป็น row เดียวกันทั้งหมด และใช้ items-center เพื่อให้ทุกอย่างจัดกึ่งกลางในแนวตั้ง */}
-  <div className="flex justify-between items-center gap-4">
-    
-    {/* 1. ชื่อระบบ */}
-    <h2 className="font-black text-xl text-gray-800 whitespace-nowrap">Dashboard พยาบาล</h2>
+      <header className="bg-white border p-4 sm:p-6 rounded-2xl shadow-sm mb-8">
+        {/* ปรับเป็น flex-col บนมือถือ และ flex-row บนหน้าจอขนาด md ขึ้นไป */}
+        <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+          
+          {/* 1. ชื่อระบบ */}
+          <h2 className="font-black text-xl text-gray-800 whitespace-nowrap w-full md:w-auto text-center md:text-left">
+            Dashboard พยาบาล
+          </h2>
 
-    {/* 2. ปุ่มเมนู (Tabs) */}
-    <nav className="bg-gray-100 p-1 rounded-xl flex border w-full max-w-sm" aria-label="Tabs">
-      {[
-        { id: 'dashboard', name: 'ภาพรวม' },
-        { id: 'category', name: 'แยกรายหมวด' },
-        { id: 'department', name: 'แยกหน่วยงาน' }
-      ].map((tab) => (
-        <button
-          key={tab.id}
-          onClick={() => {
-            setActiveTab(tab.id);
-            setSelectedCategory(null);
-            setSelectedKpi(null);
-          }}
-          className={`flex-1 px-4 py-2 rounded-lg font-bold text-sm transition-all duration-200 ${
-            activeTab === tab.id 
-              ? 'bg-purple-600 text-white shadow-md' 
-              : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
-          }`}
-        >
-          {tab.name}
-        </button>
-      ))}
-    </nav>
+          {/* 2. ปุ่มเมนู (Tabs) - ปรับให้ย่อได้บนมือถือ */}
+          <nav className="bg-gray-100 p-1 rounded-xl flex border w-full max-w-sm" aria-label="Tabs">
+            {[
+              { id: 'dashboard', name: 'ภาพรวม' },
+              { id: 'category', name: 'แยกรายหมวด' },
+              { id: 'department', name: 'แยกหน่วยงาน' }
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => {
+                  setActiveTab(tab.id);
+                  setSelectedCategory(null);
+                  setSelectedKpi(null);
+                }}
+                className={`flex-1 px-3 py-2 rounded-lg font-bold text-xs sm:text-sm transition-all duration-200 truncate ${
+                  activeTab === tab.id 
+                    ? 'bg-purple-600 text-white shadow-md' 
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-200'
+                }`}
+              >
+                {tab.name}
+              </button>
+            ))}
+          </nav>
 
-    {/* 3. ปุ่มออกจากระบบ */}
-    <LogoutButton />
-  </div>
-</header>
+          {/* 3. ปุ่มออกจากระบบ - ซ่อนบนมือถือ หรือทำให้อยู่ในมุมที่เหมาะสม */}
+          <div className="hidden md:block">
+            <LogoutButton />
+          </div>
+        </div>
+      </header>
 
       {/* เนื้อหาหลักตาม Tab */}
       {activeTab === 'dashboard' && (

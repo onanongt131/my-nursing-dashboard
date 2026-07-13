@@ -1,7 +1,7 @@
 'use client';
 
 import { useActionState } from 'react';
-import { authenticate } from './actions'; 
+import { authenticate } from './actions';
 
 export default function LoginPage() {
   const [errorMessage, action, isPending] = useActionState(authenticate, undefined);

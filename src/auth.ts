@@ -4,6 +4,8 @@ import { authConfig } from "./auth.config";
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 
+console.log("Check Service Role Key:", process.env.SUPABASE_SERVICE_ROLE_KEY); // เพิ่มบรรทัด
+
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!

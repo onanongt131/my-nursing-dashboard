@@ -10,5 +10,8 @@ export default auth((req) => {
 
 // 2. ล็อกเป้าหมายตรวจเช็คเฉพาะหน้า Login และหน้าระบบหลังบ้าน
 export const config = {
-  matcher: ["/dashboard/:path*", "/login"],
-};
+  matcher: [
+    // ยกเว้น route ของ api auth
+    '/((?!api|_next/static|_next/image|favicon.ico|login).*)',
+  ],
+}

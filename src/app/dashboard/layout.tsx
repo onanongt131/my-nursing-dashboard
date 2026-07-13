@@ -1,23 +1,15 @@
-import { auth } from "@/auth"; // นำเข้า auth จาก config
+import { auth } from "@/auth";
 import { redirect } from "next/navigation";
-import LogoutButton from "@/components/LogoutButton"; // สร้างไฟล์แยก
-import Link from 'next/link';
+import DashboardWrapper from "@/components/DashboardWrapper";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
-
-  // เช็คก่อนส่งหน้าจอให้ User
-  if (!session) {
-    redirect("/login");
-  }
+  if (!session) redirect("/login");
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <header className="...">
-        <Link href="/dashboard">Dashboard</Link>
-        <LogoutButton /> {/* ย้ายโค้ด signOut มาใส่ที่นี่แทน */}
-      </header>
-      <main className="p-6">{children}</main>
+    <div className="min-h-screen bg-gray-50 p-6">
+      {/* ส่ง children ไปที่ Wrapper เพื่อจัดการ State ของ Tabs */}
+      <DashboardWrapper>{children}</DashboardWrapper>
     </div>
   );
 }

@@ -4,6 +4,7 @@ import { signIn } from "@/auth";
 import { createClient } from "@supabase/supabase-js";
 import bcrypt from "bcryptjs";
 import { AuthError } from "next-auth";
+import { signOut as serverSignOut } from "@/auth";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -51,4 +52,7 @@ export async function authenticate(prevState: any, formData: FormData) {
     // หากเป็นข้อผิดพลาดอื่นๆ ค่อยส่งข้อความเตือน
     return "เกิดข้อผิดพลาดในการเชื่อมต่อระบบ";
   }
+}
+export async function handleSignOut() {
+  await serverSignOut({ redirectTo: "/login" });
 }

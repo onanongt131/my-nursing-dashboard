@@ -146,9 +146,9 @@ export default function DashboardPage() {
         <table className="w-full text-left">
           <thead>
             <tr className="text-gray-500 border-b">
-              <th className="p-3">ชื่อตัวชี้วัด</th>
+              <th className="p-3">ตัวชี้วัด</th>
               <th className="p-3">เป้าหมาย</th>
-              <th className="p-3">ผลการดำเนินงาน</th>
+              <th className="p-3">ผลงาน</th>
               <th className="p-3">สถานะ</th>
               <th className="p-3">จัดการ</th>
             </tr>

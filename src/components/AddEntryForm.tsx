@@ -11,42 +11,46 @@ export default function AddEntryForm({ kpiId, type, onSuccess }: { kpiId: string
     denominator: '',
     value: ''
   });
-  
+ 
   const { submitEntry } = useKpiSubmission();
   const [isSaving, setIsSaving] = useState(false);
 
-  const handleSave = async (e: React.FormEvent) => { // ระบุชนิดข้อมูลให้ e
+  const handleSave = async (e: React.FormEvent) => {
   e.preventDefault();
   
-  // 2. ป้องกัน Error หารด้วยศูนย์
+  // 1. คำนวณค่า value และเตรียมข้อมูล
   let finalValue = 0;
+  let numerator = null;
+  let denominator = null;
+
   if (type === 'percent') {
-    const num = Number(formData.numerator);
-    const den = Number(formData.denominator);
-    finalValue = den !== 0 ? (num / den) * 100 : 0; 
+    numerator = Number(formData.numerator);
+    denominator = Number(formData.denominator);
+    finalValue = denominator !== 0 ? (numerator / denominator) * 100 : 0;
   } else {
-    finalValue = Number(formData.value);
+    // กรณี count: ให้ตัวตั้งคือค่าที่ระบุ และไม่มีตัวหาร (หรือเป็น 1)
+    numerator = Number(formData.value);
+    finalValue = numerator;
   }
   
-  // 3. เตรียม payload ให้ตรงกับโครงสร้างที่ฐานข้อมูลต้องการ
+  // 2. เตรียม payload ให้ตรงกับคอลัมน์ที่คุณมีใน DB
   const payload = {
     kpi_id: kpiId,
     year: Number(formData.year),
     month: formData.month,
-    value: finalValue,
-    // ส่งข้อมูลดิบไปด้วยกรณีต้องตรวจสอบย้อนหลัง
-    raw_data: type === 'percent' ? { num: formData.numerator, den: formData.denominator } : null 
+    value: finalValue,        // สำหรับแสดงกราฟ
+    numerator: numerator,     // เก็บค่าตัวตั้งจริง
+    denominator: denominator, // เก็บค่าตัวหารจริง
+    type: type                // ส่ง type ไปด้วยเพื่อระบุประเภท
   };
 
   try {
     setIsSaving(true);
-    
-    // ปรับตรงนี้: ส่ง kpiId และ formData (หรือ payload ตามที่คุณต้องการส่ง)
-    // ให้ดูว่า saveKpiEntry ต้องการข้อมูลชุดไหน
     await submitEntry(kpiId, payload); 
-    
     onSuccess(); 
     setIsOpen(false);
+    // รีเซ็ตฟอร์ม (แนะนำให้ทำ)
+    setFormData({ year: new Date().getFullYear().toString(), month: 'Jan', numerator: '', denominator: '', value: '' });
   } catch (error) {
     console.error("Error saving KPI:", error);
     alert("เกิดข้อผิดพลาดในการบันทึกข้อมูล");
@@ -129,7 +133,7 @@ export default function AddEntryForm({ kpiId, type, onSuccess }: { kpiId: string
           <button 
             type="button" 
             onClick={() => setIsOpen(false)}
-            className="px-4 py-2 text-sm text-gray-150 bg-gray-300 rounded-lg hover:bg-gray-400 transition-colors"
+            className="px-4 py-2 text-sm text-gray-600 bg-gray-200 rounded-lg hover:bg-gray-300 transition-colors"
           >
             ยกเลิก
           </button>

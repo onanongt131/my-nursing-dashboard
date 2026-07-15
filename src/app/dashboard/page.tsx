@@ -460,7 +460,8 @@ const getYearlyTrend = (entries: any[], currentYear: number = 2569) => {
                                   ? "bg-green-50 text-green-700" // ผ่าน: พื้นหลังเขียวอ่อน ไม่มีขอบ
                                   : "bg-red-50 text-red-700"       // ไม่ผ่าน: พื้นหลังแดงอ่อน ไม่มีขอบ
                               }`}>
-                                {avgValue}
+                                {/* จำกัดทศนิยมแค่ 2 ตำแหน่ง */}
+                                {Number.isInteger(Number(avgValue)) ? Number(avgValue) : Number(avgValue).toFixed(2)}
                               </span>
                               ) : (
                                 <span className="text-gray-400 text-xs">ไม่มีข้อมูล</span>

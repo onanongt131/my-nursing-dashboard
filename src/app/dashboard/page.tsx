@@ -20,6 +20,7 @@ export default function DashboardPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingKpi, setEditingKpi] = useState<any>(null);
   const [isAdding, setIsAdding] = useState(false);
+  const [selectedDisease, setSelectedDisease] = useState("ทั้งหมด"); // เพิ่ม state นี้
 
 const categories = [
     { id: '1', name: 'หมวด 1 ผลลัพธ์ด้านการนำองค์กร', icon: '🏛️' },
@@ -31,12 +32,56 @@ const categories = [
   ];
 
   const strategicGoals = [
-    { id: '1', name: 'Service Excellence', year_range: '2565-2569' },
-    { id: '2', name: 'Medical and Wellness Tourism Model', year_range: '2565-2569' },
-    { id: '3', name: 'PP&P Excellence', year_range: '2565-2569' },
-    { id: '4', name: 'Personnel Excellence', year_range: '2565-2569' },
-    { id: '5', name: 'Governance excellence', year_range: '2565-2569' },
-  ];
+  { 
+    id: '1', 
+    name: 'Service Excellence', 
+    description: 'พัฒนาระบบบริการพยาบาลให้เป็นเลิศในการดูแลผู้ป่วยกลุ่มโรคสำคัญ', 
+    year_range: '2565-2569' 
+  },
+  { 
+    id: '2', 
+    name: 'Medical and Wellness Tourism Model', 
+    description: 'พัฒนาแอปพลิเคชั่นในการดูแลสุขภาพ : ไม่ป่วยเริ่มต้นที่ตัวคุณเอง', 
+    year_range: '2565-2569' 
+  },
+  { 
+    id: '3', 
+    name: 'PP&P Excellence', 
+    description: 'พัฒนาคุณภาพบริการพยาบาลเฉพาะทางกลุ่มโรค NCD โรคอุบัติใหม่-อุบัติซ้ำ และจิตเวช', 
+    year_range: '2565-2569' 
+  },
+  { 
+    id: '4', 
+    name: 'Personnel Excellence', 
+    description: 'พัฒนาสถาบันการวิจัย ผลิต และพัฒนาบุคลากรทางการแพทย์ การสาธารณสุข และการบริหารจัดการระดับนานาชาติ', 
+    year_range: '2565-2569' 
+  },
+  { 
+    id: '5', 
+    name: 'Governance excellence', 
+    description: 'พัฒนาองค์กรสมรรถนะสูงระดับนานาชาติ', 
+    year_range: '2565-2569' 
+  },
+];
+
+const diseaseList = [
+  "ทั้งหมด",
+  "Stroke",
+  "STEMI",
+  "Sepsis",
+  "PIH",
+  "PPH",
+  "TBI",
+  "Obesity",
+  "Spinal fusion",
+  "Multiple trauma",
+  "Chemotherapy",
+  "Preterm",
+  "Pneumonia",
+  "Cervix Cancer",
+  "Senile cataract",
+  "HBOT"
+];
 
   // 1. ประกาศฟังก์ชัน fetchData ให้เป็นฟังก์ชันหลักของ Component
     const fetchData = async () => {
@@ -198,8 +243,8 @@ const getTrendIcon = (data: any[]) => {
                   <th className="p-4 text-gray-600 font-bold">ตัวชี้วัด (KPI)</th>
                   <th className="p-4 text-center text-gray-600 font-bold">Goal</th>
                   {[2565, 2566, 2567, 2568, 2569].map(y => <th key={y} className="p-4 text-center text-gray-600 font-bold">{y}</th>)}
-                  <th className="p-4 text-center text-gray-600">TREND</th>
-                  <th className="p-4 text-center text-gray-600 font-bold">จัดการ</th>
+                  <th className="p-4 text-center text-gray-600">Trend</th>
+                  <th className="p-4 text-center text-gray-600 font-bold">Add</th>
                 </tr>
               </thead>
               <tbody>
@@ -208,7 +253,9 @@ const getTrendIcon = (data: any[]) => {
                   return (
                     <tr key={kpi.id} className="border-b hover:bg-gray-50 text-sm">
                       <td className="p-4 text-gray-800">{kpi.name}</td>
-                      <td className="p-4 text-center font-bold">{kpi.target_value}</td>
+                      <td className="p-4 text-center font-bold text-gray-700 whitespace-nowrap">
+                        {kpi.operator} {kpi.target_value}
+                      </td>
                       {[2565, 2566, 2567, 2568, 2569].map((year) => {
                         const entry = kpi.kpi_entries?.find((e: any) => e.year === year);
                         return (
@@ -270,84 +317,104 @@ const getTrendIcon = (data: any[]) => {
   <div className="space-y-6 animate-in fade-in duration-500">
     {/* 1. แถบเลือกยุทธศาสตร์ */}
     <div className="flex flex-wrap items-center gap-3 mb-6">
-  {strategicGoals
-    .filter((goal) => !goal.name.includes("หมวด"))
-    .map((goal) => (
-      <button
-        key={goal.id}
-        onClick={() => {
-          setSelectedStrategic(goal.id);
-          setSelectedKpi(null);
-        }}
-        className={`px-4 py-2 rounded-lg border text-sm font-bold transition-all whitespace-nowrap ${
-          selectedStrategic === goal.id
-            ? "bg-purple-600 text-white border-purple-600 shadow-md"
-            : "bg-white text-gray-600 border-gray-200 hover:border-purple-400 hover:bg-gray-50"
-        }`}
-      >
-        {goal.name}
-      </button>
-    ))}
-</div>
+      {strategicGoals.filter((goal) => !goal.name.includes("หมวด")).map((goal) => (
+        <button
+          key={goal.id}
+          onClick={() => {
+            setSelectedStrategic(goal.id);
+            setSelectedKpi(null);
+            setSelectedDisease("ทั้งหมด"); // รีเซ็ตทุกครั้งที่เปลี่ยนยุทธศาสตร์
+          }}
+          className={`px-4 py-2 rounded-lg border text-sm font-bold transition-all ${
+            selectedStrategic === goal.id ? "bg-purple-600 text-white" : "bg-white"
+          }`}
+        >
+          {goal.name}
+        </button>
+      ))}
+    </div>
 
     {/* 2. การแสดงผลเนื้อหาหลัก */}
-    {!selectedStrategic ? (
-      <div className="p-12 text-center text-gray-400 bg-white rounded-2xl border">
-        กรุณาเลือกยุทธศาสตร์ที่ต้องการดูข้อมูล
-      </div>
-    ) : !selectedKpi ? (
-      /* 2.1 หน้าตาราง KPI */
-      <div className="bg-white p-6 rounded-2xl border shadow-sm">
-        <h3 className="text-lg font-bold text-gray-800 mb-4">
-          ตัวชี้วัด: {strategicGoals.find((g: any) => g.id === selectedStrategic)?.name}
-        </h3>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="border-b bg-gray-50 text-sm">
-                <th className="p-4 text-gray-600 font-bold">ตัวชี้วัด (KPI)</th>
-                <th className="p-4 text-center text-gray-600 font-bold">เป้าหมาย</th>
-                {[2565, 2566, 2567, 2568, 2569].map((y) => (
-                  <th key={y} className="p-4 text-center text-gray-600 font-bold">{y}</th>
-                ))}
-                <th className="p-4 text-center text-gray-600 font-bold">แนวโน้ม</th>
-                <th className="p-4 text-center text-gray-600 font-bold">จัดการ</th>
-              </tr>
-            </thead>
-            <tbody>
-              {groupKpis
-                .filter((kpi: any) => kpi.strategic_id === selectedStrategic)
-                .map((kpi: any) => {
-                  const sortedEntries = [...(kpi.kpi_entries || [])].sort((a, b) => a.year - b.year);
-                  return (
-                    <tr key={kpi.id} className="border-b hover:bg-gray-50 text-sm">
-                      <td className="p-4 text-gray-800">{kpi.name}</td>
-                      <td className="p-4 text-center font-bold">{kpi.target_value}</td>
-                      {[2565, 2566, 2567, 2568, 2569].map((year) => {
-                        const entry = kpi.kpi_entries?.find((e: any) => e.year === year);
-                        return (
-                          <td key={year} className="p-4 text-center">
-                            {entry ? (
-                              <span className={`px-2 py-1 rounded-md font-bold ${entry.value >= kpi.target_value ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
-                                {entry.value}
-                              </span>
-                            ) : <span className="text-gray-300">-</span>}
+    {selectedStrategic && !selectedKpi && (
+      <div className="space-y-6">
+    {/* 1. กล่องแสดงกลยุทธ์ (ใช้ฟิลด์ description ที่เราเพิ่มเข้าไป) */}
+    <div className="bg-purple-50 p-4 rounded-xl border border-purple-100">
+      <p className="text-purple-800 font-bold">
+        กลยุทธ์ : {strategicGoals.find((g) => g.id === selectedStrategic)?.description || "ไม่ระบุ"}
+      </p>
+    </div>
+
+        {strategicGoals.find((g) => g.id === selectedStrategic)?.name === "Service Excellence" && (
+          <div className="flex flex-wrap gap-2">
+            {diseaseList.map((disease) => (
+              <button
+                key={disease}
+                onClick={() => setSelectedDisease(disease)}
+                className={`px-3 py-1 text-xs rounded-full border transition-all ${
+                  selectedDisease === disease 
+                    ? "bg-blue-600 text-white border-blue-600" 
+                    : "bg-white text-gray-600 hover:border-purple-400"
+                }`}
+              >
+                {disease}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* ตาราง KPI */}
+        <div className="bg-white p-6 rounded-2xl border shadow-sm">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="border-b bg-gray-50 text-sm">
+                  {selectedDisease === "ทั้งหมด" && <th className="p-4 text-gray-600 font-bold">โรค</th>}
+                  <th className="p-4 text-gray-600 font-bold">ตัวชี้วัด (KPI)</th>
+                  <th className="p-4 text-center text-gray-600 font-bold">Goal</th>
+                  {[2565, 2566, 2567, 2568, 2569].map((y) => <th key={y} className="p-4 text-center text-gray-600 font-bold">{y}</th>)}
+                  <th className="p-4 text-center text-gray-600 font-bold">Trend</th>
+                  <th className="p-4 text-center text-gray-600 font-bold">Add</th>
+                </tr>
+              </thead>
+              <tbody>
+                {groupKpis
+                  .filter((kpi: any) => 
+                    kpi.strategic_id === selectedStrategic && 
+                    (selectedDisease === "ทั้งหมด" || kpi.disease_name === selectedDisease)
+                  )
+                  .map((kpi: any) => {
+                    const sortedEntries = [...(kpi.kpi_entries || [])].sort((a, b) => a.year - b.year);
+                    return (
+                      <tr key={kpi.id} className="border-b hover:bg-gray-50 text-sm">
+                        {selectedDisease === "ทั้งหมด" && <td className="p-4 text-gray-600">{kpi.disease_name || "-"}</td>}
+                        <td className="p-4 text-gray-800">{kpi.name}</td>
+                        <td className="p-4 text-center font-bold text-gray-700 whitespace-nowrap">
+                            {kpi.operator} {kpi.target_value}
                           </td>
-                        );
-                      })}
-                      <td className="p-4 text-center">{getTrendIcon(sortedEntries)}</td>
-                      <td className="p-4 text-center">
-                        <button onClick={() => setSelectedKpi(kpi)} className="bg-purple-600 text-white px-4 py-1 rounded-lg hover:bg-purple-700">เพิ่ม</button>
-                      </td>
-                    </tr>
-                  );
-                })}
-            </tbody>
-          </table>
+                        {[2565, 2566, 2567, 2568, 2569].map((year) => {
+                          const entry = kpi.kpi_entries?.find((e: any) => e.year === year);
+                          return (
+                            <td key={year} className="p-4 text-center">
+                              {entry ? <span className={`px-2 py-1 rounded-md font-bold ${entry.value >= kpi.target_value ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>{entry.value}</span> : <span className="text-gray-300">-</span>}
+                            </td>
+                          );
+                        })}
+                        <td className="p-4 text-center">{getTrendIcon(sortedEntries)}</td>
+                        <td className="p-4 text-center">
+                          <button onClick={() => setSelectedKpi(kpi)} className="bg-purple-600 text-white px-4 py-1 rounded-lg hover:bg-purple-700">เพิ่ม</button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
-    ) : (
-      /* 2.2 หน้ากราฟและฟอร์ม */
+    )}
+
+    {/* 2.2 หน้ากราฟและฟอร์ม (เมื่อมีการเลือก KPI) */}
+    {selectedKpi && (
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         <div className="bg-white p-6 rounded-2xl border">
           <button onClick={() => setSelectedKpi(null)} className="mb-4 text-purple-600 font-bold flex items-center">← ย้อนกลับ</button>
@@ -368,6 +435,7 @@ const getTrendIcon = (data: any[]) => {
     )}
   </div>
 )} 
+
         {activeTab === 'department' && (
           <div className="space-y-8">
             <div className="mb-8">

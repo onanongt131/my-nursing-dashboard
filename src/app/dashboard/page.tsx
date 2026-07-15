@@ -269,26 +269,26 @@ const getTrendIcon = (data: any[]) => {
 {activeTab === 'strategic' && (
   <div className="space-y-6 animate-in fade-in duration-500">
     {/* 1. แถบเลือกยุทธศาสตร์ */}
-    <div className="flex flex-wrap gap-2">
-      {strategicGoals
-        .filter((goal) => !goal.name.includes("หมวด"))
-        .map((goal) => (
-          <button
-            key={goal.id}
-            onClick={() => {
-              setSelectedStrategic(goal.id);
-              setSelectedKpi(null); // รีเซ็ต KPI เมื่อเปลี่ยนยุทธศาสตร์
-            }}
-            className={`px-4 py-2 rounded-lg font-bold transition-all ${
-              selectedStrategic === goal.id
-                ? "bg-purple-600 text-white shadow-md"
-                : "bg-white border text-gray-600 hover:bg-gray-50"
-            }`}
-          >
-            {goal.name}
-          </button>
-        ))}
-    </div>
+    <div className="flex flex-wrap items-center gap-3 mb-6">
+  {strategicGoals
+    .filter((goal) => !goal.name.includes("หมวด"))
+    .map((goal) => (
+      <button
+        key={goal.id}
+        onClick={() => {
+          setSelectedStrategic(goal.id);
+          setSelectedKpi(null);
+        }}
+        className={`px-4 py-2 rounded-lg border text-sm font-bold transition-all whitespace-nowrap ${
+          selectedStrategic === goal.id
+            ? "bg-purple-600 text-white border-purple-600 shadow-md"
+            : "bg-white text-gray-600 border-gray-200 hover:border-purple-400 hover:bg-gray-50"
+        }`}
+      >
+        {goal.name}
+      </button>
+    ))}
+</div>
 
     {/* 2. การแสดงผลเนื้อหาหลัก */}
     {!selectedStrategic ? (

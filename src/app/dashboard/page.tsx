@@ -19,8 +19,9 @@ export default function DashboardPage() {
   const [selectedStrategic, setSelectedStrategic] = useState<string | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingKpi, setEditingKpi] = useState<any>(null);
-  
-  const categories = [
+  const [isAdding, setIsAdding] = useState(false);
+
+const categories = [
     { id: '1', name: 'หมวด 1 ผลลัพธ์ด้านการนำองค์กร', icon: '🏛️' },
     { id: '2', name: 'หมวด 2 ผลลัพธ์ด้านกลยุทธ์', icon: '🎯' },
     { id: '3', name: 'หมวด 3 ผลลัพธ์ด้านผู้ใช้บริการ', icon: '👥' },
@@ -71,11 +72,47 @@ export default function DashboardPage() {
   // 3. เช็ค Loading
   if (loading) return <main className="p-8 text-center text-gray-500">กำลังโหลดข้อมูล...</main>;
 
+  const handleSuccess = async () => {
+  console.log("บันทึกสำเร็จ!");
+  
+  // 1. เรียกฟังก์ชันดึงข้อมูลใหม่ (สมมติว่าคุณมีฟังก์ชัน fetchKpiData อยู่แล้ว)
+  await fetchData();
+  
+  // 2. ถ้าคุณเลือก KPI นั้นไว้แล้ว ให้ดึงข้อมูลล่าสุดของตัวนั้นมาแสดงใหม่
+  // หรือถ้าคุณใช้การ set state หลังจากดึงข้อมูลใหม่เสร็จ
+};
+
+const getTrendIcon = (data: any[]) => {
+  // 1. ตรวจสอบข้อมูล
+  if (!data || !Array.isArray(data)) return '-';
+
+  // 2. กรองเฉพาะข้อมูลที่มีค่า และเรียงลำดับตามปี (year) จากน้อยไปมาก
+  const validData = [...data]
+    .filter(d => d && (d.value !== null && d.value !== undefined))
+    .sort((a, b) => (a.year || 0) - (b.year || 0));
+  
+  // 3. ตรวจสอบว่ามีข้อมูลอย่างน้อย 2 ปี
+  if (validData.length < 2) return '-';
+  
+  // 4. ดึงข้อมูล 2 ปีล่าสุด
+  const latest = validData[validData.length - 1].value;
+  const previous = validData[validData.length - 2].value;
+
+  // 5. แสดงผล Trend
+  if (latest > previous) return <span className="text-green-500 font-bold text-2xl">▲</span>;
+  if (latest < previous) return <span className="text-red-500 font-bold">▼</span>;
+  
+  return (
+    <span className="text-blue-500 font-bold text-3xl" style={{ lineHeight: '1' }}>
+      ○
+    </span>
+  );
+};
   return (
     <main className="p-4 md:p-8 bg-gray-50 min-h-screen">
         <header className="bg-white border p-4 sm:p-6 rounded-2xl shadow-sm mb-8">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-            <h2 className="font-black text-lg md:text-xl text-gray-800">กลุ่มภารกิจด้านการพยาบาล</h2>
+            <h2 className="font-black text-lg md:text-xl text-gray-800">กลุ่มภารกิจด้านการพยาบาล โรงพยาบาลวชิระภูเก็ต</h2>
                   <nav className="bg-gray-100 p-1 rounded-xl flex border w-full max-w-3xl overflow-x-auto">
                     {[
                         { id: 'dashboard', name: 'ภาพรวม' },
@@ -96,9 +133,9 @@ export default function DashboardPage() {
                 </div>
               </header>
 
-              {/* Main Content Areas */}
-              {activeTab === 'dashboard' && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+                    {activeTab === 'dashboard' && (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in fade-in">
                   <div className="bg-white p-6 rounded-2xl shadow-sm border text-center">
                     <p className="text-gray-500">KPI ทั้งหมด</p>
                     <p className="text-6xl font-black text-purple-600">{stats.total}</p>
@@ -112,222 +149,225 @@ export default function DashboardPage() {
                       <p className="text-5xl font-black text-gray-800">{stats.percent}%</p>
                     </div>
                 </div>
-                )}
-
-        {activeTab === 'category' && (
-          <div className="animate-in fade-in space-y-6">
-            {!selectedCategory ? (
-              // 1. หน้าแสดง 6 หมวด
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {categories.map((cat) => {
-                  const filteredKpis = groupKpis.filter(k => k.category === cat.name);
-                  const totalInCat = filteredKpis.length;
-                  const passedInCat = filteredKpis.filter(k => {
-                    if (!k.kpi_entries?.length) return false;
-                    const latest = [...k.kpi_entries].sort((a: any, b: any) => b.year - a.year)[0];
-                    return latest && latest.value >= (k.target_value || 0);
-                  }).length;
-                  const progressPercent = totalInCat > 0 ? (passedInCat / totalInCat) * 100 : 0;
-
+              )}
+   
+    {activeTab === 'category' && (
+  <div className="space-y-6 animate-in fade-in duration-500">
+    
+    {/* LEVEL 1: หน้าเลือกหมวด (ถ้ายังไม่เลือกหมวด) */}
+    {!selectedCategory ? (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        {categories.map((cat) => {
+          const categoryKpis = groupKpis.filter((k) => k.category === cat.name);
+          const total = categoryKpis.length;
+          const passed = categoryKpis.filter((k) => {
+            const latest = [...(k.kpi_entries || [])].sort((a, b) => b.year - a.year)[0];
+            return latest && latest.value >= (k.target_value || 0);
+          }).length;
+          
+          return (
+            <div 
+              key={cat.id} 
+              onClick={() => setSelectedCategory(cat.name)} 
+              className="bg-white p-6 rounded-2xl border shadow-sm cursor-pointer hover:border-purple-500 hover:shadow-md transition-all"
+            >
+              <span className="text-3xl">{cat.icon}</span>
+              <h3 className="font-bold text-lg mt-2 text-gray-800">{cat.name}</h3>
+              <div className="mt-4 pt-4 border-t flex justify-between items-center">
+                <div><p className="text-xs text-gray-400 font-bold uppercase">ทั้งหมด</p><p className="text-xl font-black text-gray-700">{total}</p></div>
+                <div className="flex gap-4">
+                  <div className="text-center"><p className="text-xs text-green-500 font-bold">ผ่าน</p><p className="font-bold text-green-700">{passed}</p></div>
+                  <div className="text-center"><p className="text-xs text-red-500 font-bold">ไม่ผ่าน</p><p className="font-bold text-red-700">{total - passed}</p></div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    ) : !selectedKpi ? (
+      /* LEVEL 2: หน้าตาราง KPI รายหมวด */
+      <div className="space-y-6 animate-in slide-in-from-bottom-4">
+        <button onClick={() => setSelectedCategory(null)} className="text-purple-600 font-bold flex items-center gap-2">← กลับหน้าเลือกหมวด</button>
+        
+        <div className="bg-white p-6 rounded-2xl border shadow-sm">
+          <h2 className="text-xl font-bold mb-6 text-gray-800">ตัวชี้วัด: {selectedCategory}</h2>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="border-b bg-gray-50">
+                  <th className="p-4 text-gray-600 font-bold">ตัวชี้วัด (KPI)</th>
+                  <th className="p-4 text-center text-gray-600 font-bold">Goal</th>
+                  {[2565, 2566, 2567, 2568, 2569].map(y => <th key={y} className="p-4 text-center text-gray-600 font-bold">{y}</th>)}
+                  <th className="p-4 text-center text-gray-600">TREND</th>
+                  <th className="p-4 text-center text-gray-600 font-bold">จัดการ</th>
+                </tr>
+              </thead>
+              <tbody>
+                {groupKpis.filter((kpi) => kpi.category === selectedCategory).map((kpi: any) => {
+                  const sortedEntries = [...(kpi.kpi_entries || [])].sort((a, b) => a.year - b.year);
                   return (
-                    <div key={cat.id} onClick={() => setSelectedCategory(cat.name)}
-                      className="bg-white p-6 rounded-2xl border shadow-sm hover:border-purple-500 cursor-pointer transition-all">
-                      <div className="flex items-center gap-3 mb-4">
-                        <span className="text-2xl">{cat.icon}</span>
-                        <h3 className="font-bold text-gray-800">{cat.name}</h3>
-                      </div>
-                      <div className="flex justify-between items-center mb-4 text-sm text-gray-500">
-                        <span>มี {totalInCat} ตัวชี้วัด</span>
-                        <span className="font-bold text-gray-700">{passedInCat} / {totalInCat}</span>
-                      </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
-                        <div className={`h-2.5 rounded-full ${progressPercent === 100 ? 'bg-green-500' : 'bg-red-500'}`} style={{ width: `${progressPercent}%` }}></div>
-                      </div>
-                    </div>
+                    <tr key={kpi.id} className="border-b hover:bg-gray-50 text-sm">
+                      <td className="p-4 text-gray-800">{kpi.name}</td>
+                      <td className="p-4 text-center font-bold">{kpi.target_value}</td>
+                      {[2565, 2566, 2567, 2568, 2569].map((year) => {
+                        const entry = kpi.kpi_entries?.find((e: any) => e.year === year);
+                        return (
+                          <td key={year} className="p-4 text-center">
+                            {entry ? (
+                              <span className={`px-2 py-1 rounded-md font-bold ${entry.value >= kpi.target_value ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                {entry.value}
+                              </span>
+                            ) : <span className="text-gray-300">-</span>}
+                          </td>
+                        );
+                      })}
+                      <td className="p-4 text-center">{getTrendIcon(sortedEntries)}</td>
+                      <td className="p-4 text-center">
+                        <button onClick={() => setSelectedKpi(kpi)} className="bg-purple-600 text-white px-4 py-1 rounded-lg hover:bg-purple-700 transition-colors">เพิ่ม</button>
+                      </td>
+                    </tr>
                   );
                 })}
-              </div>
-              ) : !selectedKpi ? (
-              // 2. หน้าตาราง KPI
-              <div className="bg-white p-6 rounded-2xl border shadow-sm">
-                <button onClick={() => setSelectedCategory(null)} className="mb-4 text-sm text-purple-600 font-bold">← ย้อนกลับไปเลือกหมวด</button>
-                <table className="w-full text-left">
-                  <thead>
-                    <tr className="text-gray-500 border-b">
-                      <th className="p-3">ตัวชี้วัด</th>
-                      <th className="p-3">เป้าหมาย</th>
-                      <th className="p-3">ผลงาน</th>
-                      <th className="p-3">สถานะ</th>
-                      <th className="p-3">จัดการ</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {groupKpis.filter(k => k.category === selectedCategory).map(kpi => {
-                      const entries = kpi.kpi_entries || [];
-                      const latest = entries.length > 0 ? [...entries].sort((a: any, b: any) => b.year - a.year)[0] : null;
-                      const isPassed = latest && latest.value >= kpi.target_value;
-                      return (
-                        <tr key={kpi.id} className="border-b">
-                          <td className="p-3 font-medium">{kpi.name}</td>
-                          <td className="p-3">{kpi.target_value}</td>
-                          <td className="p-3">{latest ? latest.value : "-"}</td>
-                          <td className="p-3">
-                            <span className={`px-2 py-1 rounded-lg text-xs ${!latest ? 'bg-gray-100 text-gray-500' : isPassed ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                              {!latest ? 'รอข้อมูล' : isPassed ? 'ผ่าน' : 'ไม่ผ่าน'}
-                            </span>
-                          </td>
-                          <td className="p-3"><button onClick={() => setSelectedKpi(kpi)} className="text-purple-600 font-bold">เพิ่มข้อมูล</button></td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              // 3. หน้า Update กราฟ
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-in fade-in">
-                <div className="bg-white p-6 rounded-2xl border shadow-sm">
-                  <button onClick={() => setSelectedKpi(null)} className="mb-4 text-purple-600 font-bold">← ย้อนกลับไปตาราง</button>
-                  <h3 className="font-bold mb-4">ตัวชี้วัด: {selectedKpi.name}</h3>
-                  <div className="relative w-full h-64">
-                    <div className="absolute top-0 right-0 bg-red-50 border border-red-200 px-3 py-1 rounded-lg">
-                      <p className="text-red-600 text-sm font-bold">Target = {selectedKpi.target_value ?? 0}</p>
-                    </div>
-                    <ResponsiveContainer height="100%" width="100%">
-            <BarChart 
-              data={[...(selectedKpi.kpi_entries || [])].sort((a, b) => a.year - b.year)} 
-              margin={{ top: 20, right: 60, left: 0, bottom: 5 }}
-            >
-            <CartesianGrid stroke="#f3f4f6" strokeDasharray="3 3" vertical={false} />
-            <XAxis dataKey="year" tick={{ fontSize: 12 }} />
-            <YAxis tick={{ fontSize: 12 }} />
-            <Tooltip 
-              contentStyle={{ backgroundColor: '#f9fafb', borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)' }} 
-              cursor={{ fill: 'transparent' }} 
-            />
-            <ReferenceLine 
-              y={selectedKpi.target_value} 
-              label={{ value: 'Target', position: 'right', fill: '#ef4444', fontSize: 12, fontWeight: 'bold' }} 
-              stroke="#ef4444" 
-              strokeDasharray="4 4" 
-              strokeWidth={2} 
-            />
-            <Bar 
-              dataKey="value" 
-              fill="#9333ea" 
-              radius={[6, 6, 0, 0]} 
-              barSize={40} 
-            />
-            </BarChart>
-            </ResponsiveContainer>
-                  </div>
-                </div>
-                <div className="bg-white p-6 rounded-2xl border shadow-sm">
-                  <h3 className="font-bold mb-4">UPDATE KPI</h3>
-                  <AddEntryForm 
-                    kpiId={selectedKpi.id} 
-                    onSuccess={() => alert('อัปเดตข้อมูลสำเร็จ')} 
-                    type={selectedKpi.Type} 
-                  />
-                </div>
-              </div>
-            )}
+              </tbody>
+            </table>
           </div>
-        )}
+        </div>
+      </div>
+    ) : (
+      /* LEVEL 3: หน้ากราฟและฟอร์มเพิ่มข้อมูล */
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 animate-in fade-in">
+        <div className="bg-white p-6 rounded-2xl border">
+          <button onClick={() => setSelectedKpi(null)} className="mb-4 text-purple-600 font-bold flex items-center">← ย้อนกลับ</button>
+          <h3 className="font-bold mb-4 text-lg">ตัวชี้วัด: {selectedKpi.name}</h3>
+          <ResponsiveContainer height={250} width="100%">
+            <BarChart data={[...(selectedKpi.kpi_entries || [])].sort((a, b) => a.year - b.year)}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="year" />
+              <YAxis />
+              <Tooltip />
+              <Bar dataKey="value" fill="#8884d8" />
+              <ReferenceLine y={selectedKpi.target_value} stroke="red" strokeDasharray="4 4" />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+        <div className="bg-white p-6 rounded-2xl border">
+          <h3 className="font-bold mb-4 text-lg">บันทึกผลการดำเนินงาน</h3>
+          <AddEntryForm 
+            kpiId={selectedKpi.id} 
+            type={selectedKpi.Type} 
+            onSuccess={() => { 
+              setSelectedKpi(null); 
+              fetchData(); // ดึงข้อมูลใหม่หลังอัปเดต
+            }} 
+          />
+        </div>
+      </div>
+    )}
+  </div>
+)}
 
-              {activeTab === 'strategic' && (
-              <div className="space-y-6">
-                  {/* กล่องเลือก Strategic */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                    {strategicGoals.map((goal) => (
-                      <button
-                        key={goal.id}
-                        onClick={() => setSelectedStrategic(goal.id)}
-                        className={`
-                          p-6 rounded-2xl border-2 transition-all duration-300 ease-in-out
-                          flex items-center justify-center text-center font-medium
-                          ${selectedStrategic === goal.id 
-                            ? 'border-purple-600 bg-purple-50 text-purple-700 shadow-md ring-2 ring-purple-100' 
-                            : 'border-gray-200 bg-white text-gray-700 hover:border-gray-300 hover:shadow-sm hover:bg-gray-50'
-                          }
-                        `}
-                      >
-                        {goal.name}
-                      </button>
-                    ))}
-                  </div>
+{activeTab === 'strategic' && (
+  <div className="space-y-6 animate-in fade-in duration-500">
+    {/* 1. แถบเลือกยุทธศาสตร์ */}
+    <div className="flex flex-wrap gap-2">
+      {strategicGoals
+        .filter((goal) => !goal.name.includes("หมวด"))
+        .map((goal) => (
+          <button
+            key={goal.id}
+            onClick={() => {
+              setSelectedStrategic(goal.id);
+              setSelectedKpi(null); // รีเซ็ต KPI เมื่อเปลี่ยนยุทธศาสตร์
+            }}
+            className={`px-4 py-2 rounded-lg font-bold transition-all ${
+              selectedStrategic === goal.id
+                ? "bg-purple-600 text-white shadow-md"
+                : "bg-white border text-gray-600 hover:bg-gray-50"
+            }`}
+          >
+            {goal.name}
+          </button>
+        ))}
+    </div>
 
-                {selectedStrategic && (
-                    <div className="mt-8 bg-white p-6 rounded-2xl border shadow-sm animate-in fade-in duration-500">
-                      <h3 className="text-lg font-bold text-gray-800 mb-4">
-                        ตัวชี้วัด: {strategicGoals.find((g: any) => g.id === selectedStrategic)?.name}
-                      </h3>
-                      
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-left border-collapse">
-                          {/* ส่วนหัวตาราง (8 คอลัมน์) */}
-                          <thead>
-                            <tr className="border-b bg-gray-50 text-sm">
-                              <th className="p-4 text-gray-600 font-bold">ตัวชี้วัด (KPI)</th>
-                              <th className="p-4 text-center text-gray-600 font-bold">ค่าเป้าหมาย</th>
-                              <th className="p-4 text-center text-gray-600 font-bold">2565</th>
-                              <th className="p-4 text-center text-gray-600 font-bold">2566</th>
-                              <th className="p-4 text-center text-gray-600 font-bold">2567</th>
-                              <th className="p-4 text-center text-gray-600 font-bold">2568</th>
-                              <th className="p-4 text-center text-gray-600 font-bold">2569</th>
-                              <th className="p-4 text-center text-gray-600 font-bold">เพิ่มข้อมูล</th>
-                            </tr>
-                          </thead>
-
-                          {/* ส่วนเนื้อหาตาราง */}
-                          <tbody>
-                            {groupKpis
-                              .filter((kpi: any) => kpi.strategic_id === selectedStrategic)
-                              .map((kpi: any) => (
-                                <tr key={kpi.id} className="border-b hover:bg-gray-50 text-sm">
-                                  <td className="p-4 text-gray-800">{kpi.name}</td>
-                                  <td className="p-4 text-center font-bold">{kpi.target_value}</td>
-                                  
-                                  {/* วนลูปแสดงค่าปี 2565-2569 (ต้องมี 5 ช่องพอดี) */}
-                                  {[2565, 2566, 2567, 2568, 2569].map((year) => {
-                                    const entry = kpi.kpi_entries?.find((e: any) => e.year === year);
-                                    return (
-                                      <td key={year} className="p-4 text-center">
-                                        {entry ? (
-                                          <span className={`px-3 py-1 rounded-full text-xs font-bold ${
-                                            entry.value >= kpi.target_value ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'
-                                          }`}>
-                                            {entry.value}
-                                          </span>
-                                        ) : (
-                                          <span className="text-gray-300">-</span>
-                                        )}
-                                      </td>
-                                    );
-                                  })}
-
-                                  {/* ช่องจัดการ (อยู่คอลัมน์สุดท้าย) */}
-                                  <td className="p-4 text-center">
-                                    <button 
-                                      onClick={() => {
-                                        setSelectedKpi(kpi); // ต้องมีบรรทัดนี้ เพื่อให้ Modal รู้ว่ากำลังบันทึกตัวไหน
-                                        setIsModalOpen(true); // เปิด Modal
-                                      }}
-                                      className="bg-purple-100 text-purple-600 px-4 py-2 rounded-xl text-xs font-bold hover:bg-purple-200 transition-all"
-                                    >
-                                      + บันทึก
-                                    </button>
-                                  </td>
-                                </tr>
-                              ))}
-                          </tbody>
-                        </table>
-                      </div>
-                </div>
-              )}
-            </div>
-          )}
-
+    {/* 2. การแสดงผลเนื้อหาหลัก */}
+    {!selectedStrategic ? (
+      <div className="p-12 text-center text-gray-400 bg-white rounded-2xl border">
+        กรุณาเลือกยุทธศาสตร์ที่ต้องการดูข้อมูล
+      </div>
+    ) : !selectedKpi ? (
+      /* 2.1 หน้าตาราง KPI */
+      <div className="bg-white p-6 rounded-2xl border shadow-sm">
+        <h3 className="text-lg font-bold text-gray-800 mb-4">
+          ตัวชี้วัด: {strategicGoals.find((g: any) => g.id === selectedStrategic)?.name}
+        </h3>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="border-b bg-gray-50 text-sm">
+                <th className="p-4 text-gray-600 font-bold">ตัวชี้วัด (KPI)</th>
+                <th className="p-4 text-center text-gray-600 font-bold">เป้าหมาย</th>
+                {[2565, 2566, 2567, 2568, 2569].map((y) => (
+                  <th key={y} className="p-4 text-center text-gray-600 font-bold">{y}</th>
+                ))}
+                <th className="p-4 text-center text-gray-600 font-bold">แนวโน้ม</th>
+                <th className="p-4 text-center text-gray-600 font-bold">จัดการ</th>
+              </tr>
+            </thead>
+            <tbody>
+              {groupKpis
+                .filter((kpi: any) => kpi.strategic_id === selectedStrategic)
+                .map((kpi: any) => {
+                  const sortedEntries = [...(kpi.kpi_entries || [])].sort((a, b) => a.year - b.year);
+                  return (
+                    <tr key={kpi.id} className="border-b hover:bg-gray-50 text-sm">
+                      <td className="p-4 text-gray-800">{kpi.name}</td>
+                      <td className="p-4 text-center font-bold">{kpi.target_value}</td>
+                      {[2565, 2566, 2567, 2568, 2569].map((year) => {
+                        const entry = kpi.kpi_entries?.find((e: any) => e.year === year);
+                        return (
+                          <td key={year} className="p-4 text-center">
+                            {entry ? (
+                              <span className={`px-2 py-1 rounded-md font-bold ${entry.value >= kpi.target_value ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}>
+                                {entry.value}
+                              </span>
+                            ) : <span className="text-gray-300">-</span>}
+                          </td>
+                        );
+                      })}
+                      <td className="p-4 text-center">{getTrendIcon(sortedEntries)}</td>
+                      <td className="p-4 text-center">
+                        <button onClick={() => setSelectedKpi(kpi)} className="bg-purple-600 text-white px-4 py-1 rounded-lg hover:bg-purple-700">เพิ่ม</button>
+                      </td>
+                    </tr>
+                  );
+                })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    ) : (
+      /* 2.2 หน้ากราฟและฟอร์ม */
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="bg-white p-6 rounded-2xl border">
+          <button onClick={() => setSelectedKpi(null)} className="mb-4 text-purple-600 font-bold flex items-center">← ย้อนกลับ</button>
+          <h3 className="font-bold mb-4">ตัวชี้วัด: {selectedKpi.name}</h3>
+          <ResponsiveContainer height={250} width="100%">
+            <BarChart data={[...(selectedKpi.kpi_entries || [])].sort((a, b) => a.year - b.year)}>
+              <XAxis dataKey="year" /> <YAxis /> <Tooltip />
+              <Bar dataKey="value" fill="#8884d8" />
+              <ReferenceLine y={selectedKpi.target_value} stroke="red" strokeDasharray="4 4" />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+        <div className="bg-white p-6 rounded-2xl border">
+          <h3 className="font-bold mb-4">บันทึกข้อมูลผลการดำเนินงาน</h3>
+          <AddEntryForm kpiId={selectedKpi.id} type={selectedKpi.Type} onSuccess={() => { setSelectedKpi(null); fetchData(); }} />
+        </div>
+      </div>
+    )}
+  </div>
+)} 
         {activeTab === 'department' && (
           <div className="space-y-8">
             <div className="mb-8">

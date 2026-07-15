@@ -439,13 +439,13 @@ const getTrendIcon = (data: any[]) => {
         {activeTab === 'department' && (
           <div className="space-y-8">
             <div className="mb-8">
-              <h3 className="text-sm font-semibold text-gray-500 mb-4 uppercase tracking-wider">เลือกหน่วยงาน</h3>
+              <h3 className="text-sm font-semibold text-gray-700 mb-4 uppercase tracking-wider">เลือกหน่วยงาน</h3>
               <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
                 {departments.map((dept: any) => (
                 <button 
                   key={dept.id} 
                   onClick={() => setSelectedDept(dept.id)} 
-                  className={`p-4 rounded-xl border-2 ${selectedDept === dept.id ? 'border-purple-600 bg-purple-50' : 'border-gray-100'}`}
+                  className={`p-4 rounded-3xl border-2 ${selectedDept === dept.id ? 'border-purple-800 bg-purple-50' : 'border-gray-100'}`}
                 >
                   {dept.Department}
                 </button>

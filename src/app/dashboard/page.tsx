@@ -437,31 +437,46 @@ const getTrendIcon = (data: any[]) => {
 )} 
 
         {activeTab === 'department' && (
-          <div className="space-y-8">
-            <div className="mb-8">
-              <h3 className="text-sm font-semibold text-gray-700 mb-4 uppercase tracking-wider">เลือกหน่วยงาน</h3>
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                {departments.map((dept: any) => (
-                <button 
-                  key={dept.id} 
-                  onClick={() => setSelectedDept(dept.id)} 
-                  className={`p-4 rounded-3xl border-2 ${selectedDept === dept.id ? 'border-purple-800 bg-purple-50' : 'border-gray-100'}`}
-                >
-                  {dept.Department}
-                </button>
-              ))}
-            </div>
-          </div>
+  <div className="space-y-8 animate-in fade-in duration-500">
+    {/* 1. ส่วนเลือกหน่วยงาน */}
+    <div className="mb-8">
+      <h3 className="text-sm font-semibold text-gray-700 mb-4 uppercase tracking-wider">
+        เลือกหน่วยงาน
+      </h3>
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
+        {departments.map((dept: any) => (
+          <button 
+            key={dept.id} 
+            onClick={() => setSelectedDept(dept.id)} 
+            className={`px-4 py-4 rounded-2xl border transition-all duration-200 text-sm font-medium ${
+              selectedDept === dept.id 
+                ? "bg-purple-50 border-purple-600 text-purple-700 shadow-sm" 
+                : "bg-white border-gray-200 text-gray-600 hover:border-purple-300 hover:bg-purple-50/30"
+            }`}
+          >
+            {dept.Department}
+          </button>
+        ))}
+      </div>
+    </div>
 
-          {selectedDept && (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in">
-              {groupKpis.filter((kpi: any) => kpi.departments_id === selectedDept).map((kpi: any) => (
-              <KpiCard key={kpi.id} kpi={kpi} chartData={kpi.kpi_entries} />
-              ))}
-            </div>
-            )}
-          </div>
-        )}
+    {/* 2. ส่วนแสดงผล KPI ของหน่วยงานที่เลือก */}
+    {selectedDept && (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in duration-500">
+        {groupKpis
+          .filter((kpi: any) => kpi.departments_id === selectedDept)
+          .map((kpi: any) => (
+            <KpiCard 
+              key={kpi.id} 
+              kpi={kpi} 
+              chartData={kpi.kpi_entries} 
+            />
+          ))
+        }
+      </div>
+    )}
+  </div>
+)}
      
      {/* วาง Modal ไว้ตรงนี้ */}
         {isModalOpen && selectedKpi && (

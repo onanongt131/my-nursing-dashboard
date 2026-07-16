@@ -6,6 +6,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import AddEntryForm from '@/components/AddEntryForm';
 import LogoutButton from "@/components/LogoutButton";
 import KpiCard from "@/components/KpiCard";
+import { getButtonStyle } from "@/utils/kpiCalculations";
 
 export default function DashboardPage() {
   const [groupKpis, setGroupKpis] = useState<any[]>([]);
@@ -86,22 +87,25 @@ const calculateYearlyAverage = (entries: any[], year: number, kpiType: string): 
   const yearlyEntries = entries.filter((e: any) => e.year === year);
   if (!yearlyEntries || yearlyEntries.length === 0) return "-";
 
-  if (kpiType === 'count') {
-    return yearlyEntries.sort((a, b) => b.id - a.id)[0].value || 0;
-  }
-  
-  // เพิ่มเงื่อนไขสำหรับ 'rate' (คูณ 1000)
-  if (kpiType === 'rate') {
-    const totalNumerator = yearlyEntries.reduce((sum, curr) => sum + (curr.numerator || 0), 0);
-    const totalDenominator = yearlyEntries.reduce((sum, curr) => sum + (curr.denominator || 0), 0);
-    return totalDenominator === 0 ? 0 : parseFloat(((totalNumerator / totalDenominator) * 1000).toFixed(2));
-  }
-
-  // เดิมสำหรับ 'percent'
   const totalNumerator = yearlyEntries.reduce((sum, curr) => sum + (curr.numerator || 0), 0);
   const totalDenominator = yearlyEntries.reduce((sum, curr) => sum + (curr.denominator || 0), 0);
-  return totalDenominator === 0 ? 0 : parseFloat(((totalNumerator / totalDenominator) * 100).toFixed(2));
+
+  // เงื่อนไขสำหรับ Type = 'rate' (คูณ 1000)
+  if (kpiType === 'rate') {
+    if (totalDenominator === 0) return 0;
+    return parseFloat(((totalNumerator / totalDenominator) * 1000).toFixed(2));
+  }
+
+  // เงื่อนไขสำหรับ Type = 'percent' (คูณ 100)
+  if (kpiType === 'percent') {
+    if (totalDenominator === 0) return 0;
+    return parseFloat(((totalNumerator / totalDenominator) * 100).toFixed(2));
+  }
+
+  // กรณีอื่นๆ (เช่น count)
+  return yearlyEntries.sort((a, b) => b.id - a.id)[0].value || 0;
 };
+
   // ใช้ useCallback เพื่อป้องกันการ re-create ฟังก์ชัน
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -312,11 +316,23 @@ const getYearlyTrend = (entries: any[], kpiType: string, currentYear: number = 2
                           );
                         })}
                       <td className="p-4 text-center">
-                        {getYearlyTrend(kpi.kpi_entries || [], kpi.Type)}
-                      </td>
-                      <td className="p-4 text-center">
-                        <button onClick={() => setSelectedKpi(kpi)} className="bg-purple-600 text-white px-4 py-1 rounded-lg hover:bg-purple-700 transition-colors">เพิ่ม</button>
-                      </td>
+                          {getYearlyTrend(kpi.kpi_entries || [], kpi.Type)}
+                        </td>
+                        {/* ให้แทนที่ <td> ด้านล่างนี้ด้วยโค้ดใหม่ครับ */}
+                        <td className="p-4 text-center">
+                      {(() => {
+                        const sorted = [...(kpi.kpi_entries || [])].sort((a,b) => b.year - a.year || b.month - a.month);
+                        const color = getButtonStyle(kpi.kpi_entries);
+                        return (
+                        <button 
+                          onClick={() => { setSelectedKpi(kpi);}} 
+                          className={`${color} text-white px-4 py-1.5 rounded-lg transition-all shadow-sm font-medium text-xs`}
+                        >
+                          เพิ่ม
+                        </button>
+                      );
+                    })()}
+                        </td>
                     </tr>
                   );
                 })}
@@ -478,8 +494,20 @@ const getYearlyTrend = (entries: any[], kpiType: string, currentYear: number = 2
                         <td className="p-4 text-center">
                           {getYearlyTrend(kpi.kpi_entries || [], kpi.Type)}
                         </td>
+                        {/* ให้แทนที่ <td> ด้านล่างนี้ด้วยโค้ดใหม่ครับ */}
                         <td className="p-4 text-center">
-                          <button onClick={() => setSelectedKpi(kpi)} className="bg-purple-600 text-white px-4 py-1 rounded-lg hover:bg-purple-700">เพิ่ม</button>
+                      {(() => {
+                        const sorted = [...(kpi.kpi_entries || [])].sort((a,b) => b.year - a.year || b.month - a.month);
+                        const color = getButtonStyle(kpi.kpi_entries);
+                        return (
+                        <button 
+                          onClick={() => { setSelectedKpi(kpi);}} 
+                          className={`${color} text-white px-4 py-1.5 rounded-lg transition-all shadow-sm font-medium text-xs`}
+                        >
+                          เพิ่ม
+                        </button>
+                      );
+                    })()}
                         </td>
                       </tr>
                     );

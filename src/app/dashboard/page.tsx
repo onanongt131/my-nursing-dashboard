@@ -82,24 +82,26 @@ const diseaseList = [
   "HBOT"
 ];
 
-const calculateYearlyAverage = (entries: any[], year: number, kpiType: string = 'percentage'): string | number => {
+const calculateYearlyAverage = (entries: any[], year: number, kpiType: string): string | number => {
   const yearlyEntries = entries.filter((e: any) => e.year === year);
   if (!yearlyEntries || yearlyEntries.length === 0) return "-";
 
-  // กรณีเป็นแบบ Count: ให้ดึงค่าล่าสุดของปีนั้นมาแสดง (หรือค่าเฉลี่ยของเดือนในป่านั้น)
   if (kpiType === 'count') {
-    const latestEntry = yearlyEntries.sort((a, b) => b.id - a.id)[0];
-    return latestEntry.value || 0;
+    return yearlyEntries.sort((a, b) => b.id - a.id)[0].value || 0;
+  }
+  
+  // เพิ่มเงื่อนไขสำหรับ 'rate' (คูณ 1000)
+  if (kpiType === 'rate') {
+    const totalNumerator = yearlyEntries.reduce((sum, curr) => sum + (curr.numerator || 0), 0);
+    const totalDenominator = yearlyEntries.reduce((sum, curr) => sum + (curr.denominator || 0), 0);
+    return totalDenominator === 0 ? 0 : parseFloat(((totalNumerator / totalDenominator) * 1000).toFixed(2));
   }
 
-  // กรณีเป็นแบบ Percentage (คิดตามสูตรเดิมที่คุณมีอยู่)
+  // เดิมสำหรับ 'percent'
   const totalNumerator = yearlyEntries.reduce((sum, curr) => sum + (curr.numerator || 0), 0);
   const totalDenominator = yearlyEntries.reduce((sum, curr) => sum + (curr.denominator || 0), 0);
-
-  if (totalDenominator === 0) return 0;
-  return parseFloat(((totalNumerator / totalDenominator) * 100).toFixed(2));
+  return totalDenominator === 0 ? 0 : parseFloat(((totalNumerator / totalDenominator) * 100).toFixed(2));
 };
-
   // ใช้ useCallback เพื่อป้องกันการ re-create ฟังก์ชัน
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -140,23 +142,26 @@ const calculateYearlyAverage = (entries: any[], year: number, kpiType: string = 
     setSelectedStrategic(null);
   };
 
-const prepareChartData = (entries: any[]) => {
-    const years = [2567, 2568, 2569];
-    return years.map(year => {
-      const avgValue = calculateYearlyAverage(entries, year);
-      return {
-        year: year,
-        value: avgValue !== "-" ? parseFloat(avgValue.toString()) : 0
-      };
-    });
-  };
+// 1. ปรับฟังก์ชันให้รับ kpiType มาด้วย
+const prepareChartData = (entries: any[], kpiType: string) => {
+  const years = [2567, 2568, 2569];
+  return years.map(year => {
+    // 2. ส่ง kpiType เข้าไปที่นี่
+    const avgValue = calculateYearlyAverage(entries, year, kpiType);
+    return {
+      year: year,
+      value: avgValue !== "-" ? parseFloat(avgValue.toString()) : 0
+    };
+  });
+};
 
 // 2. แล้วค่อยเรียกใช้ภายใน getYearlyTrend
-const getYearlyTrend = (entries: any[], currentYear: number = 2569) => {
+const getYearlyTrend = (entries: any[], kpiType: string, currentYear: number = 2569) => {
   const prevYear = currentYear - 1;
-  
-  const avgCurrent = calculateYearlyAverage(entries, currentYear);
-  const avgPrev = calculateYearlyAverage(entries, prevYear);
+
+  // ส่ง kpiType เข้าไปใน calculateYearlyAverage ทั้ง 2 บรรทัด
+  const avgCurrent = calculateYearlyAverage(entries, currentYear, kpiType);
+  const avgPrev = calculateYearlyAverage(entries, prevYear, kpiType);
 
   // ตรวจสอบว่ามีข้อมูลหรือไม่
   if (avgCurrent === "-" || avgPrev === "-") return "-";
@@ -306,8 +311,8 @@ const getYearlyTrend = (entries: any[], currentYear: number = 2569) => {
                             </td>
                           );
                         })}
-                      <td className="text-center font-bold">
-                        {getYearlyTrend(kpi.kpi_entries, 2569)}
+                      <td className="p-4 text-center">
+                        {getYearlyTrend(kpi.kpi_entries || [], kpi.Type)}
                       </td>
                       <td className="p-4 text-center">
                         <button onClick={() => setSelectedKpi(kpi)} className="bg-purple-600 text-white px-4 py-1 rounded-lg hover:bg-purple-700 transition-colors">เพิ่ม</button>
@@ -341,9 +346,10 @@ const getYearlyTrend = (entries: any[], currentYear: number = 2569) => {
   
   {(() => {
     const chartData = [2565, 2566, 2567, 2568, 2569].map(year => ({
-      year: year,
-      value: parseFloat(calculateYearlyAverage(selectedKpi.kpi_entries || [], year).toString()) || 0
-    }));
+  year: year,
+  // เพิ่มพารามิเตอร์ตัวที่ 3 คือ selectedKpi.Type เข้าไปครับ
+  value: parseFloat(calculateYearlyAverage(selectedKpi.kpi_entries || [], year, selectedKpi.Type).toString()) || 0
+}));
 
     return (
       <ResponsiveContainer height={250} width="100%">
@@ -469,8 +475,8 @@ const getYearlyTrend = (entries: any[], currentYear: number = 2569) => {
                             </td>
                           );
                         })}
-                        <td className="text-center font-bold">
-                          {getYearlyTrend(kpi.kpi_entries, 2569)}
+                        <td className="p-4 text-center">
+                          {getYearlyTrend(kpi.kpi_entries || [], kpi.Type)}
                         </td>
                         <td className="p-4 text-center">
                           <button onClick={() => setSelectedKpi(kpi)} className="bg-purple-600 text-white px-4 py-1 rounded-lg hover:bg-purple-700">เพิ่ม</button>
@@ -499,10 +505,10 @@ const getYearlyTrend = (entries: any[], currentYear: number = 2569) => {
           {(() => {
           // 1. ประกาศตัวแปรข้างในฟังก์ชันนี้ได้เลย
           const chartData = [2565, 2566, 2567, 2568, 2569].map(year => ({
-            year: year,
-            // 2. ใช้ค่าจาก calculateYearlyAverage ที่คุณมีอยู่แล้ว
-            value: parseFloat(calculateYearlyAverage(selectedKpi.kpi_entries || [], year).toString()) || 0
-          }));
+              year: year,
+              // เพิ่มพารามิเตอร์ตัวที่ 3 คือ selectedKpi.Type เข้าไปครับ
+              value: parseFloat(calculateYearlyAverage(selectedKpi.kpi_entries || [], year, selectedKpi.Type).toString()) || 0
+            }));
     // 3. นำมาแสดงผลกราฟในนี้
             return (
                   <ResponsiveContainer height={250} width="100%">

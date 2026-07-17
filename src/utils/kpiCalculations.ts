@@ -90,7 +90,7 @@ export const getButtonStyle = (entries: any[], frequency: 'monthly' | 'quarterly
     const diff = (currentYear - Number(latest.year)) * 12 + (currentMonth - latestMonthNum);
 
     if (diff <= 1) return "bg-purple-300 hover:bg-purple-400 text-white px-3 py-1 rounded-md text-xs transition-all"; // ลงเดือนล่าสุด/เดือนก่อน
-    if (diff >= 3) return "bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-md text-xs transition-all"; // เกิน 3 เดือน
+    if (diff >= 2) return "bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-md text-xs transition-all"; // เกิน 3 เดือน
     return "bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded-md text-xs transition-all"; // ค่าเริ่มต้น
   }
   // สำหรับรายไตรมาส

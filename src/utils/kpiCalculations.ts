@@ -85,15 +85,20 @@ export const getButtonStyle = (entries: any[], frequency: 'monthly' | 'quarterly
   const currentMonth = 7;   // กรกฎาคม
 
   if (frequency === 'monthly') {
-    // 2. แปลง latest.month ให้เป็นตัวเลขก่อนคำนวณ
-    const latestMonthNum = monthMap[latest.month] || 0;
-    const diff = (currentYear - Number(latest.year)) * 12 + (currentMonth - latestMonthNum);
+  if (!latest) return "bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-md text-xs transition-all";
 
-    if (diff === 0) return "bg-purple-600 hover:bg-purple-700"; // เดือนปัจจุบัน
-    if (diff === 1) return "bg-purple-300 hover:bg-purple-400"; // เดือนที่แล้ว
-    if (diff >= 2) return "bg-red-600 hover:bg-red-700";
-    return "bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded-md text-xs transition-all"; // ค่าเริ่มต้น
-  }
+  const latestMonthNum = monthMap[latest.month] || 0;
+  const diff = (currentYear - Number(latest.year)) * 12 + (currentMonth - latestMonthNum);
+
+  // 1. ลงข้อมูลเดือนล่าสุด หรือ เดือนที่แล้ว (diff 0 หรือ 1) -> ม่วงอ่อน
+  if (diff <= 1) return "bg-purple-300 hover:bg-purple-400 text-white px-3 py-1 rounded-md text-xs transition-all";
+
+  // 2. ลงข้อมูลเมื่อ 2 เดือนที่แล้ว (diff 2) -> ม่วงเข้ม
+  if (diff === 2) return "bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded-md text-xs transition-all";
+
+  // 3. ไม่ได้ลงข้อมูล 3 เดือนขึ้นไป (diff >= 3) -> แดง
+  return "bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-md text-xs transition-all";
+}
   // สำหรับรายไตรมาส
   if (frequency === 'quarterly') {
     const currentQuarter = Math.ceil(currentMonth / 3);

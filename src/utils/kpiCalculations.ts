@@ -68,24 +68,37 @@ export const getKpiStatus = (entries: any[]) => {
 };
 
 export const getButtonStyle = (entries: any[]) => {
+  if (!entries || entries.length === 0) return "bg-purple-600 hover:bg-purple-700";
+
   const monthMap: Record<string, number> = { 
     'Jan': 1, 'Feb': 2, 'Mar': 3, 'Apr': 4, 'May': 5, 'Jun': 6, 
-    'Jul': 7, 'Aug': 8, 'Sep': 9, 'Oct': 10, 'Nov': 11, 'Dec': 12 
+    'Jul': 7, 'Aug': 8, 'Sep': 9, 'Oct': 10, 'Nov': 11, 'Dec': 12,
+    'jan': 1, 'feb': 2, 'mar': 3, 'apr': 4, 'may': 5, 'jun': 6 // เพิ่มตัวพิมพ์เล็กกันพลาด
   };
   
-  const sorted = [...(entries || [])].sort((a, b) => b.year - a.year || b.month - a.month);
+  // เรียงข้อมูล
+  const sorted = [...entries].sort((a, b) => {
+    // แปลง month เป็นตัวเลขก่อนเทียบ
+    const monthA = monthMap[a.month] || Number(a.month) || 0;
+    const monthB = monthMap[b.month] || Number(b.month) || 0;
+    return (b.year - a.year) || (monthB - monthA);
+  });
+
   const latest = sorted[0];
   
-  if (!latest) return "bg-purple-600 hover:bg-purple-700";
-
   const now = new Date();
   const currentYear = now.getFullYear() + 543;
   const currentMonth = now.getMonth() + 1;
-  const latestMonthNum = monthMap[latest.month] || Number(latest.month);
-  const diff = (currentYear - latest.year) * 12 + (currentMonth - latestMonthNum);
 
-  if (diff === 0) return "bg-purple-600 hover:bg-purple-700"; // เดือนปัจจุบัน = ม่วงเข้ม
-  if (diff === 1) return "bg-purple-300 hover:bg-purple-400"; // เดือนที่แล้ว = ม่วงอ่อน
-  if (diff >= 3) return "bg-red-600 hover:bg-red-700";        // เกิน 3 เดือน = แดง
-  return "bg-purple-600 hover:bg-purple-700"; // กรณีอื่นๆ (เช่น diff = 2) ให้เป็นม่วงเข้ม
+  const latestYear = Number(latest.year);
+  const latestMonthNum = monthMap[latest.month] || Number(latest.month) || 0;
+  
+  const diff = (currentYear - latestYear) * 12 + (currentMonth - latestMonthNum);
+
+  // DEBUG: ดูค่าที่คำนวณได้ใน Console (F12)
+  console.log("Latest:", latest.month, latestMonthNum, "Diff:", diff);
+
+  if (diff === 1) return "bg-purple-300 hover:bg-purple-400"; // มิถุนายน (diff = 7 - 6 = 1)
+  if (diff >= 2) return "bg-red-600 hover:bg-red-700";
+  return "bg-purple-600 hover:bg-purple-700";
 };

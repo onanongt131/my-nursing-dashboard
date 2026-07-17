@@ -82,8 +82,14 @@ export const getButtonStyle = (entries: any[], frequency: 'monthly' | 'quarterly
   const sorted = [...entries].sort((a, b) => (b.year - a.year) || (monthMap[b.month] - monthMap[a.month]));
   const latest = sorted[0];
 
-  const currentYear = 2026;
+  const currentYear = 2569;
   const currentMonth = 7;
+
+  console.log("Latest Entry:", latest);
+console.log("Latest Month (Raw):", latest.month);
+console.log("Latest Month (Number):", monthMap[latest.month]);
+console.log("Current Month:", currentMonth);
+console.log("Calculated Diff:", (currentYear - Number(latest.year)) * 12 + (currentMonth - (monthMap[latest.month] || 0)));
 
   // 3. จัดการรายเดือน
   if (frequency === 'monthly') {

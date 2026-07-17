@@ -192,6 +192,10 @@ const getYearlyTrend = (entries: any[], kpiType: string, currentYear: number = 2
 
   return isPass;
 };
+  const currentStrategic = strategicGoals.find((g) => g.id === selectedStrategic);
+  const isDiseaseStrategy = 
+  currentStrategic?.name === "Service Excellence" && 
+  selectedDisease === "ทั้งหมด";
 
   return (
     <main className="p-4 md:p-8 bg-gray-50 min-h-screen">
@@ -322,14 +326,14 @@ const getYearlyTrend = (entries: any[], kpiType: string, currentYear: number = 2
                         <td className="p-4 text-center">
                       {(() => {
                         const sorted = [...(kpi.kpi_entries || [])].sort((a,b) => b.year - a.year || b.month - a.month);
-                        const color = getButtonStyle(kpi.kpi_entries);
+                        const color = getButtonStyle(kpi.kpi_entries, kpi.frequency);
                         return (
                         <button 
-                          onClick={() => { setSelectedKpi(kpi);}} 
-                          className={`${color} text-white px-4 py-1.5 rounded-lg transition-all shadow-sm font-medium text-xs`}
-                        >
-                          เพิ่ม
-                        </button>
+                            onClick={() => setSelectedKpi(kpi)} 
+                            className={`${getButtonStyle(kpi.kpi_entries, kpi.frequency)} ...`}
+                          >
+                            เพิ่ม
+                          </button>
                       );
                     })()}
                         </td>
@@ -447,7 +451,8 @@ const getYearlyTrend = (entries: any[], kpiType: string, currentYear: number = 2
             <table className="w-full text-left border-collapse">
               <thead>
                 <tr className="border-b bg-gray-50 text-sm">
-                  {selectedDisease === "ทั้งหมด" && <th className="p-4 text-gray-600 font-bold">โรค</th>}
+                  {/* 2. ใช้ตัวแปร isDiseaseStrategy คุมคอลัมน์ "โรค" */}
+                  {isDiseaseStrategy && <th className="p-4 text-gray-600 font-bold">โรค</th>}
                   <th className="p-4 text-gray-600 font-bold">ตัวชี้วัด (KPI)</th>
                   <th className="p-4 text-center text-gray-600 font-bold">Goal</th>
                   {[2565, 2566, 2567, 2568, 2569].map((y) => <th key={y} className="p-4 text-center text-gray-600 font-bold">{y}</th>)}
@@ -462,11 +467,12 @@ const getYearlyTrend = (entries: any[], kpiType: string, currentYear: number = 2
                     (selectedDisease === "ทั้งหมด" || kpi.disease_name === selectedDisease)
                   )
                   .map((kpi: any) => {
-                    const sortedEntries = [...(kpi.kpi_entries || [])].sort((a, b) => a.year - b.year);
-                    return (
-                      <tr key={kpi.id} className="border-b hover:bg-gray-50 text-sm">
-                        {selectedDisease === "ทั้งหมด" && <td className="p-4 text-gray-600">{kpi.disease_name || "-"}</td>}
-                        <td className="p-4 text-gray-800">{kpi.name}</td>
+                  return (
+                    <tr key={kpi.id} className="border-b hover:bg-gray-50 text-sm">
+                      {/* 3. ตรงนี้ก็ต้องคุมด้วยเช่นกัน ให้แสดงเฉพาะถ้าเป็นยุทธศาสตร์กลุ่มโรค */}
+                      {isDiseaseStrategy && <td className="p-4 text-gray-600">{kpi.disease_name || "-"}</td>}
+                      
+                      <td className="p-4 text-gray-800">{kpi.name}</td>
                         <td className="p-4 text-center font-bold text-gray-700 whitespace-nowrap">
                             {kpi.operator} {kpi.target_value}
                           </td>
@@ -498,14 +504,14 @@ const getYearlyTrend = (entries: any[], kpiType: string, currentYear: number = 2
                         <td className="p-4 text-center">
                       {(() => {
                         const sorted = [...(kpi.kpi_entries || [])].sort((a,b) => b.year - a.year || b.month - a.month);
-                        const color = getButtonStyle(kpi.kpi_entries);
+                        const color = getButtonStyle(kpi.kpi_entries, kpi.frequency);
                         return (
                         <button 
-                          onClick={() => { setSelectedKpi(kpi);}} 
-                          className={`${color} text-white px-4 py-1.5 rounded-lg transition-all shadow-sm font-medium text-xs`}
-                        >
-                          เพิ่ม
-                        </button>
+                            onClick={() => setSelectedKpi(kpi)} 
+                            className={`${getButtonStyle(kpi.kpi_entries, kpi.frequency)} ...`}
+                          >
+                            เพิ่ม
+                          </button>
                       );
                     })()}
                         </td>

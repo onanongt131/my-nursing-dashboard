@@ -85,18 +85,21 @@ export const getButtonStyle = (entries: any[], frequency: 'monthly' | 'quarterly
   const currentMonth = 7;   // กรกฎาคม
 
   if (frequency === 'monthly') {
+  if (frequency === 'monthly') {
   if (!latest) return "bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-md text-xs transition-all";
 
   const latestMonthNum = monthMap[latest.month] || 0;
-  const diff = (currentYear - Number(latest.year)) * 12 + (currentMonth - latestMonthNum);
+  // คำนวณ diff: (ปีปัจจุบัน - ปีข้อมูล)*12 + (เดือนปัจจุบัน - เดือนข้อมูล)
+  const diff = (2026 - Number(latest.year)) * 12 + (7 - latestMonthNum);
 
-  // 1. ลงข้อมูลเดือนล่าสุด หรือ เดือนที่แล้ว (diff 0 หรือ 1) -> ม่วงอ่อน
+  // กรกฎาคม: 
+  // diff 0 (ก.ค.), diff 1 (มิ.ย.) -> ม่วงอ่อน (ข้อมูลยังถือว่าอัปเดต)
   if (diff <= 1) return "bg-purple-300 hover:bg-purple-400 text-white px-3 py-1 rounded-md text-xs transition-all";
 
-  // 2. ลงข้อมูลเมื่อ 2 เดือนที่แล้ว (diff 2) -> ม่วงเข้ม
+  // diff 2 (พ.ค.) -> ม่วงเข้ม
   if (diff === 2) return "bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded-md text-xs transition-all";
 
-  // 3. ไม่ได้ลงข้อมูล 3 เดือนขึ้นไป (diff >= 3) -> แดง
+  // diff 3 ขึ้นไป (เม.ย., มี.ค. หรือเก่ากว่า) -> แดง (แจ้งเตือน)
   return "bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-md text-xs transition-all";
 }
   // สำหรับรายไตรมาส

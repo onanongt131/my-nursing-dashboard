@@ -68,55 +68,51 @@ export const getKpiStatus = (entries: any[]) => {
 };
 
 export const getButtonStyle = (entries: any[], frequency: 'monthly' | 'quarterly' | 'yearly') => {
-  // 1. สร้างตัวช่วยแปลงเดือน
+  // 1. สร้างตารางแปลงเดือนให้ปลอดภัย (กรณีข้อมูลว่าง)
   const monthMap: Record<string, number> = {
     'Jan': 1, 'Feb': 2, 'Mar': 3, 'Apr': 4, 'May': 5, 'Jun': 6,
     'Jul': 7, 'Aug': 8, 'Sep': 9, 'Oct': 10, 'Nov': 11, 'Dec': 12
   };
 
-  const sorted = [...(entries || [])].sort((a, b) => {
-    return (b.year - a.year) || (monthMap[b.month] - monthMap[a.month]);
-  });
-  
+  // 2. จัดการกรณี entries เป็นค่าว่าง
+  if (!entries || entries.length === 0) {
+    return "bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-md text-xs transition-all";
+  }
+
+  const sorted = [...entries].sort((a, b) => (b.year - a.year) || (monthMap[b.month] - monthMap[a.month]));
   const latest = sorted[0];
-  if (!latest) return "bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-md text-xs transition-all";
 
-  const currentYear = 2026; // ปีปัจจุบัน
-  const currentMonth = 7;   // กรกฎาคม
+  const currentYear = 2026;
+  const currentMonth = 7;
 
+  // 3. จัดการรายเดือน
   if (frequency === 'monthly') {
-  if (frequency === 'monthly') {
-  if (!latest) return "bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-md text-xs transition-all";
+    const latestMonthNum = monthMap[latest.month] || 0;
+    const diff = (currentYear - Number(latest.year)) * 12 + (currentMonth - latestMonthNum);
 
-  const latestMonthNum = monthMap[latest.month] || 0;
-  // คำนวณ diff: (ปีปัจจุบัน - ปีข้อมูล)*12 + (เดือนปัจจุบัน - เดือนข้อมูล)
-  const diff = (2026 - Number(latest.year)) * 12 + (7 - latestMonthNum);
+    if (diff <= 1) return "bg-purple-300 hover:bg-purple-400 text-white px-3 py-1 rounded-md text-xs transition-all";
+    if (diff === 2) return "bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded-md text-xs transition-all";
+    return "bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-md text-xs transition-all";
+  }
 
-  // กรกฎาคม: 
-  // diff 0 (ก.ค.), diff 1 (มิ.ย.) -> ม่วงอ่อน (ข้อมูลยังถือว่าอัปเดต)
-  if (diff <= 1) return "bg-purple-300 hover:bg-purple-400 text-white px-3 py-1 rounded-md text-xs transition-all";
-
-  // diff 2 (พ.ค.) -> ม่วงเข้ม
-  if (diff === 2) return "bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded-md text-xs transition-all";
-
-  // diff 3 ขึ้นไป (เม.ย., มี.ค. หรือเก่ากว่า) -> แดง (แจ้งเตือน)
-  return "bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-md text-xs transition-all";
-}
-  // สำหรับรายไตรมาส
+  // 4. จัดการรายไตรมาส
   if (frequency === 'quarterly') {
+    const latestQuarter = Math.ceil((monthMap[latest.month] || 0) / 3);
     const currentQuarter = Math.ceil(currentMonth / 3);
-    const latestQuarter = Math.ceil(Number(latest.month) / 3);
-    return (latest.year === currentYear && latestQuarter >= currentQuarter - 1)
-      ? "bg-purple-300 hover:bg-purple-400 text-white px-3 py-1 rounded-md text-xs transition-all"
-      : "bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded-md text-xs transition-all";
+    const diffQ = (currentYear - Number(latest.year)) * 4 + (currentQuarter - latestQuarter);
+    
+    return diffQ <= 1 
+      ? "bg-purple-300 hover:bg-purple-400 text-white px-3 py-1 rounded-md text-xs transition-all" 
+      : "bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-md text-xs transition-all";
   }
 
-  // สำหรับรายปี
+  // 5. จัดการรายปี
   if (frequency === 'yearly') {
-    return latest.year === currentYear 
-      ? "bg-purple-300 hover:bg-purple-400 text-white px-3 py-1 rounded-md text-xs transition-all"
-      : "bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded-md text-xs transition-all";
+    return Number(latest.year) >= currentYear 
+      ? "bg-purple-300 hover:bg-purple-400 text-white px-3 py-1 rounded-md text-xs transition-all" 
+      : "bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-md text-xs transition-all";
   }
 
+  // **สำคัญ:** ต้องมี return สุดท้ายเสมอ เพื่อป้องกัน build error
   return "bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded-md text-xs transition-all";
 };

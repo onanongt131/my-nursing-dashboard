@@ -84,7 +84,8 @@ export const getButtonStyle = (entries: any[]) => {
   const latestMonthNum = monthMap[latest.month] || Number(latest.month);
   const diff = (currentYear - latest.year) * 12 + (currentMonth - latestMonthNum);
 
-  if (diff === 1) return "bg-purple-300 hover:bg-purple-400";
-  if (diff >= 3) return "bg-red-600 hover:bg-red-700";
-  return "bg-purple-600 hover:bg-purple-700";
+  if (diff === 0) return "bg-purple-600 hover:bg-purple-700"; // เดือนปัจจุบัน = ม่วงเข้ม
+  if (diff === 1) return "bg-purple-300 hover:bg-purple-400"; // เดือนที่แล้ว = ม่วงอ่อน
+  if (diff >= 3) return "bg-red-600 hover:bg-red-700";        // เกิน 3 เดือน = แดง
+  return "bg-purple-600 hover:bg-purple-700"; // กรณีอื่นๆ (เช่น diff = 2) ให้เป็นม่วงเข้ม
 };

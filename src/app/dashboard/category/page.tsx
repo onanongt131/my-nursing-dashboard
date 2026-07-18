@@ -72,7 +72,7 @@ export default function CategoryPage() {
 
       {/* 2. ส่วน CategoryClient (วางไว้นอก map) */}
       {selectedCategory && (
-        <div className="space-y-6 animate-in slide-in-from-top-4 duration-500 pt-6">
+        <div className="space-y-2 animate-in slide-in-from-top-4 duration-500 pt-6">
           <button 
             onClick={() => setSelectedCategory(null)} 
             className="text-purple-600 font-bold flex items-center gap-2 hover:underline"

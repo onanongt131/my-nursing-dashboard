@@ -99,7 +99,7 @@ export default function CategoryClient({ category }: { category: string }) {
           onClick={() => setSelectedKpi(null)} 
           className="flex items-center text-purple-600 font-medium hover:text-purple-800 transition-colors"
         >
-          <span className="mr-1">←</span> ย้อนกลับไปหน้าหมวดหมู่
+          <span className="mr-1">←</span> ย้อนกลับไปหน้าตาราง
         </button>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

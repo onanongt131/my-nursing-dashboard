@@ -1,6 +1,7 @@
 import { auth } from "@/auth";
 import { redirect } from "next/navigation";
-import DashboardWrapper from "@/components/DashboardWrapper";
+import DashboardLayoutContent from "@/components/DashboardLayoutContent";
+import { DashboardHeader } from "@/components/DashboardHeader";
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await auth();
@@ -9,7 +10,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
   return (
     <div className="min-h-screen bg-gray-50 p-6">
       {/* ส่ง children ไปที่ Wrapper เพื่อจัดการ State ของ Tabs */}
-      <DashboardWrapper>{children}</DashboardWrapper>
+      <DashboardLayoutContent>{children}</DashboardLayoutContent>
     </div>
   );
 }

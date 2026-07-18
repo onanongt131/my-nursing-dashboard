@@ -1,9 +1,13 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Sarabun } from "next/font/google"; // เปลี่ยนจาก Geist เป็น Sarabun
 import "@/app/globals.css";
 
-const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
-const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
+// ตั้งค่าฟอนต์ Sarabun
+const sarabun = Sarabun({ 
+  subsets: ["thai"], 
+  weight: ["300", "400", "500", "700"],
+  variable: "--font-sarabun",
+});
 
 export const metadata: Metadata = {
   title: "Nursing KPI Dashboard",
@@ -12,9 +16,9 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="th" className={`${geistSans.variable} ${geistMono.variable}`}>
+    // นำ variable ของ sarabun มาใส่ที่นี่
+    <html lang="th" className={`${sarabun.variable}`}>
       <body className="bg-gray-100 min-h-screen font-sans">
-        {/* ใส่ Navbar หรือ Header ตรงนี้หากต้องการให้มีทุกหน้า */}
         <main className="max-w-7xl mx-auto p-4 md:p-6">
           {children}
         </main>

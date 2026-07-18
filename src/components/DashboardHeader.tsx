@@ -13,43 +13,40 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, stats }: any) =
   return (
     <div className="bg-white shadow-sm">
       {/* ส่วน Header หลัก */}
-      <header className="flex items-center justify-between px-6 py-4">
-        <div className="flex items-center gap-3">
+      <header className="flex items-center justify-between px-6 py-4 bg-white shadow-sm">
+        <div className="flex items-center gap-4"> {/* เพิ่ม gap เป็น 4 เพื่อเว้นระยะ */}
           <img 
             src="/Logo-NSO.png" 
-            alt="Nursing Mission Group Logo" 
-            className="h-12 w-auto object-contain" 
+            alt="Logo" 
+            className="h-14 w-14 object-contain" // ปรับให้เป็นขนาดคงที่เพื่อป้องกันภาพยืดหรือเบี้ยว
+            onError={(e) => { e.currentTarget.style.display = 'none'; }} // ซ่อนรูปถ้าโหลดไม่ขึ้น เพื่อไม่ให้แสดงชื่อ alt
           />
           <div>
-            <h1 className="text-xl font-bold text-gray-800">
-              {title || "กลุ่มภารกิจด้านการพยาบาล โรงพยาบาลวชิระภูเก็ต"}
-            </h1>
-            <p className="text-sm text-gray-500">
-              ผลการติดตามตัวชี้วัดภาพรวม ({stats?.total || 0} รายการ)
-            </p>
+            <h1 className="text-xl font-bold text-gray-800">กลุ่มภารกิจด้านการพยาบาล โรงพยาบาลวิชิระภูเก็ต</h1>
+            <p className="text-sm text-gray-500">ผลการติดตามตัวชี้วัดภาพรวม (12 รายการ)</p>
           </div>
         </div>
         <LogoutButton />
       </header>
 
-      {/* ส่วน Tabs นำมาไว้ภายใน Return และครอบด้วย Container เดียวกัน */}
-      <nav className="flex gap-8 px-6 border-b border-gray-200" role="tablist">
-        {tabs.map((tab) => (
-          <button
-            key={tab.name}
-            onClick={() => onTabChange(tab.name)}
-            aria-selected={activeTab === tab.name}
-            role="tab"
-            className={`pb-3 px-1 font-medium transition-all border-b-2 duration-300 ${
-              activeTab === tab.name 
-                ? 'border-purple-600 text-purple-700' 
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </nav>
+      {/* เพิ่ม mt-4 หรือ mt-6 เพื่อให้แถบ Tabs ขยับห่างจาก Header ด้านบน */}
+<nav className="flex gap-8 px-6 border-b border-gray-200 mt-4" role="tablist">
+  {tabs.map((tab) => (
+    <button
+      key={tab.name}
+      onClick={() => onTabChange(tab.name)}
+      aria-selected={activeTab === tab.name}
+      role="tab"
+      className={`pb-3 px-1 font-medium transition-all border-b-2 duration-300 ${
+        activeTab === tab.name 
+          ? 'border-purple-600 text-purple-700' 
+          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+      }`}
+    >
+      {tab.label}
+    </button>
+  ))}
+</nav>
     </div>
   );
 };

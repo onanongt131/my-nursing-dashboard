@@ -42,8 +42,8 @@ export default function CategoryPage() {
             <div 
               key={cat.id} 
               onClick={() => setSelectedCategory(cat.name)} 
-              className="bg-white p-6 rounded-3xl border border-gray-200 shadow-sm cursor-pointer hover:border-purple-300 hover:shadow-lg transition-all duration-300 group"
-            >
+              className="mt-6 bg-white p-6 rounded-3xl border border-gray-200 shadow-sm cursor-pointer hover:border-purple-300 ..."
+                >
               <div className="flex items-center gap-4 mb-4">
                 <span className="text-4xl">{cat.icon}</span>
                 <h3 className="font-bold text-lg text-gray-800 group-hover:text-purple-700">{cat.name}</h3>

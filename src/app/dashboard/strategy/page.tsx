@@ -41,9 +41,9 @@ export default function Strategic() {
   if (loading) return <div className="p-8 text-center">กำลังโหลดข้อมูล...</div>;
 
   return (
-  <div className="space-y-4 animate-in fade-in duration-500">
+   <div className="space-y-6 mt-8 animate-in fade-in duration-500">
     {/* 1. แถบเลือกยุทธศาสตร์ - ปรับให้ดูเด่นและกระชับ */}
-    <div className="flex w-full gap-2">
+  <div className="flex gap-4">
   {strategicGoals.map((goal) => (
     <button
       key={goal.id}

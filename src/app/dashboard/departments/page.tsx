@@ -35,7 +35,7 @@ export default function DepartmentPage() {
   const filteredDepartments = data.filter(d => d.group === selectedGroup);
 
   return (
-    <div className="space-y-4 animate-in fade-in duration-500">
+    <div className="space-y-6 mt-6 animate-in fade-in duration-500">
       {/* 1. ส่วนเลือกกลุ่มงาน */}
       <h1 className="text-2xl font-bold text-gray-800">เลือกกลุ่มงาน</h1>
       <div className="flex flex-wrap gap-2 pb-6 border-b border-gray-100">
@@ -56,7 +56,7 @@ export default function DepartmentPage() {
 
       {/* 2. ส่วนเลือกหน่วยงาน */}
       {selectedGroup && (
-        <div className="space-y-4">
+        <div className="space-y-6">
           <h2 className="text-sm font-bold text-gray-400 uppercase">เลือกหน่วยงานใน {selectedGroup}</h2>
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
             {filteredDepartments.map((dept) => (

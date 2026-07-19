@@ -3,6 +3,8 @@ import { useState, useEffect } from 'react';
 import { getProductivityData } from '@/lib/kpiService'; 
 import { ProductivityTable } from '@/components/ProductivityTable';
 
+// ลบบรรทัด export const revalidate = 0; ออกไปเลยครับ
+
 export default function ProductivityPage() {
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -28,14 +30,13 @@ const getBgColor = (value: number) => {
   useEffect(() => {
     async function loadData() {
       setLoading(true);
-      // แก้ไข: เปลี่ยนจาก year เป็น selectedYear
       const results = await getProductivityData(selectedYear);
       setData(results || []);
       setLoading(false);
     }
     loadData();
-  }, [selectedYear]); // แก้ไข: เปลี่ยนจาก [year] เป็น [selectedYear]
-
+  }, [selectedYear]);
+  
   return (
   <div className="flex flex-col mb-6"> 
     {/* บรรทัดเดียวสำหรับหัวข้อและ Legend */}

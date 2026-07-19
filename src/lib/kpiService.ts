@@ -1,7 +1,9 @@
 import { supabase } from '@/lib/supabaseClient';
+import { createClient } from '@/utils/supabase/server'; // หรือ client ขึ้นอยู่กับการใช้งาน
 
 interface KpiEntryPayload {
   kpi_id: number;
+  department_id: number; // เพิ่มบรรทัดนี้
   year: number;
   month: string;
   value: number;
@@ -26,6 +28,7 @@ export const saveKpiEntry = async (payload: KpiEntryPayload) => {
     .insert([
       {
         kpi_id: payload.kpi_id,
+        department_id: payload.department_id,
         year: payload.year,
         month: payload.month,
         value: payload.value,
@@ -59,12 +62,11 @@ export const getProductivityData = async (year: string) => {
     throw new Error('ระบบฐานข้อมูลยังไม่พร้อมใช้งาน');
   }
 
-  // 1. ดึงข้อมูล KPI ตามปีที่เลือก
+  // เพิ่ม .headers({ 'Cache-Control': 'no-cache' }) เพื่อสั่ง Supabase ว่าอย่าใช้ข้อมูลเก่า
   const { data: kpiData, error: kpiError } = await supabase
     .from('nursing_kpi_data')
-    .select('*')
-    .eq('fiscal_year', parseInt(year)) // มั่นใจว่าตัวแปร year ตรงกับ 2569
-    .range(0, 1000) // <--- เพิ่มตรงนี้: ดึงข้อมูลสูงสุด 1001 แถว
+    .select('*', { count: 'exact', head: false }) // ระบุว่าไม่ต้องใช้ Cache
+    .eq('fiscal_year', parseInt(year))
     .order('department_id', { ascending: true })
     .order('month', { ascending: true });
 
@@ -110,3 +112,4 @@ export const upsertProductivityData = async (newDataArray: any[]) => {
   }
   return data;
 };
+

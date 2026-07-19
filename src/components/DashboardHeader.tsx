@@ -22,7 +22,7 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, stats }: any) =
             onError={(e) => { e.currentTarget.style.display = 'none'; }} // ซ่อนรูปถ้าโหลดไม่ขึ้น เพื่อไม่ให้แสดงชื่อ alt
           />
           <div>
-            <h1 className="text-xl font-bold text-gray-800">กลุ่มภารกิจด้านการพยาบาล โรงพยาบาลวิชิระภูเก็ต</h1>
+            <h1 className="text-xl font-bold text-gray-800">กลุ่มภารกิจด้านการพยาบาล โรงพยาบาลวชิระภูเก็ต</h1>
             <p className="text-sm text-gray-500">ผลการติดตามตัวชี้วัดภาพรวม (12 รายการ)</p>
           </div>
         </div>

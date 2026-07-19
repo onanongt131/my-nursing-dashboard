@@ -20,12 +20,12 @@ export const ProductivityTable: React.FC<ProductivityTableProps> = ({ data }) =>
   // 1. ปรับฟังก์ชัน getBgColor ให้สีจางลง
 const getBgColor = (value: number) => {
   // เงื่อนไขต้องเรียงลำดับจากมากไปน้อยเพื่อให้ครอบคลุมช่วงข้อมูลที่ถูกต้องครับ
-  if (value > 130) return "bg-red-100 text-red-800 border border-red-200";      // มากกว่า 130 สีแดงอ่อน
-  if (value > 120) return "bg-pink-100 text-pink-800 border border-pink-200";   // มากกว่า 120 สีชมพู
-  if (value > 110) return "bg-orange-100 text-orange-800 border border-orange-200"; // มากกว่า 110 สีส้มอ่อน
-  if (value >= 90) return "bg-green-100 text-green-800 border border-green-200"; // 90-110 สีเขียว
-  return "bg-yellow-100 text-yellow-800 border border-yellow-200";              // น้อยกว่า 90 สีเหลืองอ่อน
-};
+  if (value > 130) return "bg-red-100 text-red-800 border border-red-300";      // มากกว่า 130 สีแดงอ่อน
+  if (value > 120) return "bg-orange-100 text-orange-800 border border-orange-300";   // มากกว่า 120 สีชมพู
+  if (value > 110) return "bg-yellow-100 text-yellow-800 border border-yellow-300"; // มากกว่า 110 สีส้มอ่อน
+  if (value >= 90) return "bg-green-100 text-gray-800 border border-green-300 font-normal";
+  return "bg-gray-200 text-black-400 border border-gray-300";
+    };     // น้อยกว่า 90 สีเหลืองอ่อน
 
   console.log("Data received in Table:", data); // ดูว่าใน object มี key 'department_name' ไหม
 

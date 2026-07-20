@@ -41,16 +41,16 @@ export default function Strategic() {
   if (loading) return <div className="p-8 text-center">กำลังโหลดข้อมูล...</div>;
 
   return (
-   <div className="space-y-6 mt-8 animate-in fade-in duration-500">
+   <div className="space-y-6 mt-6 animate-in fade-in duration-500">
     {/* 1. แถบเลือกยุทธศาสตร์ - ปรับให้ดูเด่นและกระชับ */}
-  <div className="flex gap-4">
+  <div className="flex gap-2">
   {strategicGoals.map((goal) => (
     <button
       key={goal.id}
       onClick={() => { setSelectedStrategic(goal.id); }}
-      className={`flex-1 px-4 py-3 rounded-lg border font-bold text-center transition-all ${
+      className={`flex-1 px-2 py-3 rounded-xl border font-bold text-center transition-all ${
         selectedStrategic === goal.id 
-          ? "bg-purple-600 text-white border-purple-600" 
+          ? "bg-purple-400 text-white border-purple-600" 
           : "bg-white text-gray-700 hover:bg-purple-50"
       }`}
     >
@@ -64,7 +64,7 @@ export default function Strategic() {
       <div className="space-y-4">
         {/* กลยุทธ์ : ขยับขึ้นมาให้ชิดกับแถบเลือกยุทธศาสตร์ เพื่อความเป็นเอกภาพ */}
         <div className="bg-purple-50/80 p-4 rounded-2xl border border-purple-100">
-          <p className="text-purple-900 font-bold text-lg">
+          <p className="text-purple-600 font-bold text-lg">
             {currentStrategic?.description}
           </p>
         </div>
@@ -76,7 +76,7 @@ export default function Strategic() {
               <button key={disease} onClick={() => setSelectedDisease(disease)} 
                 className={`px-4 py-1.5 text-xs rounded-full border transition-all font-medium ${
                   selectedDisease === disease 
-                    ? "bg-blue-600 text-white border-blue-600 shadow-md" 
+                    ? "bg-blue-500 text-white border-blue-600 shadow-md" 
                     : "bg-white border-gray-200 text-gray-600 hover:border-blue-300"
                 }`}>
                 {disease}

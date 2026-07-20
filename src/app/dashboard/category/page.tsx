@@ -49,7 +49,7 @@ export default function CategoryPage() {
                 <span className="text-4xl">{cat.icon}</span>
                 <h3 className="font-bold text-lg text-gray-800 group-hover:text-purple-700">{cat.name}</h3>
               </div>
-              <div className="border-t border-gray-100 mb-4"></div>
+              <div className="border-t border-gray-200 mb-4"></div>
               <div className="flex justify-between items-center">
               <div className="flex flex-col">
                   <span className="text-gray-500 text-sm">KPI ทั้งหมด</span>

@@ -62,8 +62,9 @@ export default function CategoryClient({ category }: { category: string }) {
                   </td>
                   {[2565, 2566, 2567, 2568, 2569].map((year) => {
                     const avg = calculateYearlyAverage(kpi.kpi_entries || [], year, kpi.Type);
-                    const hasData = avg !== null && avg !== "-" && Number(avg) !== 0;
-                    const pass = hasData ? checkStatus(Number(avg), kpi.target_value, kpi.operator) : false;
+                            // ตรวจสอบว่า avg เป็นค่าว่าง, "-", หรือ null
+                            const hasData = avg !== null && avg !== "-" && avg !== ""; 
+                            const pass = hasData ? checkStatus(Number(avg), kpi.target_value, kpi.operator) : false;
 
                     return (
                       <td key={year} className="p-4 text-center">
@@ -79,13 +80,8 @@ export default function CategoryClient({ category }: { category: string }) {
                   })}
                   <td className="p-4 text-center text-lg">{getYearlyTrend(kpi.kpi_entries || [], kpi.Type)}</td>
                   <td className="p-4 text-center">
-                    <button 
-                      onClick={() => setSelectedKpi(kpi)} 
-                      className="px-4 py-1.5 bg-white border border-purple-200 text-purple-600 rounded-lg text-xs font-bold hover:bg-purple-50 transition-colors"
-                    >
-                      เพิ่ม
-                    </button>
-                  </td>
+                    <button onClick={() => setSelectedKpi(kpi)} className={getButtonStyle(kpi.kpi_entries || [], 'monthly')}>เพิ่ม</button>
+                    </td>
                 </tr>
               ))}
             </tbody>

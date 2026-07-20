@@ -93,17 +93,14 @@ export default function CategoryClient({ category }: { category: string }) {
         </div>
       </div>
     ) : (
-      // ส่วนหน้าแก้ไข KPI
-      <div className="space-y-6">
-        <button 
-          onClick={() => setSelectedKpi(null)} 
-          className="flex items-center text-purple-600 font-medium hover:text-purple-800 transition-colors"
-        >
-          <span className="mr-1">←</span> ย้อนกลับไปหน้าตาราง
-        </button>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+            <button onClick={() => setSelectedKpi(null)} className="mb-4 text-purple-600 font-bold text-sm">← ย้อนกลับ</button>
+            <div className="absolute top-6 right-6 bg-red-50 border border-red-100 p-3 rounded-xl">
+                <p className="text-[10px] text-red-600 font-bold uppercase">Goal</p>
+                <p className="text-lg font-black text-red-700">{selectedKpi.operator} {selectedKpi.target_value}</p>
+            </div>
             <h3 className="font-bold text-gray-800 text-lg mb-6">{selectedKpi.name}</h3>
             <ResponsiveContainer height={250} width="100%">
               <BarChart data={[2565, 2566, 2567, 2568, 2569].map(y => ({
@@ -123,7 +120,6 @@ export default function CategoryClient({ category }: { category: string }) {
             <AddEntryForm kpiId={selectedKpi.id} type={selectedKpi.Type} onSuccess={() => { setSelectedKpi(null); fetchData(); }} />
           </div>
         </div>
-      </div>
     )}
   </div>
 );

@@ -1,112 +1,101 @@
 'use client';
-import { useState, useRef, useEffect } from 'react';
+import { useState, useEffect } from 'react';
+import { createClient } from '@/utils/supabase/client'; // ปรับตามที่คุณสร้างไว้
 import { useKpiSubmission } from '@/hooks/useKpiSubmission';
 
 export default function AddEntryForm({ kpiId, type, deptId, onSuccess }: { 
-  kpiId: string, 
-  type: string, 
-  deptId?: string, 
-  onSuccess: () => void 
+  kpiId: string, type: string, deptId?: string, onSuccess: () => void 
 }) {
-
+  const supabase = createClient();
+  const { submitEntry } = useKpiSubmission();
+  
   const [isOpen, setIsOpen] = useState(false);
-  const [formData, setFormData] = useState({
+  const [isSavingNum, setIsSavingNum] = useState(false);
+  const [isSaving3P, setIsSaving3P] = useState(false);
+  
+const [formData, setFormData] = useState({
     year: new Date().getFullYear().toString(),
     month: '',
     numerator: '',
     denominator: '',
-    value: ''
+    value: '',
+    purpose: '',
+    process: '',
+    performance: ''
   });
-  
-  const { submitEntry } = useKpiSubmission();
-  const [isSaving, setIsSaving] = useState(false);
 
-  const handleSave = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsSaving(true);
-    
-    try { // <--- เพิ่ม try ตรงนี้
-      const num = Number(formData.numerator);
-      const den = Number(formData.denominator);
-      const val = Number(formData.value);
-      
-      let finalValue = 0;
-
-      // คำนวณค่าตามประเภท
-      if (type === 'percent') {
-        finalValue = den !== 0 ? Number(((num / den) * 100).toFixed(2)) : 0;
-      } else if (type === 'rate') {
-        finalValue = den !== 0 ? Number(((num / den) * 1000).toFixed(2)) : 0;
-      } else {
-        finalValue = val;
-      }
-        
-      const payload = {
-        kpi_id: kpiId,
-        department_id: deptId || null,
-        year: Number(formData.year),
-        month: formData.month,
-        value: finalValue,
-        numerator: type === 'count' ? val : num,
-        denominator: type === 'count' ? 1 : den,
-        type: type
+  useEffect(() => {
+    if (isOpen) {
+      const fetchData = async () => {
+        // ดึง 3P
+        const { data: data3P } = await supabase.from('kpi_3p_analysis').select('*').eq('kpi_id', kpiId).single();
+        if (data3P) {
+          setFormData(prev => ({ ...prev, purpose: data3P.purpose || '', process: data3P.process || '', performance: data3P.performance || '' }));
+        }
       };
-
-      await submitEntry(kpiId, payload); 
-      
-      setFormData({ 
-        year: new Date().getFullYear().toString(), 
-        month: '', 
-        numerator: '', 
-        denominator: '', 
-        value: '' 
-      });
-      
-      onSuccess(); 
-      setIsOpen(false);
-    
-    } catch (error: unknown) {
-      if (error instanceof Error) {
-          console.error("Error saving KPI:", error.message);
-      } else {
-          console.error("Error saving KPI:", error);
-      }
-      alert("เกิดข้อผิดพลาดในการบันทึกข้อมูล");
-    } finally {
-      setIsSaving(false);
+      fetchData();
     }
+  }, [isOpen, kpiId, supabase]);
+
+  // 1. บันทึกเฉพาะตัวเลข (จัดการ payload ไว้ในนี้)
+  const handleSaveNumeric = async () => {
+    setIsSavingNum(true);
+    
+    // คำนวณค่าก่อน
+    const num = Number(formData.numerator);
+    const den = Number(formData.denominator);
+    const val = Number(formData.value);
+    let finalValue = type === 'percent' ? (den !== 0 ? (num / den) * 100 : 0) : 
+                     type === 'rate' ? (den !== 0 ? (num / den) * 1000 : 0) : val;
+
+    // สร้าง payload และส่งค่าในฟังก์ชันนี้เท่านั้น
+    const payload = {
+      kpi_id: kpiId,
+      department_id: deptId || null,
+      year: Number(formData.year),
+      month: formData.month,
+      value: finalValue,
+      numerator: type === 'count' ? val : num,
+      denominator: type === 'count' ? 1 : den,
+      type: type
+    };
+
+    await submitEntry(kpiId, payload);
+    
+    setIsSavingNum(false);
+    onSuccess();
+    alert("บันทึกผลงานแล้ว");
+  };
+
+  // 2. บันทึกเฉพาะ 3P (แยกฟังก์ชันอิสระ)
+  const handleSave3P = async () => {
+    setIsSaving3P(true);
+    const { error } = await supabase.from('kpi_3p_analysis').upsert({
+      kpi_id: kpiId,
+      purpose: formData.purpose,
+      process: formData.process,
+      performance: formData.performance,
+      updated_at: new Date().toISOString()
+    });
+    setIsSaving3P(false);
+    if (!error) alert("บันทึกการวิเคราะห์ 3P แล้ว");
   };
 
   return (
     <div> 
-      <button 
-        onClick={() => setIsOpen(!isOpen)} 
-        className="text-indigo-600 font-medium flex items-center gap-1"
-      >
-        {isOpen ? "ซ่อนฟอร์ม" : "เพิ่มข้อมูล"}
+      <button onClick={() => setIsOpen(!isOpen)} className="text-indigo-600 font-medium">
+        {isOpen ? "ซ่อนฟอร์ม" : "เพิ่มข้อมูล/วิเคราะห์ 3P"}
       </button>
 
       {isOpen && (
-        <form onSubmit={handleSave} className="mt-4 p-4 border rounded-xl bg-white shadow-sm space-y-3">
-          <div className="grid grid-cols-2 gap-2">
-            <input 
-              type="number" 
-              placeholder="ปี พ.ศ." 
-              className="border p-2 rounded-lg" 
-              value={formData.year} 
-              onChange={(e) => setFormData({...formData, year: e.target.value})} 
-              required 
-            />
-            <select 
-              className="border p-2 rounded-lg" 
-              value={formData.month} 
-              onChange={(e) => setFormData({...formData, month: e.target.value})}
-              required
-            >
+        <div className="mt-4 p-4 border rounded-xl bg-white shadow-sm space-y-6">
+          {/* ส่วนตัวเลข */}
+          <div className="space-y-3">
+             <div className="grid grid-cols-2 gap-2">
+            <input type="number" placeholder="ปี พ.ศ." className="border p-2 rounded-lg" value={formData.year} onChange={(e) => setFormData({...formData, year: e.target.value})} required />
+            <select className="border p-2 rounded-lg" value={formData.month} onChange={(e) => setFormData({...formData, month: e.target.value})} required>
               <option value="">เลือกเดือน</option>
-              {['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].map(m => 
-                <option key={m} value={m}>{m}</option>
-              )}
+              {['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'].map(m => <option key={m} value={m}>{m}</option>)}
             </select>
           </div>
 
@@ -140,16 +129,23 @@ export default function AddEntryForm({ kpiId, type, deptId, onSuccess }: {
               required 
             />
           )}
+          {/* Inputs... */}
+             <button onClick={handleSaveNumeric} className="w-full bg-green-600 text-white py-2 rounded-lg">
+               {isSavingNum ? 'กำลังบันทึก...' : 'บันทึกผลงาน'}
+             </button>
+          </div>
 
-          <div className="flex items-center gap-2 pt-2">
-            <button type="submit" disabled={isSaving} className="flex-grow bg-indigo-600 text-white py-2 rounded-lg hover:bg-indigo-700 font-medium disabled:opacity-50">
-              {isSaving ? 'กำลังบันทึก...' : 'บันทึกข้อมูล'}
-            </button>
-            <button type="button" onClick={() => setIsOpen(false)} className="px-4 py-2 text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200">
-              ยกเลิก
+          {/* ส่วน 3P */}
+          <div className="border-t pt-4 space-y-3">
+            <h4 className="font-bold">วิเคราะห์ 3P</h4>
+            <textarea placeholder="Purpose" className="w-full border p-2 rounded" value={formData.purpose} onChange={(e) => setFormData({...formData, purpose: e.target.value})} />
+            <textarea placeholder="Process" className="w-full border p-2 rounded" value={formData.process} onChange={(e) => setFormData({...formData, process: e.target.value})} />
+            <textarea placeholder="Performance" className="w-full border p-2 rounded" value={formData.performance} onChange={(e) => setFormData({...formData, performance: e.target.value})} />
+            <button onClick={handleSave3P} className="w-full bg-indigo-600 text-white py-2 rounded-lg">
+              {isSaving3P ? 'กำลังบันทึก...' : 'บันทึกการวิเคราะห์'}
             </button>
           </div>
-        </form>
+        </div>
       )}
     </div>
   );

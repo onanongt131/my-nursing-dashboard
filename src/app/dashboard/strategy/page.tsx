@@ -141,9 +141,9 @@ export default function Strategic() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           <div className="bg-white p-6 rounded-2xl border relative">
             <button onClick={() => setSelectedKpi(null)} className="mb-4 text-purple-600 font-bold text-sm">← ย้อนกลับ</button>
-            <div className="absolute top-6 right-6 bg-red-50 border border-red-100 p-3 rounded-xl">
-                <p className="text-[10px] text-red-600 font-bold uppercase">เป้าหมาย (Goal)</p>
-                <p className="text-lg font-black text-red-700">{selectedKpi.operator} {selectedKpi.target_value}</p>
+            <div className="absolute top-4 right-4 bg-red-50 border border-red-100 p-2 rounded-xl">
+                <span className="text-[10px] text-red-600 font-bold uppercase">Goal</span>
+                <span className="text-[10px] font-black text-red-700">{selectedKpi.operator} {selectedKpi.target_value}</span>
             </div>
             <h3 className="font-bold text-lg mb-6">{selectedKpi.name}</h3>
             <ResponsiveContainer height={250} width="100%">
@@ -159,7 +159,12 @@ export default function Strategic() {
           </div>
           <div className="bg-white p-6 rounded-2xl border">
             <h3 className="font-bold mb-4">บันทึกข้อมูลผลงาน</h3>
-            <AddEntryForm kpiId={selectedKpi.id} type={selectedKpi.Type} onSuccess={() => { setSelectedKpi(null); fetchData(); }} />
+            <AddEntryForm 
+                kpiId={selectedKpi.id} 
+                type={selectedKpi.type} 
+                // ไม่ต้องใส่ deptId แล้ว หรือถ้าอยากใส่ให้ชัดเจนให้ใส่ deptId={null as any}
+                onSuccess={() => { /* logic */ }}
+              />
           </div>
         </div>
       )}

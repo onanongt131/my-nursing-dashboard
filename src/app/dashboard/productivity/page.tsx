@@ -3,8 +3,6 @@ import { useState, useEffect } from 'react';
 import { getProductivityData } from '@/lib/kpiService'; 
 import { ProductivityTable } from '@/components/ProductivityTable';
 
-// ลบบรรทัด export const revalidate = 0; ออกไปเลยครับ
-
 export default function ProductivityPage() {
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);

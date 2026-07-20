@@ -7,6 +7,7 @@ import KpiCard from "@/components/KpiCard";
 import { getButtonStyle } from "@/utils/kpiCalculations";
 import { DashboardHeader } from "@/components/DashboardHeader";
 import CategoryClient from './category/CategoryClient';
+import { CheckCircleIcon as IconCheck, XCircleIcon as XIcon } from '@heroicons/react/24/solid';
 
 export const categories = [
   { id: 1, name: "หมวด 1 ผลลัพธ์ด้านการนำองค์กร", icon: "🏛️" },
@@ -67,32 +68,44 @@ export default function DashboardPage() {
   return (
     <main className="p-6 space-y-6">
       {/* 1. Header & Stats Section */}
-{/* ปรับจาก grid-cols-1 md:grid-cols-3 ให้เป็น gap ที่กว้างขึ้น */}
-<div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-10"> 
-  
-  {/* เพิ่ม padding (p-8) เพื่อให้กล่องสูงขึ้น และเพิ่มขนาดตัวเลขให้เด่นขึ้น */}
-  <div className="bg-white p-8 rounded-2xl border text-center shadow-sm">
-    <p className="text-gray-500 text-lg">KPI ทั้งหมด</p>
-    <p className="text-6xl font-black text-purple-600 mt-2">{stats.total}</p>
-  </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6">
+        
+        {/* Card 1: KPI ทั้งหมด */}
+        <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 flex flex-col items-center">
+          <span className="text-gray-500 font-lg mb-2">KPI ทั้งหมด</span>
+          <span className="text-6xl font-black text-gray-500 ml-2">{stats.total}</span>
+        </div>
 
-  <div className="bg-white p-8 rounded-2xl border flex items-center justify-around shadow-sm">
-    <div className="text-center">
-      <p className="text-green-600 font-bold text-lg">ผ่าน</p>
-      <p className="text-4xl font-bold mt-2">✅ {stats.passed}</p>
-    </div>
-    <div className="text-center">
-      <p className="text-red-600 font-bold text-lg">ไม่ผ่าน</p>
-      <p className="text-4xl font-bold mt-2">❌ {stats.failed}</p>
-    </div>
-  </div>
+        {/* Card 2: ผ่าน/ไม่ผ่าน */}
+        <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 flex justify-around items-center">
+          {/* ฝั่ง "ผ่าน" */}
+          <div className="flex flex-col items-center gap-2">
+            <div className="text-green-600 font-bold text-2xl">ผ่าน</div>
+            <div className="flex items-center">
+              <IconCheck className="w-12 h-12 text-green-700" />
+              <span className="text-6xl font-black text-green-700 ml-2">{stats.passed}</span>
+            </div>
+          </div>
 
-  <div className="bg-white p-8 rounded-2xl border text-center shadow-sm">
-    <p className="text-gray-500 text-lg">สัดส่วนการผ่าน</p>
-    <p className="text-6xl font-black mt-2">{stats.percent}%</p>
-  </div>
-  
-</div>
+          {/* เส้นคั่นกลาง */}
+          <div className="w-px h-12 bg-gray-200"></div>
+
+          {/* ฝั่ง "ไม่ผ่าน" */}
+          <div className="flex flex-col items-center gap-2">
+            <div className="text-red-600 font-bold text-lg">ไม่ผ่าน</div>
+            <div className="flex items-center">
+              <XIcon className="w-8 h-8 text-red-500" />
+              <span className="text-3xl font-black text-red-700 ml-2">{stats.failed}</span>
+            </div>
+          </div>
+        </div>
+
+        {/* Card 3: สัดส่วนการผ่าน */}
+        <div className="bg-white p-8 rounded-3xl shadow-sm border border-gray-100 flex flex-col items-center">
+          <span className="text-gray-500 font-medium mb-4">สัดส่วนการผ่าน</span>
+          <span className="text-6xl font-black text-green-700 ml-2">{stats.percent}%</span>
+        </div>
+
+      </div>
     </main>
-  );
-}
+  )}

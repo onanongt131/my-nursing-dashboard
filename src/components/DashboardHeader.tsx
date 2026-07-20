@@ -11,7 +11,7 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, stats }: any) =
   ];
 
   return (
-    <div className="bg-white shadow-sm">
+   <div className="bg-white shadow-sm -mt-6"> {/* ใช้ -mt-6 เพื่อดึงขึ้นไปทับระยะห่างด้านบน */}
       {/* ส่วน Header หลัก */}
       <header className="flex items-center justify-between px-6 py-4 bg-white shadow-sm">
         <div className="flex items-center gap-4"> {/* เพิ่ม gap เป็น 4 เพื่อเว้นระยะ */}

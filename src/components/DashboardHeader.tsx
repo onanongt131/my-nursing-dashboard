@@ -7,7 +7,8 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, stats }: any) =
     { name: 'category', label: 'รายหมวด' },
     { name: 'strategy', label: 'แผนยุทธศาสตร์' },
     { name: 'unit', label: 'รายหน่วยงาน' },
-    { name: 'productivity', label: 'Productivity' }
+    { name: 'productivity', label: 'Productivity' },
+    { name: 'wp-qa', label: 'WP/QA', path: '/dashboard/wp-qa' }
   ];
 
   return (

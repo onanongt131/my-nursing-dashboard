@@ -13,19 +13,21 @@ export default function DashboardLayoutContent({ children }: { children: React.R
     if (pathname.startsWith('/dashboard/strategy')) return 'strategy';
     if (pathname.startsWith('/dashboard/departments')) return 'unit';
     if (pathname.startsWith('/dashboard/productivity')) return 'productivity';
+    if (pathname.startsWith('/dashboard/wp-qa')) return 'wp-qa'; // ปรับค่า return ให้ตรงกัน
     return 'dashboard';
   };
 
-  const activeTab = getActiveTab(); // ตอนนี้จะไม่มี Error แล้ว
+  const activeTab = getActiveTab();
 
-  // 2. ปรับ handleTabChange ให้เรียบร้อย (คุณเขียนไว้แล้ว ดีมากครับ)
+  // 2. ปรับ handleTabChange ให้เรียบร้อย
   const handleTabChange = (tabName: string) => {
-    const paths: any = {
+    const paths: Record<string, string> = {
       dashboard: '/dashboard',
       category: '/dashboard/category',
       strategy: '/dashboard/strategy',
       unit: '/dashboard/departments',
-      productivity: '/dashboard/productivity' // เพิ่มตรงนี้
+      productivity: '/dashboard/productivity',
+      'wp-qa': '/dashboard/wp-qa' // 💡 ใส่เครื่องหมายคำพูดครอบ เพราะมีขีดกลาง (-)
     };
     router.push(paths[tabName]);
   };

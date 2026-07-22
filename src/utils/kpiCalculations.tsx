@@ -27,8 +27,9 @@ export const calculateYearlyAverage = (entries: any[], year: number, type: KpiTy
   if (yearlyEntries.length === 0) return "-";
   const sum = yearlyEntries.reduce((acc, curr) => acc + calculateEntryValue(curr, type), 0);
   const avg = sum / yearlyEntries.length;
-  return type === 'count' ? avg.toFixed(0) : avg.toFixed(2);
+  return avg.toFixed(2);
 };
+  
 
 // --- 2. กลุ่มจัดการสถานะและการแสดงผล ---
 export const checkStatus = (value: number, target: number, operator: string, isHigherBetter: boolean = true): boolean => {

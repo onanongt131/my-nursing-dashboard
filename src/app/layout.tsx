@@ -17,11 +17,9 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     // นำ variable ของ sarabun มาใส่ที่นี่
-    <html lang="th" className={`${sarabun.variable}`}>
-      <body className="bg-gray-100 min-h-screen font-sans">
-        <main className="max-w-7xl mx-auto p-4 md:p-6">
-          {children}
-        </main>
+    <html lang="th" data-scroll-behavior="smooth">
+      <body>
+        {children}
       </body>
     </html>
   );

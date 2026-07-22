@@ -1,27 +1,81 @@
 // app/dashboard/category/CategoryClient.tsx
 'use client';
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '@/lib/supabaseClient'; // ปรับ path ให้ตรงกับที่เก็บไฟล์
+import { createClient } from '@/utils/supabase/client';
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
-import AddEntryForm from '@/components/AddEntryForm'; // ปรับ path ให้ตรง
-import { calculateYearlyAverage, checkStatus, getYearlyTrend, getButtonStyle } from '@/utils/kpiCalculations'; // ปรับ path ให้ตรง
+import AddEntryForm from '@/components/AddEntryForm'; 
+import { calculateYearlyAverage, checkStatus, getYearlyTrend, getButtonStyle } from '@/utils/kpiCalculations'; 
 
 export default function CategoryClient({ category }: { category: string }) {
+  const supabase = createClient();
   const [kpis, setKpis] = useState<any[]>([]);
   const [selectedKpi, setSelectedKpi] = useState<any | null>(null);
   const [loading, setLoading] = useState(true);
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
 
   const fetchData = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase
-      .from('kpis')
-      .select('*, kpi_entries(*)')
-      .eq('category', category);
-    
-    if (data) setKpis(data);
-    setLoading(false);
-  }, [category]);
+    try {
+      // 1. ดึงข้อมูล User และ Profile ปัจจุบัน พร้อม join ตาราง departments
+      const { data: { user } } = await supabase.auth.getUser();
+      let userProfile = null;
+
+      if (user) {
+        const { data } = await supabase
+          .from('profiles')
+          .select('*, departments(group)')
+          .eq('id', user.id)
+          .maybeSingle();
+        userProfile = data;
+      }
+
+      // 2. ดึงข้อมูล KPIs ทั้งหมดเฉพาะหมวดนี้
+      const { data: allKpis, error: kpiError } = await supabase
+        .from('kpis')
+        .select('*, kpi_entries(*)')
+        .eq('category', category);
+      
+      if (kpiError) {
+        console.error("Error fetching KPIs by category:", kpiError.message);
+      }
+
+      if (allKpis) {
+        let filtered = allKpis.filter((k: any) => k.departments_id === null);
+
+        if (userProfile && userProfile.role) {
+          const role = userProfile.role;
+          const userDeptId = userProfile.department_id;
+          const userGroup = (userProfile.departments as any)?.group;
+
+          if (role === 'staff') {
+            filtered = allKpis.filter((k: any) => k.departments_id === userDeptId);
+          } 
+          else if (role === 'head_department') {
+            filtered = allKpis.filter((k: any) => k.departments_id === userDeptId);
+          } 
+          else if (role === 'head_group' && userGroup) {
+            const { data: deptsInGroup } = await supabase
+              .from('departments')
+              .select('id')
+              .eq('group', userGroup);
+
+            const deptIds = deptsInGroup ? deptsInGroup.map(d => d.id) : [];
+            filtered = allKpis.filter((k: any) => deptIds.includes(k.departments_id));
+          }
+          else if (role === 'admin' || role === 'head_nurse') {
+            filtered = allKpis;
+          }
+        } else {
+          filtered = allKpis;
+        }
+
+        setKpis(filtered);
+      }
+    } catch (err) {
+      console.error("Unexpected error:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, [category, supabase]);
 
   useEffect(() => {
     fetchData();
@@ -62,9 +116,8 @@ export default function CategoryClient({ category }: { category: string }) {
                   </td>
                   {[2565, 2566, 2567, 2568, 2569].map((year) => {
                     const avg = calculateYearlyAverage(kpi.kpi_entries || [], year, kpi.Type);
-                            // ตรวจสอบว่า avg เป็นค่าว่าง, "-", หรือ null
-                            const hasData = avg !== null && avg !== "-" && avg !== ""; 
-                            const pass = hasData ? checkStatus(Number(avg), kpi.target_value, kpi.operator) : false;
+                    const hasData = avg !== null && avg !== "-" && avg !== ""; 
+                    const pass = hasData ? checkStatus(Number(avg), kpi.target_value, kpi.operator) : false;
 
                     return (
                       <td key={year} className="p-4 text-center">
@@ -81,7 +134,7 @@ export default function CategoryClient({ category }: { category: string }) {
                   <td className="p-4 text-center text-lg">{getYearlyTrend(kpi.kpi_entries || [], kpi.Type)}</td>
                   <td className="p-4 text-center">
                     <button onClick={() => setSelectedKpi(kpi)} className={getButtonStyle(kpi.kpi_entries || [], 'monthly')}>เพิ่ม</button>
-                    </td>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -89,9 +142,8 @@ export default function CategoryClient({ category }: { category: string }) {
         </div>
       </div>
     ) : (
-
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 relative">
+          <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm relative">
             <button onClick={() => setSelectedKpi(null)} className="mb-4 text-purple-600 font-bold text-sm">← ย้อนกลับ</button>
             <div className="absolute top-4 right-4 bg-red-50 border border-red-100 p-2 rounded-xl">
                 <span className="text-[10px] text-red-600 font-bold uppercase">Goal</span>

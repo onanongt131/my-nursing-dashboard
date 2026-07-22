@@ -45,9 +45,14 @@ const [formData, setFormData] = useState({
     const num = Number(formData.numerator);
     const den = Number(formData.denominator);
     const val = Number(formData.value);
-    let finalValue = type === 'percent' ? (den !== 0 ? (num / den) * 100 : 0) : 
-                     type === 'rate' ? (den !== 0 ? (num / den) * 1000 : 0) : val;
-
+    
+    // 1. คำนวณค่าดิบเก็บไว้ใน rawFinalValue
+    const rawFinalValue = type === 'percent' ? (den !== 0 ? (num / den) * 100 : 0) : 
+                          type === 'rate' ? (den !== 0 ? (num / den) * 1000 : 0) : val;
+    
+    // 2. แปลงเป็นทศนิยมไม่เกิน 2 ตำแหน่ง และเก็บใส่ตัวแปร finalValue เพียงครั้งเดียว
+    const finalValue = Number(Number(rawFinalValue).toFixed(2));
+    
     // สร้าง payload และส่งค่าในฟังก์ชันนี้เท่านั้น
     const payload = {
       kpi_id: kpiId,

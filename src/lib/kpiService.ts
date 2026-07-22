@@ -1,5 +1,4 @@
-import { supabase } from '@/lib/supabaseClient';
-import { createClient } from '@/utils/supabase/server'; // หรือ client ขึ้นอยู่กับการใช้งาน
+import { createClient } from '@/utils/supabase/client';
 
 interface KpiEntryPayload {
   kpi_id: number;
@@ -10,6 +9,8 @@ interface KpiEntryPayload {
   numerator?: number | null;
   denominator?: number | null;
 }
+
+const supabase = createClient();
 
 export const saveKpiEntry = async (payload: KpiEntryPayload) => {
   // 1. ด่านตรวจ: ตรวจสอบว่า supabase พร้อมใช้งานหรือไม่

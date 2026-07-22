@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useMemo, useCallback } from 'react';
-import { supabase } from '@/lib/supabaseClient';
+import { createClient } from '@/utils/supabase/client';
 import { LayoutDashboard, CheckCircle2, XCircle } from 'lucide-react';
 import AddEntryForm from '@/components/AddEntryForm';
 import KpiCard from "@/components/KpiCard";
@@ -27,6 +27,7 @@ export const strategicGoals = [
 ];
 
 export default function DashboardPage() {
+  const supabase = createClient();
   const [groupKpis, setGroupKpis] = useState<any[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);

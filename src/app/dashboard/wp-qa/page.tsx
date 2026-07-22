@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabaseClient';
+import { createClient } from '@/utils/supabase/client';
 
 interface Department {
   id: number | string;
@@ -23,6 +23,7 @@ interface TableRow {
 }
 
 export default function WpQaDashboard() {
+  const supabase = createClient();
   const [selectedDept, setSelectedDept] = useState<string>('');
   const [departments, setDepartments] = useState<Department[]>([]);
   const [tableData, setTableData] = useState<TableRow[]>([]);

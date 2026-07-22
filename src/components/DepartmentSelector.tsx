@@ -1,8 +1,9 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabaseClient'; 
+import { createClient } from '@/utils/supabase/client';
 
 export default function DepartmentSelector({ onSelect }: { onSelect: (id: number | null) => void }) {
+  const supabase = createClient();
   const [departments, setDepartments] = useState<any[]>([]);
 
   useEffect(() => {

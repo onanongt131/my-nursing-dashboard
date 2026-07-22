@@ -1,18 +1,23 @@
+// hooks/useIdleLogout.ts (หรือไฟล์ที่คุณเก็บ Hook นี้ไว้)
 'use client';
 import { useState, useEffect } from 'react';
-import { signOut } from 'next-auth/react'; // เปลี่ยนมาใช้ตัวนี้
+import { createClient } from '@/utils/supabase/client'; // 👈 นำเข้า Supabase client
 
 export const useIdleLogout = (timeoutInMinutes: number = 5) => {
   const [showWarning, setShowWarning] = useState(false);
   const timeoutMs = timeoutInMinutes * 60 * 1000;
+  const supabase = createClient(); // 👈 สร้าง instance ของ supabase
 
   useEffect(() => {
     let idleTimer: NodeJS.Timeout;
     let warningTimer: NodeJS.Timeout;
 
     const logout = async () => {
-      // ใช้ signOut ของ Next-Auth เพื่อเคลียร์คุกกี้ทั้งหมด
-      await signOut({ callbackUrl: '/login' });
+      // 1. ทำการ Logout จาก Supabase เพื่อเคลียร์ Session และ Token ฝั่งเซิร์ฟเวอร์/คุกกี้
+      await supabase.auth.signOut();
+      
+      // 2. เปลี่ยนเส้นทางไปยังหน้า Login พร้อมรีเฟรชหน้าจอเพื่อล้างค่า State ทั้งหมด
+      window.location.href = '/login';
     };
 
     const resetTimer = () => {
@@ -21,7 +26,6 @@ export const useIdleLogout = (timeoutInMinutes: number = 5) => {
       setShowWarning(false);
 
       // เตือนก่อน 1 นาที
-      // ใช้ Math.max เพื่อป้องกันกรณีตั้งเวลาสั้นกว่า 1 นาที
       const warningTime = Math.max(0, timeoutMs - 60000);
       warningTimer = setTimeout(() => setShowWarning(true), warningTime);
       
@@ -44,7 +48,7 @@ export const useIdleLogout = (timeoutInMinutes: number = 5) => {
       clearTimeout(idleTimer);
       clearTimeout(warningTimer);
     };
-  }, [timeoutMs]);
+  }, [timeoutMs, supabase]);
 
   return { showWarning, setShowWarning };
 };

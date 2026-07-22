@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { supabase } from '@/lib/supabaseClient';
+import { createClient } from '@/utils/supabase/client';
 import LogoutButton from '@/components/LogoutButton';
 import AddEntryForm from '@/components/AddEntryForm';
 import Link from 'next/link';
@@ -8,6 +8,7 @@ import { Home, CheckCircle, XCircle, Target, TrendingUp } from 'lucide-react';
 import KpiBarChart from '@/components/KpiBarChart';
 
 export default function KpiDetailClient({ id }: { id: string }) {
+  const supabase = createClient();
   const [kpi, setKpi] = useState<any>(null);
   const [categoryKpis, setCategoryKpis] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);

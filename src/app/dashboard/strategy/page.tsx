@@ -4,6 +4,7 @@ import { createClient } from '@/utils/supabase/client';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import AddEntryForm from '@/components/AddEntryForm';
 import { calculateYearlyAverage, checkStatus, getYearlyTrend, getButtonStyle } from '@/utils/kpiCalculations';
+import ThreePForm from '@/components/ThreePForm';
 
 export default function Strategic() {
   const supabase = createClient();
@@ -102,38 +103,36 @@ export default function Strategic() {
   if (loading) return <div className="p-8 text-center">กำลังโหลดข้อมูล...</div>;
 
   return (
-   <div className="space-y-6 mt-6 animate-in fade-in duration-500">
-    {/* 1. แถบเลือกยุทธศาสตร์ - ปรับให้ดูเด่นและกระชับ */}
-  <div className="flex gap-2">
-  {strategicGoals.map((goal) => (
-    <button
-        key={goal.id}
-        onClick={() => { 
-          setSelectedStrategic(goal.id);
-          setSelectedKpi(null); // 👈 เพิ่มบรรทัดนี้เพื่อเคลียร์หน้ากราฟที่ค้างอยู่เมื่อเปลี่ยนโรค
-        }}
-        className={`flex-1 px-2 py-3 rounded-xl border font-bold text-center transition-all ${
-          selectedStrategic === goal.id 
-            ? "bg-purple-400 text-white border-purple-600" 
-            : "bg-white text-gray-700 hover:bg-purple-50"
-        }`}
-      >
-  {goal.name}
-</button>
-  ))}
-</div>
+    <div className="space-y-6 mt-6 animate-in fade-in duration-500">
+      {/* 1. แถบเลือกยุทธศาสตร์ */}
+      <div className="flex gap-2">
+        {strategicGoals.map((goal) => (
+          <button
+            key={goal.id}
+            onClick={() => { 
+              setSelectedStrategic(goal.id);
+              setSelectedKpi(null); 
+            }}
+            className={`flex-1 px-2 py-3 rounded-xl border font-bold text-center transition-all ${
+              selectedStrategic === goal.id 
+                ? "bg-purple-400 text-white border-purple-600" 
+                : "bg-white text-gray-700 hover:bg-purple-50"
+            }`}
+          >
+            {goal.name}
+          </button>
+        ))}
+      </div>
 
-      {/* 2. เนื้อหาหลัก (แสดงเมื่อไม่ได้เลือก KPI เพื่อดูกราฟ) */}
+      {/* 2. เนื้อหาหลัก (แสดงเมื่อไม่ได้เลือก KPI) */}
       {!selectedKpi && (
         <div className="space-y-4">
-          {/* กลยุทธ์ : คำอธิบายยุทธศาสตร์ปัจจุบัน */}
           <div className="bg-purple-50/80 p-4 rounded-2xl border border-purple-100">
             <p className="text-purple-600 font-bold text-lg">
               {currentStrategic?.description}
             </p>
           </div>
 
-          {/* ฟิลเตอร์กลุ่มโรค (แสดงเฉพาะเมื่อเป็นยุทธศาสตร์ที่เกี่ยวข้อง เช่น Service Excellence) */}
           {isDiseaseStrategy && (
             <div className="flex flex-wrap gap-2">
               {diseaseList.map((disease) => (
@@ -155,13 +154,11 @@ export default function Strategic() {
             </div>
           )}
 
-          {/* 📌 ตารางข้อมูล (ต้องอยู่นอกเงื่อนไขโรค เพื่อให้แสดงผลได้ทุกยุทธศาสตร์) */}
           <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
                   <tr className="border-b bg-gray-50 text-xs text-gray-500 uppercase tracking-wider">
-                    {/* แสดงคอลัมน์โรคเฉพาะยุทธศาสตร์ที่มีการแบ่งโรค */}
                     {showDiseaseColumn && <th className="p-4">โรค</th>}
                     <th className="p-4">ตัวชี้วัด (KPI)</th>
                     <th className="p-4 text-center">Goal</th>
@@ -173,12 +170,8 @@ export default function Strategic() {
                 <tbody className="divide-y divide-gray-100">
                   {groupKpis
                     .filter((k: any) => {
-                      // 1. กรองตามยุทธศาสตร์ที่เลือกเสมอ
                       const matchStrategic = String(k.strategic_id) === String(selectedStrategic);
-                      
-                      // 2. ถ้าเป็นยุทธศาสตร์ที่มีโรค ให้กรองโรคด้วย (ถ้ายุทธศาสตร์อื่นไม่มีโรค ให้ข้ามเงื่อนไขนี้ไป)
                       const matchDisease = !isDiseaseStrategy || selectedDisease === "ทั้งหมด" || k.disease_name === selectedDisease;
-
                       return matchStrategic && matchDisease;
                     })
                     .map((kpi: any) => (
@@ -216,33 +209,36 @@ export default function Strategic() {
         </div>
       )}
 
-      {/* 2.2 หน้ากราฟ (เพิ่ม relative class ที่นี่ เพื่อไม่ให้ Goal box หลุดตำแหน่ง) */}
+      {/* 2.2 หน้ากราฟและฟอร์ม (แสดงเมื่อเลือก KPI แล้ว) */}
       {selectedKpi && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <div className="bg-white p-6 rounded-2xl border relative">
-            <button onClick={() => setSelectedKpi(null)} className="mb-4 text-purple-600 font-bold text-sm">← ย้อนกลับ</button>
-            <div className="absolute top-4 right-4 bg-red-50 border border-red-100 p-2 rounded-xl">
+        <div className="space-y-8">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="bg-white p-6 rounded-2xl border relative">
+              <button onClick={() => setSelectedKpi(null)} className="mb-4 text-purple-600 font-bold text-sm">← ย้อนกลับ</button>
+              <div className="absolute top-4 right-4 bg-red-50 border border-red-100 p-2 rounded-xl">
                 <span className="text-[10px] text-red-600 font-bold uppercase">Goal</span>
                 <span className="text-[10px] font-black text-red-700">{selectedKpi.operator} {selectedKpi.target_value}</span>
+              </div>
+              <h3 className="font-bold text-lg mb-6">{selectedKpi.name}</h3>
+              <ResponsiveContainer height={250} width="100%">
+                <BarChart data={[2565, 2566, 2567, 2568, 2569].map(y => ({ year: y, v: parseFloat(calculateYearlyAverage(selectedKpi.kpi_entries || [], y, selectedKpi.Type)) || 0 }))}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                  <XAxis dataKey="year" fontSize={12} />
+                  <YAxis fontSize={12} />
+                  <Tooltip cursor={{ fill: '#f9fafb' }} />
+                  <Bar dataKey="v" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
+                  <ReferenceLine y={selectedKpi.target_value} stroke="red" strokeDasharray="4 4" />
+                </BarChart>
+              </ResponsiveContainer>
             </div>
-            <h3 className="font-bold text-lg mb-6">{selectedKpi.name}</h3>
-            <ResponsiveContainer height={250} width="100%">
-              <BarChart data={[2565, 2566, 2567, 2568, 2569].map(y => ({ year: y, v: parseFloat(calculateYearlyAverage(selectedKpi.kpi_entries || [], y, selectedKpi.Type)) || 0 }))}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                <XAxis dataKey="year" fontSize={12} />
-                <YAxis fontSize={12} />
-                <Tooltip cursor={{ fill: '#f9fafb' }} />
-                <Bar dataKey="v" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
-                <ReferenceLine y={selectedKpi.target_value} stroke="red" strokeDasharray="4 4" />
-              </BarChart>
-            </ResponsiveContainer>
+            
+            <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+              <h3 className="font-bold text-gray-800 mb-6">บันทึกผลการดำเนินงาน</h3>
+              <AddEntryForm kpiId={selectedKpi.id} type={selectedKpi.Type} onSuccess={() => { setSelectedKpi(null); fetchData(); }} />
+            </div>
           </div>
-          <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-                      <h3 className="font-bold text-gray-800 mb-6">บันทึกผลการดำเนินงาน</h3>
-                      <AddEntryForm kpiId={selectedKpi.id} type={selectedKpi.Type} onSuccess={() => { setSelectedKpi(null); fetchData(); }} />
-                    </div>
-                  </div>
-              )}
-            </div>
-          );
-          }
+        </div>
+      )}
+    </div>
+  );
+}

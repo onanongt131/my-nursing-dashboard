@@ -72,18 +72,30 @@ const [formData, setFormData] = useState({
     alert("บันทึกผลงานแล้ว");
   };
 
-  // 2. บันทึกเฉพาะ 3P (แยกฟังก์ชันอิสระ)
+  // 2. บันทึกเฉพาะ 3P (แก้ไขเพื่อป้องกัน Error 409 และรองรับ Upsert สมบูรณ์)
   const handleSave3P = async () => {
     setIsSaving3P(true);
-    const { error } = await supabase.from('kpi_3p_analysis').upsert({
-      kpi_id: kpiId,
-      purpose: formData.purpose,
-      process: formData.process,
-      performance: formData.performance,
-      updated_at: new Date().toISOString()
-    });
+    const targetKpiId = Number(kpiId);
+
+    const { error } = await supabase.from('kpi_3p_analysis').upsert(
+      {
+        kpi_id: targetKpiId,
+        purpose: formData.purpose,
+        process: formData.process,
+        performance: formData.performance,
+        updated_at: new Date().toISOString()
+      },
+      { onConflict: 'kpi_id' } // จุดสำคัญ: ป้องกันข้อมูลซ้ำโดยการอัปเดตทับทันทีถ้า kpi_id นี้มีอยู่แล้ว
+    );
+
     setIsSaving3P(false);
-    if (!error) alert("บันทึกการวิเคราะห์ 3P แล้ว");
+
+    if (error) {
+      alert("เกิดข้อผิดพลาดในการบันทึก: " + error.message);
+      return;
+    }
+
+    alert("บันทึกการวิเคราะห์ 3P แล้ว");
   };
 
   return (

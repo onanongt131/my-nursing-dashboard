@@ -4,9 +4,9 @@ import { createClient } from '@supabase/supabase-js';
 
 export default function ThreePForm({ kpiId }: { kpiId: string }) {
   const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [data, setData] = useState({ purpose: '', process: '', performance: '' });
@@ -14,11 +14,21 @@ export default function ThreePForm({ kpiId }: { kpiId: string }) {
   // 1. โหลดข้อมูลเดิมเมื่อเปิด Component
   useEffect(() => {
     const fetchData = async () => {
-      const { data: existingData } = await supabase
+      if (!kpiId) return;
+      setLoading(true);
+
+      const targetKpiId = Number(kpiId);
+
+      // ใช้ .maybeSingle() เพื่อดึงมาแค่ 1 แถวแบบปลอดภัย ไม่ให้เกิด Error 406
+      const { data: existingData, error } = await supabase
         .from('kpi_3p_analysis')
         .select('*')
-        .eq('kpi_id', kpiId)
-        .single();
+        .eq('kpi_id', targetKpiId)
+        .maybeSingle();
+
+      if (error) {
+        console.error("Error fetching 3P:", error.message);
+      }
 
       if (existingData) {
         setData({
@@ -26,29 +36,45 @@ export default function ThreePForm({ kpiId }: { kpiId: string }) {
           process: existingData.process || '',
           performance: existingData.performance || ''
         });
+      } else {
+        // ถ้ายังไม่มีข้อมูล ให้เคลียร์ฟอร์มเป็นค่าว่าง
+        setData({ purpose: '', process: '', performance: '' });
       }
       setLoading(false);
     };
+
     fetchData();
   }, [kpiId, supabase]);
 
-  // 2. ฟังก์ชันบันทึกข้อมูล (Upsert)
   const handleSave = async () => {
+    if (!kpiId) return;
     setSaving(true);
+    const targetKpiId = Number(kpiId);
+
+    // ใช้ .upsert และระบุ onConflict เพื่อให้ Supabase อัปเดตทับข้อมูลเก่าทันทีถ้า kpi_id ซ้ำ
     const { error } = await supabase
       .from('kpi_3p_analysis')
-      .upsert({ 
-        kpi_id: kpiId, 
-        ...data,
-        updated_at: new Date().toISOString()
-      });
+      .upsert(
+        { 
+          kpi_id: targetKpiId, 
+          purpose: data.purpose,
+          process: data.process,
+          performance: data.performance 
+        },
+        { onConflict: 'kpi_id' } // จุดนี้สำคัญมาก ต้องตรงกับชื่อคอลัมน์ที่เป็น Unique ในตาราง
+      );
 
-    if (error) alert('เกิดข้อผิดพลาด: ' + error.message);
-    else alert('บันทึกข้อมูล 3P เรียบร้อยแล้ว');
+    if (error) {
+      alert('เกิดข้อผิดพลาดในการบันทึก: ' + error.message);
+      setSaving(false);
+      return;
+    }
+
+    alert('บันทึกข้อมูล 3P เรียบร้อยแล้ว');
     setSaving(false);
   };
-
-  if (loading) return <div>กำลังโหลดข้อมูล...</div>;
+  
+  if (loading) return <div className="p-4 text-center text-gray-500">กำลังโหลดข้อมูล 3P...</div>;
 
   return (
     <div className="bg-white p-6 border rounded-xl shadow-sm space-y-4">

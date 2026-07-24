@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { BarChart, Bar, XAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import AddEntryForm from '@/components/AddEntryForm'; 
-import { calculateYearlyAverage, checkStatus, getYearlyTrend, getButtonStyle } from '@/utils/kpiCalculations'; 
+import { calculateYearlySummary, checkStatus, getYearlyTrend, getButtonStyle } from '@/utils/kpiCalculations';
 
 export default function CategoryClient({ category }: { category: string }) {
   const supabase = createClient();
@@ -115,7 +115,7 @@ export default function CategoryClient({ category }: { category: string }) {
                     {kpi.operator} {kpi.target_value}
                   </td>
                   {[2565, 2566, 2567, 2568, 2569].map((year) => {
-                    const avg = calculateYearlyAverage(kpi.kpi_entries || [], year, kpi.Type);
+                    const avg = calculateYearlySummary(kpi.kpi_entries || [], year, kpi.Type);
                     const hasData = avg !== null && avg !== "-" && avg !== ""; 
                     const pass = hasData ? checkStatus(Number(avg), kpi.target_value, kpi.operator) : false;
 
@@ -153,7 +153,7 @@ export default function CategoryClient({ category }: { category: string }) {
             <ResponsiveContainer height={250} width="100%">
               <BarChart data={[2565, 2566, 2567, 2568, 2569].map(y => ({
                 year: y,
-                value: parseFloat(calculateYearlyAverage(selectedKpi.kpi_entries || [], y, selectedKpi.Type).toString()) || 0
+                value: parseFloat(calculateYearlySummary(selectedKpi.kpi_entries || [], y, selectedKpi.Type).toString()) || 0
               }))}>
                 <XAxis dataKey="year" axisLine={false} tickLine={false} tick={{fill: '#64748b', fontSize: 12}} />
                 <Tooltip cursor={{fill: '#f8fafc'}} />

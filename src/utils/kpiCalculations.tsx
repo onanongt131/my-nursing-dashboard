@@ -28,7 +28,7 @@ export const calculateEntryValue = (entry: any, kpiType: KpiType): number | stri
   return Number(numVal.toFixed(2)) || 0;
 };
 
-export const calculateYearlyAverage = (entries: any[], year: number, type: KpiType): string => {
+export const calculateYearlySummary = (entries: any[], year: number, type: KpiType): string | number => {
   const yearlyEntries = entries.filter(e => e.year === year);
   if (yearlyEntries.length === 0) return "-";
 
@@ -37,10 +37,14 @@ export const calculateYearlyAverage = (entries: any[], year: number, type: KpiTy
     return acc + (typeof val === 'number' ? val : 0);
   }, 0);
 
-  const avg = sum / yearlyEntries.length;
+  // ถ้าเป็น count ให้คืนค่าผลรวม (SUM) ทันที ไม่หาค่าเฉลี่ย
+  if (type === 'count') {
+    return sum;
+  }
 
-  // ถ้าเป็น count และค่าเฉลี่ยเป็นจำนวนเต็ม ไม่ต้องแสดงทศนิยม .00
-  if (type === 'count' && Number.isInteger(avg)) {
+  // สำหรับ percent หรือ rate ใช้การหาค่าเฉลี่ยตามเดิม
+  const avg = sum / yearlyEntries.length;
+  if (Number.isInteger(avg)) {
     return avg.toString();
   }
 
@@ -65,19 +69,20 @@ export const checkStatus = (value: number, target: number, operator: string, isH
 };
 
 // ฟังก์ชัน Trend ที่ปรับปรุงตามความต้องการของคุณ
-export const getYearlyTrend = (entries: any[], kpiType: KpiType, currentYear: number = 2569): ReactNode => {
+export const getYearlyTrend = (entries: any[], kpiType: KpiType, currentYear: number = 2569): React.ReactNode => {
   const prevYear = currentYear - 1;
-  const avgCurrent = calculateYearlyAverage(entries, currentYear, kpiType);
-  const avgPrev = calculateYearlyAverage(entries, prevYear, kpiType);
+  const avgCurrent = calculateYearlySummary(entries, currentYear, kpiType);
+  const avgPrev = calculateYearlySummary(entries, prevYear, kpiType);
 
   if (avgCurrent === "-" || avgPrev === "-") return "-";
 
-  const valCurrent = parseFloat(avgCurrent);
-  const valPrev = parseFloat(avgPrev);
+  // ใช้ Number() แทน parseFloat เพื่อรองรับทั้ง string และ number ได้อย่างถูกต้อง
+  const valCurrent = Number(avgCurrent);
+  const valPrev = Number(avgPrev);
 
   if (valCurrent > valPrev) return <span className="text-green-500 font-bold text-sm">▲</span>;
   if (valCurrent < valPrev) return <span className="text-red-500 font-bold text-sm">▼</span>;
-  return <span className="text-blue-500 font-bold text-xl">○</span>;
+  return <span className="text-blue-500 font-bold text-xl">o</span>;
 };
 
 // --- 3. กลุ่มจัดการสถานะปุ่ม (Alert/Status) ---

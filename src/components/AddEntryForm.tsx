@@ -66,8 +66,8 @@ const [formData, setFormData] = useState({
       year: Number(formData.year),
       month: formData.month,
       value: finalValue,
-      numerator: type === 'count' ? finalValue : num,
-      denominator: type === 'count' ? 1 : den,
+      numerator: type === 'count' ? null : num,       // ถ้าเป็น count ให้เป็น null
+      denominator: type === 'count' ? null : den, // ถ้าเป็น count ให้เป็น null
       type: type
     };
 

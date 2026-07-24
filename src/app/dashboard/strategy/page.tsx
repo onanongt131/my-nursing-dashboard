@@ -3,8 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts';
 import AddEntryForm from '@/components/AddEntryForm';
-import { calculateYearlyAverage, checkStatus, getYearlyTrend, getButtonStyle } from '@/utils/kpiCalculations';
-import ThreePForm from '@/components/ThreePForm';
+import { calculateYearlySummary, checkStatus, getYearlyTrend, getButtonStyle } from '@/utils/kpiCalculations';
 
 export default function Strategic() {
   const supabase = createClient();
@@ -180,7 +179,7 @@ export default function Strategic() {
                         <td className="p-4 font-medium text-gray-900">{kpi.name}</td>
                         <td className="p-4 text-center font-bold text-gray-700">{kpi.operator} {kpi.target_value}</td>
                         {[2565, 2566, 2567, 2568, 2569].map((year) => {
-                          const avg = calculateYearlyAverage(kpi.kpi_entries || [], year, kpi.Type);
+                          const avg = calculateYearlySummary(kpi.kpi_entries || [], year, kpi.Type);
                           const hasData = avg !== null && avg !== "-" && avg !== ""; 
                           const pass = hasData ? checkStatus(Number(avg), kpi.target_value, kpi.operator) : false;
 
@@ -221,7 +220,10 @@ export default function Strategic() {
               </div>
               <h3 className="font-bold text-lg mb-6">{selectedKpi.name}</h3>
               <ResponsiveContainer height={250} width="100%">
-                <BarChart data={[2565, 2566, 2567, 2568, 2569].map(y => ({ year: y, v: parseFloat(calculateYearlyAverage(selectedKpi.kpi_entries || [], y, selectedKpi.Type)) || 0 }))}>
+                <BarChart data={[2565, 2566, 2567, 2568, 2569].map(y => ({ 
+                  year: y, 
+                  v: Number(calculateYearlySummary(selectedKpi.kpi_entries || [], y, selectedKpi.Type)) || 0 
+                }))}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} />
                   <XAxis dataKey="year" fontSize={12} />
                   <YAxis fontSize={12} />

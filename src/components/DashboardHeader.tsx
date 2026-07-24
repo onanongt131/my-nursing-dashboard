@@ -1,26 +1,30 @@
 'use client';
 import LogoutButton from "@/components/LogoutButton";
+import { usePathname } from 'next/navigation';
 
 export const DashboardHeader = ({ title, activeTab, onTabChange, stats }: any) => {
+  const pathname = usePathname();
+
   const tabs = [
-    { name: 'dashboard', label: 'ภาพรวม' },
-    { name: 'category', label: 'รายหมวด' },
-    { name: 'strategy', label: 'แผนยุทธศาสตร์' },
-    { name: 'unit', label: 'รายหน่วยงาน' },
-    { name: 'productivity', label: 'Productivity' },
-    { name: 'wp-qa', label: 'WP/QA', path: '/dashboard/wp-qa' }
+    { name: 'dashboard', label: 'ภาพรวม', path: '/dashboard' },
+    { name: 'category', label: 'รายหมวด', path: '/dashboard/category' },
+    { name: 'strategy', label: 'แผนยุทธศาสตร์', path: '/dashboard/strategy' },
+    { name: 'unit', label: 'รายหน่วยงาน', path: '/dashboard/departments' }, // ปรับ path ให้ตรงกับฟังก์ชัน handleTabChange ของคุณ
+    { name: 'productivity', label: 'Productivity', path: '/dashboard/productivity' },
+    { name: 'wp-qa', label: 'WP/QA', path: '/dashboard/wp-qa' },
+    { name: 'audit-chart', label: 'Audit chart', path: '/dashboard/audit-chart' }
   ];
 
   return (
-   <div className="bg-white shadow-sm -mt-6"> {/* ใช้ -mt-6 เพื่อดึงขึ้นไปทับระยะห่างด้านบน */}
+    <div className="bg-white shadow-sm -mt-6">
       {/* ส่วน Header หลัก */}
       <header className="flex items-center justify-between px-6 py-4 bg-white shadow-sm">
-        <div className="flex items-center gap-4"> {/* เพิ่ม gap เป็น 4 เพื่อเว้นระยะ */}
+        <div className="flex items-center gap-4">
           <img 
             src="/Logo-NSO.png" 
             alt="Logo" 
-            className="h-14 w-14 object-contain" // ปรับให้เป็นขนาดคงที่เพื่อป้องกันภาพยืดหรือเบี้ยว
-            onError={(e) => { e.currentTarget.style.display = 'none'; }} // ซ่อนรูปถ้าโหลดไม่ขึ้น เพื่อไม่ให้แสดงชื่อ alt
+            className="h-14 w-14 object-contain"
+            onError={(e) => { e.currentTarget.style.display = 'none'; }}
           />
           <div>
             <h1 className="text-3xl font-bold text-gray-800">กลุ่มภารกิจด้านการพยาบาล โรงพยาบาลวชิระภูเก็ต</h1>
@@ -29,24 +33,29 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, stats }: any) =
         <LogoutButton />
       </header>
 
-      {/* เพิ่ม mt-4 หรือ mt-6 เพื่อให้แถบ Tabs ขยับห่างจาก Header ด้านบน */}
-<nav className="flex gap-8 px-6 border-b border-gray-200 mt-4" role="tablist">
-  {tabs.map((tab) => (
-    <button
-      key={tab.name}
-      onClick={() => onTabChange(tab.name)}
-      aria-selected={activeTab === tab.name}
-      role="tab"
-      className={`pb-3 px-1 font-medium transition-all border-b-2 duration-300 ${
-        activeTab === tab.name 
-          ? 'border-purple-600 text-purple-700' 
-          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-      }`}
-    >
-      {tab.label}
-    </button>
-  ))}
-</nav>
+      {/* แถบ Tabs */}
+      <nav className="flex gap-8 px-6 border-b border-gray-200 mt-4" role="tablist">
+        {tabs.map((tab) => {
+          // เช็คว่า active จากทั้ง URL path ปัจจุบัน หรือจาก prop activeTab ที่ส่งเข้ามา
+          const isActive = pathname === tab.path || activeTab === tab.name;
+
+          return (
+            <button
+              key={tab.name}
+              onClick={() => onTabChange && onTabChange(tab.name)}
+              aria-selected={isActive}
+              role="tab"
+              className={`pb-3 px-1 font-medium transition-all border-b-2 duration-300 ${
+                isActive 
+                  ? 'border-purple-600 text-purple-700' 
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              }`}
+            >
+              {tab.label}
+            </button>
+          );
+        })}
+      </nav>
     </div>
-  );
-};
+  )
+}

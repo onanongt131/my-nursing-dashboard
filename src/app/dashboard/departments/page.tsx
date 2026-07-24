@@ -5,7 +5,7 @@ import { createClient } from '@/utils/supabase/client';
 import AddEntryForm from '@/components/AddEntryForm';
 import React from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ResponsiveContainer } from 'recharts';
-import { calculateYearlyAverage, checkStatus, getYearlyTrend, getButtonStyle } from '@/utils/kpiCalculations';
+import { calculateYearlySummary, checkStatus, getYearlyTrend, getButtonStyle } from '@/utils/kpiCalculations';
 
 export default function DepartmentPage() {
   const [data, setData] = useState<any[]>([]);

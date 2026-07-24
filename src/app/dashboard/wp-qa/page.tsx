@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { createClient } from '@/utils/supabase/client';
 
 interface Department {
@@ -9,7 +9,8 @@ interface Department {
 }
 
 interface WpRecord {
-  fiscal_year: number;
+  id?: number;
+  fiscal_year: number | string;
   department_id: number | string;
   month: number;
   name: string;
@@ -17,39 +18,32 @@ interface WpRecord {
 }
 
 interface TableRow {
-  name: string;
+  labelName: string;
   months: (number | string)[];
   average: number | string;
 }
 
 export default function WpQaDashboard() {
   const supabase = createClient();
-  const [selectedDept, setSelectedDept] = useState<string>('');
+  const [selectedYear, setSelectedYear] = useState<string>('2569');
+  const [selectedDept, setSelectedDept] = useState<string>(''); // ค่าว่าง = ภาพรวมทุกหน่วยงาน
   const [departments, setDepartments] = useState<Department[]>([]);
-  const [tableData, setTableData] = useState<TableRow[]>([]);
+  const [rawData, setRawData] = useState<WpRecord[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
-  const [summaryPercentage, setSummaryPercentage] = useState<number | string>(0);
-  const [passCount, setPassCount] = useState<number>(0);
-  const [failCount, setFailCount] = useState<number>(0);
 
   useEffect(() => {
-    fetchDepartments();
+    fetchDepartmentsAndAllData();
   }, []);
 
-  useEffect(() => {
-    fetchWpQaData(selectedDept);
-  }, [selectedDept]);
-
-  const fetchDepartments = async () => {
+  const fetchDepartmentsAndAllData = async () => {
+    setLoading(true);
     try {
-      const { data, error } = await supabase.from('departments').select('id, Department');
-      if (error) {
-        console.warn("Could not fetch departments table, skipping dropdown list:", error.message);
-        return;
-      }
-      if (data) {
+      const deptRes = await supabase.from('departments').select('id, Department');
+      if (deptRes.error) {
+        console.warn("Could not fetch departments table:", deptRes.error.message);
+      } else if (deptRes.data) {
         const excludedDepts = ["IC", "ฝ่ายการพยาบาล", "MICU 3", "ห้องคลอด", "ห้องผ่าตัด", "วิสัญญี", "OPD"];
-        const filteredData = data.filter(item => !excludedDepts.includes(item.Department));
+        const filteredData = deptRes.data.filter(item => !excludedDepts.includes(item.Department));
 
         const formattedDepts = filteredData.map(item => ({
           id: item.id,
@@ -57,23 +51,33 @@ export default function WpQaDashboard() {
         }));
         setDepartments(formattedDepts);
       }
-    } catch (err) {
-      console.error("Error fetching departments:", err);
-    }
-  };
 
-  const fetchWpQaData = async (deptId: string) => {
-    setLoading(true);
-    try {
-      let query = supabase.from('wp_qa_results').select('*');
-      
-      if (deptId !== '') {
-        query = query.eq('department_id', deptId);
+      let allWpData: WpRecord[] = [];
+      let page = 0;
+      const pageSize = 1000;
+      let hasMore = true;
+
+      while (hasMore) {
+        const { data, error } = await supabase
+          .from('wp_qa_results')
+          .select('*')
+          .range(page * pageSize, (page + 1) * pageSize - 1);
+
+        if (error) throw error;
+
+        if (data && data.length > 0) {
+          allWpData = [...allWpData, ...data];
+          if (data.length < pageSize) {
+            hasMore = false;
+          } else {
+            page += 1;
+          }
+        } else {
+          hasMore = false;
+        }
       }
-      
-      const { data, error } = await query;
-      if (error) throw error;
-      processTableData(data || []);
+
+      setRawData(allWpData);
     } catch (err) {
       console.error("Error fetching WP/QA data:", err);
     } finally {
@@ -81,84 +85,221 @@ export default function WpQaDashboard() {
     }
   };
 
-  // ใช้ตรรกะคำนวณตัวชี้วัดเสมอ (ตามที่ผู้ใช้ต้องการ: "เอาเฉพาะ ร้อยละการปฏิบัติตามแนวทาง WP/QA")
-  const processTableData = (rawData: WpRecord[]) => {
+  const availableYears = useMemo(() => {
+    const years = rawData.map(item => String(item.fiscal_year));
+    return Array.from(new Set(years)).sort().reverse();
+  }, [rawData]);
+
+  const departmentMapName = useMemo(() => {
+    const map: { [key: string]: string } = {};
+    departments.forEach((dept) => {
+      map[String(dept.id).trim()] = dept.name;
+    });
+    return map;
+  }, [departments]);
+
+  const { tableData, passCount, failCount, summaryPercentage, totalItemsCount } = useMemo(() => {
     const monthsOrder = [10, 11, 12, 1, 2, 3, 4, 5, 6, 7, 8, 9];
-    const grouped: { [key: string]: { [month: number]: { sum: number; count: number } } } = {};
 
-    rawData.forEach((item) => {
-      if (!grouped[item.name]) {
-        grouped[item.name] = {};
-      }
-      if (!grouped[item.name][item.month]) {
-        grouped[item.name][item.month] = { sum: 0, count: 0 };
-      }
-
-      const val = item.wp;
-      if (val !== undefined && val !== null && val !== ("" as any)) {
-        grouped[item.name][item.month].sum += Number(val);
-        grouped[item.name][item.month].count += 1;
-      }
+    const filteredByYear = rawData.filter(item => {
+      return String(item.fiscal_year || '').trim() === String(selectedYear).trim();
     });
 
-    let pCount = 0;
-    let totalIndicators = 0;
+    const isOverview = selectedDept === '';
 
-    const formatted: TableRow[] = Object.keys(grouped).map((name) => {
-      let totalSumYear = 0;
-      let totalCountYear = 0;
+    if (isOverview) {
+      const deptGrouped: { [deptIdStr: string]: { [month: number]: { [indicatorName: string]: number } } } = {};
+      const deptIndicatorScoresYear: { [deptIdStr: string]: { [indicatorName: string]: number[] } } = {};
 
-      const monthValues = monthsOrder.map((m) => {
-        const monthData = grouped[name][m];
-        if (monthData && monthData.count > 0) {
-          const avgMonthVal = monthData.sum / monthData.count;
-          totalSumYear += avgMonthVal;
-          totalCountYear += 1;
-          return Number(avgMonthVal.toFixed(1));
+      filteredByYear.forEach((item) => {
+        const deptIdStr = String(item.department_id || '').trim();
+        if (!deptIdStr || !item.name) return;
+
+        if (!deptGrouped[deptIdStr]) {
+          deptGrouped[deptIdStr] = {};
         }
-        return "ไม่มีข้อมูล";
+        if (!deptGrouped[deptIdStr][item.month]) {
+          deptGrouped[deptIdStr][item.month] = {};
+        }
+
+        const val = item.wp;
+        if (val !== undefined && val !== null && val !== ("" as any)) {
+          const numVal = Number(val);
+          deptGrouped[deptIdStr][item.month][item.name] = numVal;
+
+          if (!deptIndicatorScoresYear[deptIdStr]) {
+            deptIndicatorScoresYear[deptIdStr] = {};
+          }
+          if (!deptIndicatorScoresYear[deptIdStr][item.name]) {
+            deptIndicatorScoresYear[deptIdStr][item.name] = [];
+          }
+          deptIndicatorScoresYear[deptIdStr][item.name].push(numVal);
+        }
       });
 
-      const average = totalCountYear > 0 ? Number((totalSumYear / totalCountYear).toFixed(1)) : "ไม่มีข้อมูล";
+      let pCount = 0;
+      let totalDepts = 0;
 
-      totalIndicators += 1;
-      if (average !== "ไม่มีข้อมูล" && Number(average) >= 90) {
-        pCount += 1;
-      }
+      const formatted: TableRow[] = Object.keys(deptGrouped).map((deptIdStr) => {
+        const monthValues = monthsOrder.map((m) => {
+          const monthIndicators = deptGrouped[deptIdStr][m];
+          if (!monthIndicators) return "ไม่มีข้อมูล";
+
+          const indicatorNames = Object.keys(monthIndicators);
+          if (indicatorNames.length === 0) return "ไม่มีข้อมูล";
+
+          let passInMonth = 0;
+          let totalInMonth = indicatorNames.length;
+
+          indicatorNames.forEach((indName) => {
+            const score = monthIndicators[indName];
+            if (score >= 90) {
+              passInMonth += 1;
+            }
+          });
+
+          const monthlyPercent = (passInMonth / totalInMonth) * 100;
+          return Number(monthlyPercent.toFixed(1));
+        });
+
+        const indicatorsMap = deptIndicatorScoresYear[deptIdStr] || {};
+        const indicatorNamesList = Object.keys(indicatorsMap);
+        let average: number | string = "ไม่มีข้อมูล";
+
+        if (indicatorNamesList.length > 0) {
+          let passIndCount = 0;
+          indicatorNamesList.forEach((indName) => {
+            const scores = indicatorsMap[indName];
+            const avgScore = scores.reduce((a, b) => a + b, 0) / scores.length;
+            if (avgScore >= 90) {
+              passIndCount += 1;
+            }
+          });
+          average = Number(((passIndCount / indicatorNamesList.length) * 100).toFixed(1));
+        }
+
+        const deptName = departmentMapName[deptIdStr] || `หน่วยงาน ID: ${deptIdStr}`;
+
+        totalDepts += 1;
+        if (average !== "ไม่มีข้อมูล" && Number(average) >= 90) {
+          pCount += 1;
+        }
+
+        return {
+          labelName: deptName,
+          months: monthValues,
+          average
+        };
+      });
+
+      const fCount = totalDepts - pCount;
+      const percent = totalDepts > 0 ? Number(((pCount / totalDepts) * 100).toFixed(1)) : 0;
 
       return {
-        name,
-        months: monthValues,
-        average
+        tableData: formatted,
+        passCount: pCount,
+        failCount: fCount,
+        summaryPercentage: percent,
+        totalItemsCount: totalDepts
       };
-    });
 
-    setTableData(formatted);
-
-    const fCount = totalIndicators - pCount;
-    setPassCount(pCount);
-    setFailCount(fCount);
-
-    if (totalIndicators > 0) {
-      const percent = (pCount / totalIndicators) * 100;
-      setSummaryPercentage(Number(percent.toFixed(1)));
     } else {
-      setSummaryPercentage(0);
+      const filteredByDept = filteredByYear.filter(item => {
+        return String(item.department_id || '').trim() === String(selectedDept).trim();
+      });
+
+      const indicatorGrouped: { [name: string]: { [month: number]: number[] } } = {};
+
+      filteredByDept.forEach((item) => {
+        if (!item.name) return;
+        if (!indicatorGrouped[item.name]) {
+          indicatorGrouped[item.name] = {};
+        }
+        if (!indicatorGrouped[item.name][item.month]) {
+          indicatorGrouped[item.name][item.month] = [];
+        }
+
+        const val = item.wp;
+        if (val !== undefined && val !== null && val !== ("" as any)) {
+          indicatorGrouped[item.name][item.month].push(Number(val));
+        }
+      });
+
+      let passIndicatorsCount = 0;
+      let failIndicatorsCount = 0;
+      let totalIndicators = 0;
+
+      const formatted: TableRow[] = Object.keys(indicatorGrouped).map((name) => {
+        const monthMap = indicatorGrouped[name];
+
+        const monthValues = monthsOrder.map((m) => {
+          const scores = monthMap[m];
+          if (scores && scores.length > 0) {
+            const sum = scores.reduce((a, b) => a + b, 0);
+            const avg = sum / scores.length;
+            return Number(avg.toFixed(1));
+          }
+          return "ไม่มีข้อมูล";
+        });
+
+        const allScoresFlat = Object.values(monthMap).flat();
+        let indicatorYearAvg: number | string = "ไม่มีข้อมูล";
+        if (allScoresFlat.length > 0) {
+          indicatorYearAvg = allScoresFlat.reduce((a, b) => a + b, 0) / allScoresFlat.length;
+        }
+
+        totalIndicators += 1;
+        const isPass = indicatorYearAvg !== "ไม่มีข้อมูล" && Number(indicatorYearAvg) >= 90;
+        if (isPass) {
+          passIndicatorsCount += 1;
+        } else {
+          failIndicatorsCount += 1;
+        }
+
+        return {
+          labelName: name,
+          months: monthValues,
+          average: indicatorYearAvg !== "ไม่มีข้อมูล" ? Number(indicatorYearAvg.toFixed(1)) : "ไม่มีข้อมูล"
+        };
+      });
+
+      const summaryPercent = totalIndicators > 0 ? Number(((passIndicatorsCount / totalIndicators) * 100).toFixed(1)) : 0;
+
+      return {
+        tableData: formatted,
+        passCount: passIndicatorsCount,
+        failCount: failIndicatorsCount,
+        summaryPercentage: summaryPercent,
+        totalItemsCount: totalIndicators
+      };
     }
-  };
+  }, [rawData, selectedYear, selectedDept, departmentMapName]);
 
   return (
-    <div className="p-6 bg-white rounded-xl shadow-xs">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6 gap-4">
+    <div className="p-6 bg-white rounded-xl shadow-xs space-y-6">
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <h2 className="text-xl font-bold text-gray-800">ผลการประเมินแนวทางปฏิบัติ WP/QA</h2>
         
-        <div className="flex items-center space-x-3 bg-gray-50/80 px-4 py-2.5 rounded-xl border border-purple-100/60 shadow-xs">
-          <label className="text-sm font-semibold text-gray-700">หน่วยงาน:</label>
-          <div className="relative">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center space-x-2 bg-gray-50/80 px-3 py-2 rounded-xl border border-purple-100/60 shadow-xs">
+            <label className="text-sm font-semibold text-gray-700">ปีงบฯ:</label>
+            <select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(e.target.value)}
+              className="bg-white border border-purple-200 rounded-lg px-3 py-1.5 text-sm font-medium text-gray-800 focus:outline-none focus:ring-2 focus:ring-purple-500/20"
+            >
+              {availableYears.map((yr) => (
+                <option key={yr} value={yr}>{yr}</option>
+              ))}
+            </select>
+          </div>
+
+          <div className="flex items-center space-x-2 bg-gray-50/80 px-3 py-2 rounded-xl border border-purple-100/60 shadow-xs">
+            <label className="text-sm font-semibold text-gray-700">หน่วยงาน:</label>
             <select
               value={selectedDept}
               onChange={(e) => setSelectedDept(e.target.value)}
-              className="appearance-none bg-white border border-purple-200 hover:border-purple-400 rounded-xl px-4 py-2 pr-10 text-sm font-medium text-gray-800 focus:outline-none focus:ring-2 focus:ring-purple-500/20 focus:border-purple-600 transition-all cursor-pointer shadow-xs min-w-[240px]"
+              className="bg-white border border-purple-200 rounded-lg px-3 py-1.5 text-sm font-medium text-gray-800 focus:outline-none focus:ring-2 focus:ring-purple-500/20 min-w-[220px]"
             >
               <option value="">-- ภาพรวมทั้งหมด (ทุกหน่วยงาน) --</option>
               {departments.map((dept) => (
@@ -167,22 +308,21 @@ export default function WpQaDashboard() {
                 </option>
               ))}
             </select>
-            <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-purple-500">
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
-              </svg>
-            </div>
           </div>
         </div>
       </div>
 
-      <div className="mb-5 p-4 bg-purple-50/50 border border-purple-100 rounded-xl flex flex-col md:flex-row items-center justify-between gap-3 shadow-2xs">
+      <div className="p-4 bg-purple-50/50 border border-purple-100 rounded-xl flex flex-col md:flex-row items-center justify-between gap-3 shadow-2xs">
         <div className="text-sm font-semibold text-gray-700">
           <span>📊 ร้อยละการปฏิบัติตามแนวทาง WP/QA ผ่านเกณฑ์:</span>
         </div>
 
         <div className="text-sm font-medium text-gray-600 bg-white/60 px-4 py-1.5 rounded-lg border border-purple-100/60 shadow-2xs">
-          <span>ผ่าน <strong className="text-emerald-700">{passCount}</strong> ตัวชี้วัด / ไม่ผ่าน <strong className="text-rose-600">{failCount}</strong> ตัวชี้วัด</span>
+          <span>
+            ผ่าน <strong className="text-emerald-700">{passCount}</strong> {selectedDept === '' ? 'หน่วยงาน' : 'ตัวชี้วัด'} / 
+            ไม่ผ่าน <strong className="text-rose-600">{failCount}</strong> {selectedDept === '' ? 'หน่วยงาน' : 'ตัวชี้วัด'} 
+            <span className="text-gray-400 text-xs ml-1">(จากทั้งหมด {totalItemsCount})</span>
+          </span>
         </div>
 
         <div className="px-4 py-1.5 bg-white border border-purple-200 rounded-lg shadow-2xs">
@@ -191,10 +331,12 @@ export default function WpQaDashboard() {
       </div>
 
       <div className="overflow-x-auto border border-purple-100 rounded-xl shadow-xs">
-        <table className="min-w-full border-collapse text-center text-sm table-fixed">
+        <table className="min-w-full border-collapse text-center text-sm">
           <thead>
             <tr className="bg-purple-50/40 text-gray-700 border-b border-purple-100/80">
-              <th className="p-3.5 text-left border-r border-purple-100/80 font-bold text-gray-800 w-[380px]">ชื่อแนวทาง (WP/QA)</th>
+              <th className="p-3.5 px-6 text-left border-r border-purple-100/80 font-bold text-gray-800 w-auto">
+                {selectedDept === '' ? 'ชื่อหน่วยงาน' : 'ชื่อแนวทาง (WP/QA)'}
+              </th>
               {['OCT', 'NOV', 'DEC', 'JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP'].map((m) => (
                 <th key={m} className="py-3.5 px-1 border-r border-purple-100/80 font-bold text-purple-900 text-xs w-[62px]">{m}</th>
               ))}
@@ -204,7 +346,7 @@ export default function WpQaDashboard() {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={14} className="p-6 text-gray-400">กำลังโหลดข้อมูล...</td>
+                <td colSpan={14} className="p-6 text-gray-400">กำลังโหลดข้อมูลทั้งหมด...</td>
               </tr>
             ) : tableData.length > 0 ? (
               tableData.map((row, index) => {
@@ -221,7 +363,9 @@ export default function WpQaDashboard() {
 
                 return (
                   <tr key={index} className={`border-b border-purple-100/60 ${rowBgClass} hover:bg-purple-50/30 transition-colors`}>
-                    <td className="p-3.5 text-left border-r border-purple-100/60 font-medium text-gray-800 break-words leading-relaxed">{row.name}</td>
+                    <td className="p-3.5 px-6 text-left border-r border-purple-100/60 font-medium text-gray-800 break-words leading-relaxed w-auto">
+                      {row.labelName}
+                    </td>
                     
                     {row.months.map((val, idx) => {
                       let badgeStyle = "bg-gray-50/60 text-gray-400 border-gray-200/50 text-[10px] px-1 py-0.5 tracking-tighter";
@@ -249,7 +393,7 @@ export default function WpQaDashboard() {
               })
             ) : (
               <tr>
-                <td colSpan={14} className="p-6 text-gray-400">ไม่พบข้อมูลผลการประเมิน WP/QA</td>
+                <td colSpan={14} className="p-6 text-gray-400">ไม่พบข้อมูลผลการประเมิน WP/QA สำหรับเงื่อนไขที่เลือก</td>
               </tr>
             )}
           </tbody>

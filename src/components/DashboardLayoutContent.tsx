@@ -28,6 +28,7 @@ export default function DashboardLayoutContent({ profile, children }: DashboardL
     if (pathname.startsWith('/dashboard/departments')) return 'unit';
     if (pathname.startsWith('/dashboard/productivity')) return 'productivity';
     if (pathname.startsWith('/dashboard/wp-qa')) return 'wp-qa';
+    if (pathname.startsWith('/dashboard/audit-chart')) return 'Audit chart';
     return 'dashboard';
   };
 
@@ -40,9 +41,12 @@ export default function DashboardLayoutContent({ profile, children }: DashboardL
       strategy: '/dashboard/strategy',
       unit: '/dashboard/departments',
       productivity: '/dashboard/productivity',
-      'wp-qa': '/dashboard/wp-qa'
+      'wp-qa': '/dashboard/wp-qa',
+      'audit-chart': '/dashboard/audit-chart' // ปรับให้เป็นตัวพิมพ์เล็กให้ตรงกับชื่อแท็บ
     };
-    router.push(paths[tabName]);
+    
+    const targetPath = paths[tabName] || '/dashboard';
+    router.push(targetPath);
   };
 
   return (

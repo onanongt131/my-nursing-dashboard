@@ -37,7 +37,7 @@ const [formData, setFormData] = useState({
     }
   }, [isOpen, kpiId, supabase]);
 
-  // 1. บันทึกเฉพาะตัวเลข (จัดการ payload ไว้ในนี้)
+ // 1. บันทึกเฉพาะตัวเลข (จัดการ payload ไว้ในนี้)
   const handleSaveNumeric = async () => {
     setIsSavingNum(true);
     
@@ -46,21 +46,27 @@ const [formData, setFormData] = useState({
     const den = Number(formData.denominator);
     const val = Number(formData.value);
     
-    // 1. คำนวณค่าดิบเก็บไว้ใน rawFinalValue
-    const rawFinalValue = type === 'percent' ? (den !== 0 ? (num / den) * 100 : 0) : 
-                          type === 'rate' ? (den !== 0 ? (num / den) * 1000 : 0) : val;
-    
-    // 2. แปลงเป็นทศนิยมไม่เกิน 2 ตำแหน่ง และเก็บใส่ตัวแปร finalValue เพียงครั้งเดียว
-    const finalValue = Number(Number(rawFinalValue).toFixed(2));
+    let finalValue = 0;
+
+    if (type === 'count') {
+      // ถ้าเป็นประเภท count: ใช้ค่าที่กรอก (val) โดยถ้ามีทศนิยมให้ปัดไม่เกิน 2 ตำแหน่ง แต่ถ้าเป็นจำนวนเต็มจะไม่เติม .00
+      finalValue = Number(Number(val).toFixed(2));
+    } else {
+      // ถ้าเป็น percent หรือ rate: คำนวณสูตรปกติ
+      const rawFinalValue = type === 'percent' ? (den !== 0 ? (num / den) * 100 : 0) : 
+                            type === 'rate' ? (den !== 0 ? (num / den) * 1000 : 0) : val;
+      
+      finalValue = Number(Number(rawFinalValue).toFixed(2));
+    }
     
     // สร้าง payload และส่งค่าในฟังก์ชันนี้เท่านั้น
     const payload = {
-      kpi_id: kpiId,
+      kpi_id: Number(kpiId),
       department_id: deptId || null,
       year: Number(formData.year),
       month: formData.month,
       value: finalValue,
-      numerator: type === 'count' ? val : num,
+      numerator: type === 'count' ? finalValue : num,
       denominator: type === 'count' ? 1 : den,
       type: type
     };

@@ -4,8 +4,8 @@ import { ReactNode } from 'react';
 export type KpiType = 'percent' | 'rate' | 'count';
 
 // --- 1. กลุ่มคำนวณค่าพื้นฐาน ---
-export const calculateEntryValue = (entry: any, kpiType: KpiType): number => {
-  if (!entry) return 0;
+export const calculateEntryValue = (entry: any, kpiType: KpiType): number | string => {
+  if (!entry) return "-";
 
   // 1. ถ้าเป็น Percent หรือ Rate ที่มีสูตร (มี numerator/denominator) ให้คำนวณตามสูตร
   if (kpiType === 'percent' && entry.numerator != null && entry.denominator > 0) {
@@ -15,18 +15,35 @@ export const calculateEntryValue = (entry: any, kpiType: KpiType): number => {
     return Number(((entry.numerator / entry.denominator) * 1000).toFixed(2));
   }
 
-  // 2. ถ้าไม่มีค่า numerator หรือเป็นประเภท count ให้ดึงจาก column 'value' เป็นลำดับแรก
-  // หาก column 'value' ไม่มี (เป็น null/undefined) ให้ไปใช้ numerator
+  // 2. ถ้าเป็นประเภท count ให้ดึงค่ามาตรงๆ โดยไม่บังคับทศนิยม
   const finalValue = entry.value != null ? entry.value : entry.numerator;
-  
-  return Number(finalValue) || 0;
+  if (finalValue == null) return "-";
+
+  const numVal = Number(finalValue);
+  // ถ้าเป็น count และเป็นจำนวนเต็ม ให้คืนค่าเป็นจำนวนเต็มปกติ ไม่เติม .00
+  if (kpiType === 'count') {
+    return numVal;
+  }
+
+  return Number(numVal.toFixed(2)) || 0;
 };
 
 export const calculateYearlyAverage = (entries: any[], year: number, type: KpiType): string => {
   const yearlyEntries = entries.filter(e => e.year === year);
   if (yearlyEntries.length === 0) return "-";
-  const sum = yearlyEntries.reduce((acc, curr) => acc + calculateEntryValue(curr, type), 0);
+
+  const sum = yearlyEntries.reduce((acc, curr) => {
+    const val = calculateEntryValue(curr, type);
+    return acc + (typeof val === 'number' ? val : 0);
+  }, 0);
+
   const avg = sum / yearlyEntries.length;
+
+  // ถ้าเป็น count และค่าเฉลี่ยเป็นจำนวนเต็ม ไม่ต้องแสดงทศนิยม .00
+  if (type === 'count' && Number.isInteger(avg)) {
+    return avg.toString();
+  }
+
   return avg.toFixed(2);
 };
   

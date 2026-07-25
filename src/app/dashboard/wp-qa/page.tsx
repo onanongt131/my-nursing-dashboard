@@ -282,14 +282,14 @@ export default function WpQaDashboard() {
         
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center space-x-2 bg-gray-50/80 px-3 py-2 rounded-xl border border-purple-100/60 shadow-xs">
-            <label className="text-sm font-semibold text-gray-700">ปีงบฯ:</label>
+            <label className="text-sm font-bold text-gray-700 whitespace-nowrap pl-2">📅 ปีงบประมาณ:</label>
             <select
               value={selectedYear}
               onChange={(e) => setSelectedYear(e.target.value)}
               className="bg-white border border-purple-200 rounded-lg px-3 py-1.5 text-sm font-medium text-gray-800 focus:outline-none focus:ring-2 focus:ring-purple-500/20"
             >
               {availableYears.map((yr) => (
-                <option key={yr} value={yr}>{yr}</option>
+                <option key={yr} value={yr}>ปีงบประมาณ{yr}</option>
               ))}
             </select>
           </div>

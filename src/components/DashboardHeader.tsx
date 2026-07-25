@@ -12,7 +12,8 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, stats }: any) =
     { name: 'unit', label: 'รายหน่วยงาน', path: '/dashboard/departments' }, // ปรับ path ให้ตรงกับฟังก์ชัน handleTabChange ของคุณ
     { name: 'productivity', label: 'Productivity', path: '/dashboard/productivity' },
     { name: 'wp-qa', label: 'WP/QA', path: '/dashboard/wp-qa' },
-    { name: 'audit-chart', label: 'Audit chart', path: '/dashboard/audit-chart' }
+    { name: 'audit-chart', label: 'Audit chart', path: '/dashboard/audit-chart' },
+    { name: 'iv-care', label: 'IV care', path: '/dashboard/iv-care' }
   ];
 
   return (

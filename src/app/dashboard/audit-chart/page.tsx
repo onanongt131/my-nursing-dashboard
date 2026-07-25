@@ -211,14 +211,14 @@ export default function AuditChartPage() {
         <h1 className="text-2xl font-bold">Audit Chart : ร้อยละความสมบูรณ์บันทึกทางการพยาบาล</h1>
         
         <div className="flex items-center gap-2">
-          <label className="text-lg font-medium text-gray-700">ปีงบประมาณ:</label>
+          <label className="text-sm font-bold text-gray-700 whitespace-nowrap pl-2">📅 ปีงบประมาณ:</label>
           <select 
             value={selectedYear} 
             onChange={(e) => setSelectedYear(e.target.value)}
             className="border p-2 rounded-lg font-medium text-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
           >
             {fiscalYears.map((year) => (
-              <option key={year} value={year}>{year}</option>
+              <option key={year} value={year}>ปีงบประมาณ{year}</option>
             ))}
           </select>
         </div>

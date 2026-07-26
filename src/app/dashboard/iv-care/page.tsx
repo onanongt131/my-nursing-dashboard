@@ -15,7 +15,7 @@ const ThaiMonths = [
   { id: 7, name: 'JUL' }, { id: 8, name: 'AUG' }, { id: 9, name: 'SEP' }
 ];
 
-const AvailableYears = [2569, 2568, 2567, 2566];
+const AvailableYears = [2570, 2569, 2568, 2567, 2566];
 
 export default function IvCarePage() {
   const [activeSubTab, setActiveSubTab] = useState('success');
@@ -25,7 +25,6 @@ export default function IvCarePage() {
   const [departmentsMap, setDepartmentsMap] = useState<{ [key: number]: string }>({});
   const [summaryStats, setSummaryStats] = useState({ success: 0, phlebitis: 0, extravasation: 0, infiltration: 0 });
 
-  // Modal State สำหรับคลิกดูข้ามปีของหน่วยงาน
   const [modalOpen, setModalOpen] = useState(false);
   const [selectedDeptModal, setSelectedDeptModal] = useState<{ id: number; name: string } | null>(null);
   const [historicalData, setHistoricalData] = useState<any[]>([]);
@@ -199,7 +198,6 @@ export default function IvCarePage() {
     });
   };
 
-  // ฟังก์ชันคลิกชื่อหน่วยงานเพื่อเปิด Modal ดูข้อมูลย้อนหลัง
   const handleDepartmentClick = async (deptId: number, deptName: string) => {
     setSelectedDeptModal({ id: deptId, name: deptName });
     setModalOpen(true);
@@ -211,10 +209,10 @@ export default function IvCarePage() {
       .eq('department_id', deptId);
 
     if (!error && data) {
-      const yearMap: { [year: number]: { sum: number; count: number; rawData: any[] } } = {};
+      const yearMap: { [year: number]: { sum: number; count: number } } = {};
 
       AvailableYears.forEach(y => {
-        yearMap[y] = { sum: 0, count: 0, rawData: [] };
+        yearMap[y] = { sum: 0, count: 0 };
       });
 
       data.forEach(row => {
@@ -265,85 +263,82 @@ export default function IvCarePage() {
   };
 
   return (
-    <div className="p-6 bg-gradient-to-br from-slate-50 to-blue-50/35 min-h-screen rounded-2xl shadow-sm border border-gray-100 m-4">
+    <div className="p-6 bg-gradient-to-br from-slate-50 to-blue-50/40 min-h-screen rounded-3xl shadow-xs border border-gray-100/80 m-4">
       {/* ส่วนหัวข้อและตัวเลือกปีงบประมาณ */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white p-5 rounded-2xl shadow-sm border border-gray-100 mb-6 gap-4">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white p-6 rounded-2xl shadow-xs border border-gray-100 mb-6 gap-4">
         <div>
           <h1 className="text-2xl font-extrabold text-gray-800 tracking-tight">รายงาน IV Care</h1>
           <p className="text-sm text-gray-500 mt-0.5">ระบบติดตามตัวชี้วัดคุณภาพการให้สารน้ำหลอดเลือดดำ</p>
         </div>
-        <div className="flex items-center gap-3 w-full sm:w-auto bg-gray-50 p-2.5 rounded-xl border border-gray-200">
+        <div className="flex items-center gap-3 w-full sm:w-auto bg-gray-50/80 p-2.5 rounded-2xl border border-gray-200/70">
           <label className="text-sm font-bold text-gray-700 whitespace-nowrap pl-2">📅 ปีงบประมาณ:</label>
           <select 
             value={selectedYear} 
             onChange={(e) => setSelectedYear(Number(e.target.value))}
-            className="border border-blue-300 rounded-xl px-4 py-2 text-sm font-bold text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white shadow-sm w-full sm:w-48 cursor-pointer transition-all hover:border-blue-400"
+            className="border border-blue-300 rounded-xl px-4 py-2 text-sm font-bold text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white shadow-xs w-full sm:w-48 cursor-pointer transition-all hover:border-blue-400"
           >
-            <option value={2566}>ปีงบประมาณ 2566</option>
-            <option value={2567}>ปีงบประมาณ 2567</option>
-            <option value={2568}>ปีงบประมาณ 2568</option>
-            <option value={2569}>ปีงบประมาณ 2569</option>
+            {AvailableYears.map(year => (
+              <option key={year} value={year}>ปีงบประมาณ {year}</option>
+            ))}
           </select>
         </div>
       </div>
 
-      {/* แท็บย่อยแบบการ์ด 4 ช่อง */}
-      <div className="bg-white p-4 rounded-2xl border border-gray-100 mb-6 shadow-sm">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          {[
-            { key: 'success', label: 'ความสำเร็จของการให้สารน้ำ' },
-            { key: 'phlebitis', label: 'Phlebitis' },
-            { key: 'extravasation', label: 'Extravasation' },
-            { key: 'infiltration', label: 'Infiltration' },
-          ].map(tab => {
-            const isActive = activeSubTab === tab.key;
-            return (
-              <button
-                key={tab.key}
-                onClick={() => setActiveSubTab(tab.key)}
-                className={`py-3 px-4 rounded-xl text-center font-semibold transition-all duration-200 flex items-center justify-center shadow-xs cursor-pointer ${
-                  isActive 
-                    ? 'bg-blue-600 text-white shadow-md ring-2 ring-blue-200 scale-[1.02]' 
-                    : 'bg-gray-50 text-gray-700 border border-gray-200 hover:bg-gray-100'
-                }`}
-              >
-                <span className="text-sm leading-snug">{tab.label}</span>
-              </button>
-            );
-          })}
-        </div>
+      {/* เมนูแท็บการ์ดด้านบน ดีไซน์แบบแบ่ง 2 ฝั่ง ซ้าย-ขวา */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+        {[
+          { key: 'success', label: 'ความสำเร็จของการให้สารน้ำ', stat: `${summaryStats.success}%` },
+          { key: 'phlebitis', label: 'Phlebitis', stat: `${summaryStats.phlebitis}%` },
+          { key: 'extravasation', label: 'Extravasation', stat: `${summaryStats.extravasation}%` },
+          { key: 'infiltration', label: 'Infiltration', stat: `${summaryStats.infiltration}%` },
+        ].map(tab => {
+          const isActive = activeSubTab === tab.key;
+          return (
+            <button
+              key={tab.key}
+              onClick={() => setActiveSubTab(tab.key)}
+              className={`p-5 rounded-2xl text-left transition-all duration-300 flex items-center justify-between cursor-pointer relative overflow-hidden shadow-xs ${
+                isActive 
+                  ? 'bg-gradient-to-br from-blue-600 to-blue-700 text-white shadow-md ring-2 ring-blue-300/50 scale-[1.01]' 
+                  : 'bg-white text-gray-700 border border-gray-200/80 hover:border-blue-300 hover:shadow-sm'
+              }`}
+            >
+              {/* ฝั่งซ้าย: ชื่อหัวข้อ */}
+              <div className="w-1/2 pr-3">
+                <span className={`text-base font-extrabold tracking-tight leading-snug block ${isActive ? 'text-white' : 'text-gray-800'}`}>
+                  {tab.label}
+                </span>
+              </div>
 
-        {/* กล่องสรุปผล */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 mt-4 pt-4 border-t border-gray-100">
-          <div className="bg-blue-50/60 border border-blue-100 rounded-xl p-3 text-center">
-            <span className="text-xs text-blue-600 font-semibold block">ภาพรวมความสำเร็จฯ</span>
-            <span className="text-lg font-bold text-blue-800">{summaryStats.success}%</span>
-          </div>
-          <div className="bg-rose-50/60 border border-rose-100 rounded-xl p-3 text-center">
-            <span className="text-xs text-rose-600 font-semibold block">ภาพรวม Phlebitis</span>
-            <span className="text-lg font-bold text-rose-800">{summaryStats.phlebitis}%</span>
-          </div>
-          <div className="bg-amber-50/60 border border-amber-100 rounded-xl p-3 text-center">
-            <span className="text-xs text-amber-600 font-semibold block">ภาพรวม Extravasation</span>
-            <span className="text-lg font-bold text-amber-800">{summaryStats.extravasation}%</span>
-          </div>
-          <div className="bg-purple-50/60 border border-purple-100 rounded-xl p-3 text-center">
-            <span className="text-xs text-purple-600 font-semibold block">ภาพรวม Infiltration</span>
-            <span className="text-lg font-bold text-purple-800">{summaryStats.infiltration}%</span>
-          </div>
-        </div>
+              {/* เส้นคั่นกลาง */}
+              <div className={`h-12 w-[1px] ${isActive ? 'bg-blue-400/40' : 'bg-gray-200'}`}></div>
+
+              {/* ฝั่งขวา: คำว่าภาพรวม และ ตัวเลขเปอร์เซ็นต์ */}
+              <div className="w-1/2 pl-3 flex flex-col items-end text-right">
+                <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full mb-1 ${
+                  isActive ? 'bg-blue-800/80 text-blue-200' : 'bg-gray-100 text-gray-600'
+                }`}>
+                  ภาพรวม
+                </span>
+                <span className={`text-2xl font-black tracking-tight whitespace-nowrap ${isActive ? 'text-white' : 'text-blue-600'}`}>
+                  {tab.stat}
+                </span>
+              </div>
+            </button>
+          );
+        })}
       </div>
 
       {/* ตารางแสดงผล */}
-      <div className="overflow-x-auto border border-gray-200 rounded-2xl shadow-sm bg-white">
+      <div className="overflow-x-auto border border-gray-200/80 rounded-2xl shadow-xs bg-white">
         <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+          <thead className="bg-gray-50/80">
             <tr>
               <th className="px-4 py-3.5 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-200">ชื่อหน่วยงาน</th>
               {ThaiMonths.map(m => (
                 <th key={m.id} className="px-2 py-3.5 text-center text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-200">{m.name}</th>
               ))}
-              <th className="px-4 py-3.5 text-center text-xs font-bold text-gray-800 uppercase tracking-wider bg-gray-100">ค่าเฉลี่ย</th>
+              <th className="px-4 py-3.5 text-center text-xs font-bold text-gray-800 uppercase tracking-wider bg-gray-100/80">ค่าเฉลี่ย</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">

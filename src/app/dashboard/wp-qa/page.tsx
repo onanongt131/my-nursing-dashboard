@@ -90,6 +90,18 @@ export default function WpQaDashboard() {
     return Array.from(new Set(years)).sort().reverse();
   }, [rawData]);
 
+  // ฟังก์ชันแปลงชื่อหน่วยงานสำหรับปี 2567 และ 2568
+  const getMappedDepartmentName = (originalName: string, year: number | string) => {
+    const numericYear = Number(year);
+    if (numericYear === 2566 || numericYear === 2567 || numericYear === 2568) {
+      if (originalName === 'อายุรกรรม 4') return 'อายุรกรรมชาย 1';
+      if (originalName === 'อายุรกรรม 2') return 'อายุรกรรมชาย 2';
+      if (originalName === 'อายุรกรรม 5') return 'อายุรกรรมหญิง';
+      if (originalName === 'อายุรกรรม 6') return 'ร่มไทร';
+    }
+    return originalName;
+  };
+
   const departmentMapName = useMemo(() => {
     const map: { [key: string]: string } = {};
     departments.forEach((dept) => {
@@ -178,7 +190,9 @@ export default function WpQaDashboard() {
           average = Number(((passIndCount / indicatorNamesList.length) * 100).toFixed(1));
         }
 
-        const deptName = departmentMapName[deptIdStr] || `หน่วยงาน ID: ${deptIdStr}`;
+        const rawDeptName = departmentMapName[deptIdStr] || `หน่วยงาน ID: ${deptIdStr}`;
+        // ทำการแมปชื่อหน่วยงานตามปีที่เลือก
+        const deptName = getMappedDepartmentName(rawDeptName, selectedYear);
 
         totalDepts += 1;
         if (average !== "ไม่มีข้อมูล" && Number(average) >= 90) {
@@ -259,7 +273,7 @@ export default function WpQaDashboard() {
         return {
           labelName: name,
           months: monthValues,
-          average: indicatorYearAvg !== "ไม่มีข้อมูล" ? Number(indicatorYearAvg.toFixed(1)) : "ไม่มีข้อมูล"
+          average: typeof indicatorYearAvg === 'number' ? Number(indicatorYearAvg.toFixed(1)) : indicatorYearAvg,
         };
       });
 

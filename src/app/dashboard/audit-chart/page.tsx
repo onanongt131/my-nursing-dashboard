@@ -1,4 +1,5 @@
 'use client';
+
 import { useState, useEffect, useMemo } from 'react';
 import { createClient } from '@/utils/supabase/client';
 
@@ -44,6 +45,18 @@ export default function AuditChartPage() {
     });
     return map;
   }, [departments]);
+
+  // ฟังก์ชันแปลงชื่อหน่วยงานสำหรับปี 2567 และ 2568 (ตามรูปแบบภาพที่ 1)
+  const getMappedDepartmentName = (originalName: string, year: number | string) => {
+    const numericYear = Number(year);
+    if (numericYear === 2566 || numericYear === 2567 || numericYear === 2568) {
+      if (originalName === 'อายุรกรรม 4') return 'อายุรกรรมชาย 1';
+      if (originalName === 'อายุรกรรม 2') return 'อายุรกรรมชาย 2';
+      if (originalName === 'อายุรกรรม 5') return 'อายุรกรรมหญิง';
+      if (originalName === 'อายุรกรรม 6') return 'ร่มไทร';
+    }
+    return originalName;
+  };
 
   const fiscalYears = useMemo(() => {
     const years = data.map((item) => String(item.fiscal_year));
@@ -111,7 +124,8 @@ export default function AuditChartPage() {
 
     filteredDataByYear.forEach((item) => {
       const deptId = String(item.department_id || 'unknown');
-      const deptName = departmentMapName[deptId] || `หน่วยงาน ${deptId}`;
+      const rawDeptName = departmentMapName[deptId] || `หน่วยงาน ${deptId}`;
+      const deptName = getMappedDepartmentName(rawDeptName, selectedYear);
       const month = String(item.month || '');
       
       const aVal = Number(item.a || 0);
@@ -161,14 +175,13 @@ export default function AuditChartPage() {
         avgTotal: avgTotal.toFixed(1)
       };
     });
-  }, [filteredDataByYear, departmentMapName]);
+  }, [filteredDataByYear, departmentMapName, selectedYear]);
 
-  // คำนวณข้อมูล 3รีย้อนหลังสำหรับหน่วยงานที่ถูกเลือกใน Modal
+  // คำนวณข้อมูล 3 ปีย้อนหลังสำหรับหน่วยงานที่ถูกเลือกใน Modal
   const historicalDataForModal = useMemo(() => {
     if (!selectedDeptModal) return [];
 
     const deptId = selectedDeptModal.id;
-    // หาปีทั้งหมดที่มีในระบบ แล้วเรียงจากมากไปน้อย (เช่น 2569, 2568, 2567) แล้วเอา 3 ปีล่าสุด
     const sortedYears = Array.from(new Set(data.map(item => String(item.fiscal_year)))).sort().reverse().slice(0, 3);
 
     return sortedYears.map((year) => {
@@ -277,10 +290,11 @@ export default function AuditChartPage() {
                     <td className="px-5 py-3.5 border-r border-gray-100 font-medium text-gray-900 sticky left-0 bg-white">
                       <button 
                         onClick={() => setSelectedDeptModal({ id: row.departmentId, name: row.departmentName })}
-                        className="text-indigo-600 hover:text-indigo-900 hover:underline text-left font-medium focus:outline-none"
+                        className="text-indigo-600 hover:text-indigo-900 hover:underline text-left font-medium focus:outline-none flex items-center gap-2"
                         title="คลิกเพื่อดูสรุป 3 ปีย้อนหลัง"
                       >
-                        {row.departmentName}
+                        <span>🏢</span>
+                        <span>{row.departmentName}</span>
                       </button>
                     </td>
                     {allMonths.map((m) => {
@@ -307,31 +321,26 @@ export default function AuditChartPage() {
                       );
                     })}
                     
-                    {/* คอลัมน์ A สรุป */}
                     <td className="px-2 py-3.5 border-r border-gray-100 text-center bg-gray-50/50">
                       <span className={`text-xs font-bold ${valA < 90 ? 'text-red-600' : 'text-indigo-600'}`}>
                         {row.pctA}
                       </span>
                     </td>
-                    {/* คอลัมน์ P สรุป */}
                     <td className="px-2 py-3.5 border-r border-gray-100 text-center bg-gray-50/50">
                       <span className={`text-xs font-bold ${valP < 90 ? 'text-red-600' : 'text-indigo-600'}`}>
                         {row.pctP}
                       </span>
                     </td>
-                    {/* คอลัมน์ I สรุป */}
                     <td className="px-2 py-3.5 border-r border-gray-100 text-center bg-gray-50/50">
                       <span className={`text-xs font-bold ${valI < 90 ? 'text-red-600' : 'text-indigo-600'}`}>
                         {row.pctI}
                       </span>
                     </td>
-                    {/* คอลัมน์ E สรุป */}
                     <td className="px-2 py-3.5 border-r border-gray-100 text-center bg-gray-50/50">
                       <span className={`text-xs font-bold ${valE < 90 ? 'text-red-600' : 'text-indigo-600'}`}>
                         {row.pctE}
                       </span>
                     </td>
-                    {/* คอลัมน์ เฉลี่ยรวม */}
                     <td className="px-3 py-3.5 text-center bg-indigo-50/60">
                       <span className={`text-xs font-extrabold ${valAvg < 90 ? 'text-red-600' : 'text-indigo-950'}`}>
                         {row.avgTotal}

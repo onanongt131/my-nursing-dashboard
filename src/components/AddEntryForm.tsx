@@ -41,43 +41,47 @@ const [formData, setFormData] = useState({
   const handleSaveNumeric = async () => {
     setIsSavingNum(true);
     
-    // คำนวณค่าก่อน
-    const num = Number(formData.numerator);
-    const den = Number(formData.denominator);
-    const val = Number(formData.value);
-    
-    let finalValue = 0;
-
-    if (type === 'count') {
-      // ถ้าเป็นประเภท count: ใช้ค่าที่กรอก (val) โดยถ้ามีทศนิยมให้ปัดไม่เกิน 2 ตำแหน่ง แต่ถ้าเป็นจำนวนเต็มจะไม่เติม .00
-      finalValue = Number(Number(val).toFixed(2));
-    } else {
-      // ถ้าเป็น percent หรือ rate: คำนวณสูตรปกติ
-      const rawFinalValue = type === 'percent' ? (den !== 0 ? (num / den) * 100 : 0) : 
-                            type === 'rate' ? (den !== 0 ? (num / den) * 1000 : 0) : val;
+    try {
+      // คำนวณค่าก่อน
+      const num = Number(formData.numerator);
+      const den = Number(formData.denominator);
+      const val = Number(formData.value);
       
-      finalValue = Number(Number(rawFinalValue).toFixed(2));
+      let finalValue = 0;
+
+      if (type === 'count') {
+        finalValue = Number(Number(val).toFixed(2));
+      } else {
+        const rawFinalValue = type === 'percent' ? (den !== 0 ? (num / den) * 100 : 0) : 
+                              type === 'rate' ? (den !== 0 ? (num / den) * 1000 : 0) : val;
+        
+        finalValue = Number(Number(rawFinalValue).toFixed(2));
+      }
+      
+      const payload = {
+        kpi_id: Number(kpiId),
+        year: Number(formData.year),
+        month: formData.month,
+        value: finalValue,
+        numerator: type === 'count' ? null : num,      
+        denominator: type === 'count' ? null : den, 
+        type: type
+      };
+
+      // เรียกใช้งาน submitEntry และดักจับ Error เผื่อไว้
+      await submitEntry(kpiId, payload);
+      
+      alert("บันทึกผลงานแล้ว");
+      onSuccess(); // สั่งปิดฟอร์มและรีเฟรชข้อมูลหน้าหลัก
+      
+    } catch (err: any) {
+      console.error("Error saving numeric entry:", err);
+      alert("เกิดข้อผิดพลาดในการบันทึก: " + (err.message || "กรุณาลองใหม่อีกครั้ง"));
+    } finally {
+      // 🛡️ สำคัญมาก: คำสั่งนี้จะทำงานเสมอ ไม่ว่าจะสำเร็จหรือพัง ปุ่มจะหายค้างทันที
+      setIsSavingNum(false);
     }
-    
-    // สร้าง payload และส่งค่าในฟังก์ชันนี้เท่านั้น
-    const payload = {
-      kpi_id: Number(kpiId),
-      department_id: deptId || null,
-      year: Number(formData.year),
-      month: formData.month,
-      value: finalValue,
-      numerator: type === 'count' ? null : num,       // ถ้าเป็น count ให้เป็น null
-      denominator: type === 'count' ? null : den, // ถ้าเป็น count ให้เป็น null
-      type: type
-    };
-
-    await submitEntry(kpiId, payload);
-    
-    setIsSavingNum(false);
-    onSuccess();
-    alert("บันทึกผลงานแล้ว");
   };
-
   // 2. บันทึกเฉพาะ 3P (แก้ไขเพื่อป้องกัน Error 409 และรองรับ Upsert สมบูรณ์)
   const handleSave3P = async () => {
     setIsSaving3P(true);

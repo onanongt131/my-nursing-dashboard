@@ -1,13 +1,11 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/utils/supabase/client'; 
-import { useKpiSubmission } from '@/hooks/useKpiSubmission';
 
 export default function AddEntryForm({ kpiId, type, deptId, onSuccess }: { 
   kpiId: string, type: string, deptId?: string, onSuccess: () => void 
 }) {
   const supabase = createClient();
-  const { submitEntry } = useKpiSubmission();
   
   const [isOpen, setIsOpen] = useState(false);
   const [isSavingNum, setIsSavingNum] = useState(false);
@@ -24,19 +22,16 @@ export default function AddEntryForm({ kpiId, type, deptId, onSuccess }: {
     performance: ''
   });
 
-  // 📌 ฟังก์ชันดึงข้อมูลเดิม (ทั้งตัวเลขรายเดือน และ 3P) เมื่อเปิดฟอร์มหรือเปลี่ยน ปี/เดือน
   const fetchExistingEntry = useCallback(async () => {
     if (!kpiId) return;
 
     try {
-      // 1. ดึงข้อมูล 3P
       const { data: data3P } = await supabase
         .from('kpi_3p_analysis')
         .select('*')
         .eq('kpi_id', kpiId)
         .maybeSingle();
 
-      // 2. ดึงข้อมูลผลงานตัวเลขรายเดือน (ถ้ามีการเลือกปีและเดือนแล้ว)
       let currentNumerator = '';
       let currentDenominator = '';
       let currentValue = '';
@@ -78,7 +73,6 @@ export default function AddEntryForm({ kpiId, type, deptId, onSuccess }: {
     }
   }, [isOpen, fetchExistingEntry]);
 
-  // 1. บันทึกเฉพาะตัวเลข
   const handleSaveNumeric = async () => {
     setIsSavingNum(true);
     
@@ -98,30 +92,36 @@ export default function AddEntryForm({ kpiId, type, deptId, onSuccess }: {
         finalValue = Number(Number(rawFinalValue).toFixed(2));
       }
       
+      // ตัดฟิลด์ type ออกเพื่อไม่ให้ติดปัญหาเรื่องคอลัมน์ในตาราง entries
       const payload = {
         kpi_id: Number(kpiId),
         year: Number(formData.year),
         month: formData.month,
         value: finalValue,
         numerator: type === 'count' ? null : num,      
-        denominator: type === 'count' ? null : den, 
-        type: type
+        denominator: type === 'count' ? null : den
       };
 
-      await submitEntry(kpiId, payload);
+      const { error } = await supabase
+        .from('kpi_entries')
+        .upsert(payload, { onConflict: 'kpi_id, year, month' });
+
+      if (error) throw error;
       
-      alert("บันทึก/แก้ไขผลงานเรียบร้อยแล้ว");
+      alert("บันทึกทับ/อัปเดตผลงานเรียบร้อยแล้ว");
       onSuccess(); 
       
     } catch (err: any) {
       console.error("Error saving numeric entry:", err);
-      alert("เกิดข้อผิดพลาดในการบันทึก: " + (err.message || "กรุณาลองใหม่อีกครั้ง"));
+      
+      // ดึงข้อความจากทุกรูปแบบที่เป็นไปได้ของ Error
+      const errorMsg = err?.message || err?.error_description || JSON.stringify(err);
+      alert("เกิดข้อผิดพลาดในการบันทึก: " + (errorMsg === "{}" ? "Unknown database error" : errorMsg));
     } finally {
       setIsSavingNum(false);
     }
   };
 
-  // 2. บันทึกเฉพาะ 3P
   const handleSave3P = async () => {
     setIsSaving3P(true);
     const targetKpiId = Number(kpiId);
@@ -155,7 +155,6 @@ export default function AddEntryForm({ kpiId, type, deptId, onSuccess }: {
 
       {isOpen && (
         <div className="mt-4 p-4 border rounded-xl bg-white shadow-sm space-y-6">
-          {/* ส่วนตัวเลข */}
           <div className="space-y-3">
             <h4 className="font-bold text-gray-700 text-sm">บันทึก / แก้ไขผลงานรายเดือน</h4>
             <div className="grid grid-cols-2 gap-2">
@@ -180,7 +179,6 @@ export default function AddEntryForm({ kpiId, type, deptId, onSuccess }: {
               </select>
             </div>
 
-            {/* ส่วนรับค่าตามประเภท KPI */}
             {type === 'percent' || type === 'rate' ? (
               <div className="grid grid-cols-2 gap-2">
                 <input 
@@ -221,7 +219,6 @@ export default function AddEntryForm({ kpiId, type, deptId, onSuccess }: {
             {!formData.month && <p className="text-xs text-red-500 text-center">กรุณาเลือกเดือนก่อนทำการบันทึกหรือตรวจสอบข้อมูล</p>}
           </div>
 
-          {/* ส่วน 3P */}
           <div className="border-t pt-4 space-y-3">
             <h4 className="font-bold text-gray-700 text-sm">วิเคราะห์ 3P</h4>
             <textarea placeholder="Purpose" className="w-full border p-2 rounded text-sm" value={formData.purpose} onChange={(e) => setFormData({...formData, purpose: e.target.value})} />

@@ -1,56 +1,67 @@
-// src/app/forgot-password/page.tsx
-"use client"; // ต้องใส่ เพราะมีการใช้ React Hook
+"use client";
 
-import { useActionState } from "react";
-import { createClient } from '@/utils/supabase/client'; // แนะนำใช้ client-side supabase ในหน้า UI
-
-async function resetPasswordAction(prevState: any, formData: FormData) {
-  const email = formData.get("email") as string;
-  const supabase = createClient();
-
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${window.location.origin}/auth/callback?type=recovery`,
-  });
-
-  if (error) {
-    return { success: false, message: "เกิดข้อผิดพลาด: " + error.message };
-  }
-  
-  return { success: true, message: "ระบบส่งลิงก์รีเซ็ตรหัสผ่านไปที่อีเมลแล้ว" };
-}
+import { useState } from 'react';
+import { createBrowserClient } from '@supabase/ssr';
+import Link from 'next/link';
 
 export default function ForgotPasswordPage() {
-  // useActionState จะคอยรับค่าที่ส่งมาจาก Server Action
-  const [state, formAction, pending] = useActionState(resetPasswordAction, null);
+  const [email, setEmail] = useState('');
+  const [message, setMessage] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const supabase = createBrowserClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+
+  async function handleReset(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    setMessage('');
+
+    // ส่งลิงก์รีเซ็ตไปที่อีเมล โดยกำหนดให้ Redirect มาที่หน้า update-password ของคุณ
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/update-password`,
+    });
+
+    if (error) {
+      setMessage("เกิดข้อผิดพลาด: " + error.message);
+    } else {
+      setMessage("ส่งลิงก์รีเซ็ตไปที่อีเมลของคุณแล้ว กรุณาตรวจสอบกล่องข้อความ");
+    }
+    setLoading(false);
+  }
 
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-gray-50">
-      <form action={formAction} className="w-full max-w-sm bg-white p-6 rounded-2xl shadow-sm border">
-        <h1 className="text-xl font-bold mb-4">ลืมรหัสผ่าน</h1>
-        <p className="text-sm text-gray-600 mb-4">กรอกอีเมลของคุณเพื่อรับลิงก์รีเซ็ตรหัสผ่าน</p>
+      <form onSubmit={handleReset} className="w-full max-w-sm bg-white p-6 rounded-2xl shadow-sm border">
+        <h1 className="text-xl font-bold mb-2 text-center">ลืมรหัสผ่าน</h1>
+        <p className="text-sm text-gray-500 mb-4 text-center">กรอกอีเมลของคุณเพื่อรับลิงก์ตั้งรหัสผ่านใหม่</p>
         
         <input 
-          name="email" 
           type="email" 
           placeholder="อีเมลของคุณ" 
           required 
-          className="w-full p-3 border rounded-xl mb-4"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          className="w-full p-3 border rounded-xl mb-4 text-sm"
         />
-
+        
         <button 
           type="submit" 
-          disabled={pending}
-          className="w-full bg-blue-600 text-white py-3 rounded-xl font-bold hover:bg-blue-700 disabled:bg-gray-400"
+          disabled={loading}
+          className="w-full bg-purple-600 text-white py-3 rounded-xl font-bold hover:bg-purple-700 transition"
         >
-          {pending ? "กำลังส่ง..." : "ส่งอีเมลรีเซ็ต"}
+          {loading ? 'กำลังส่ง...' : 'ส่งลิงก์รีเซ็ต'}
         </button>
 
-        {/* แสดงข้อความสถานะ (สำเร็จ หรือ ผิดพลาด) */}
-        {state && (
-          <div className={`mt-4 p-3 rounded-lg text-sm ${state.success ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-            {state.message}
-          </div>
-        )}
+        <div className="mt-4 text-center">
+          <Link href="/login" className="text-sm text-purple-600 hover:underline">
+            กลับไปหน้าเข้าสู่ระบบ
+          </Link>
+        </div>
+
+        {message && <p className="mt-4 text-sm text-center text-gray-700">{message}</p>}
       </form>
     </div>
   );

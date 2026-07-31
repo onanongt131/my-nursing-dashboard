@@ -2,6 +2,7 @@
 
 import { useActionState } from 'react';
 import { authenticate } from './actions';
+import Link from 'next/link'; // อย่าลืม import Link
 
 export default function LoginPage() {
   const [errorMessage, action, isPending] = useActionState(authenticate, undefined);
@@ -15,12 +16,19 @@ export default function LoginPage() {
         <form action={action} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">อีเมล</label>
-            <input name="email" type="email" required className="w-full px-3 py-2 border rounded-lg" />
+            <input name="email" type="email" required className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" />
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">รหัสผ่าน</label>
-            <input name="password" type="password" required className="w-full px-3 py-2 border rounded-lg" />
+            <input name="password" type="password" required className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" />
+            
+            {/* ย้ายลิงก์ลืมรหัสผ่านไว้ใต้ช่องรหัสผ่าน และจัดให้อยู่ชิดขวา */}
+            <div className="flex justify-end mt-1">
+              <Link href="/forgot-password" className="text-sm text-purple-600 hover:underline">
+                ลืมรหัสผ่าน?
+              </Link>
+            </div>
           </div>
 
           {errorMessage && (
@@ -37,7 +45,7 @@ export default function LoginPage() {
         </form>
 
         <div className="mt-6 text-center text-sm text-gray-600">
-          ยังไม่มีบัญชีใช่ไหม?{' '}
+          ยังไม่มีบัญชีใช่ไหมหรอ?{' '}
           <a href="/register" className="text-purple-600 font-bold hover:underline">
             สมัครสมาชิกที่นี่
           </a>

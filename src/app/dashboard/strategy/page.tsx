@@ -7,12 +7,15 @@ import { calculateYearlySummary, checkStatus, getYearlyTrend, getButtonStyle } f
 
 export default function Strategic() {
   const supabase = createClient();
-  // 1. เพิ่ม State ที่ขาดไป
-  const [selectedStrategic, setSelectedStrategic] = useState<string | null>('1'); // เริ่มต้นที่ยุทธศาสตร์แรก
+  const [selectedStrategic, setSelectedStrategic] = useState<string | null>('1');
   const [selectedDisease, setSelectedDisease] = useState("ทั้งหมด");
   const [selectedKpi, setSelectedKpi] = useState<any>(null);
   const [groupKpis, setGroupKpis] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // 📌 เพิ่ม State สำหรับจัดการ Modal รายละเอียดรายเดือน
+  const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [modalData, setModalData] = useState<{ kpi: any; year: number; entries: any[] } | null>(null);
 
   const strategicGoals = [
     { id: '1', name: 'Service Excellence', description: 'กลยุทธ์ : พัฒนาระบบบริการพยาบาลให้เป็นเลิศในการดูแลผู้ป่วยกลุ่มโรคสำคัญ', year_range: '2565-2569' },
@@ -27,12 +30,10 @@ export default function Strategic() {
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
-      // 1. ดึงข้อมูล User ปัจจุบัน
       const { data: { user } } = await supabase.auth.getUser();
       let userProfile = null;
 
       if (user) {
-        // ใช้ .maybeSingle() แทน .single() เพื่อป้องกัน Error กรณีไม่พบแถวข้อมูล
         const { data } = await supabase
           .from('profiles')
           .select('*, departments(group)')
@@ -41,7 +42,6 @@ export default function Strategic() {
         userProfile = data;
       }
 
-      // 2. ดึงข้อมูล KPIs ทั้งหมด
       const { data: allKpis, error: kpiError } = await supabase.from('kpis').select('*, kpi_entries(*)');
       
       if (kpiError) {
@@ -56,10 +56,7 @@ export default function Strategic() {
           const userDeptId = userProfile.department_id;
           const userGroup = (userProfile.departments as any)?.group;
 
-          if (role === 'staff') {
-            filtered = allKpis.filter((k: any) => k.departments_id === userDeptId);
-          } 
-          else if (role === 'head_department') {
+          if (role === 'staff' || role === 'head_department') {
             filtered = allKpis.filter((k: any) => k.departments_id === userDeptId);
           } 
           else if (role === 'head_group' && userGroup) {
@@ -72,11 +69,9 @@ export default function Strategic() {
             filtered = allKpis.filter((k: any) => deptIds.includes(k.departments_id));
           }
           else if (role === 'admin' || role === 'head_nurse') {
-            // Admin หรือ Head Nurse เห็นทั้งหมด
             filtered = allKpis;
           }
         } else {
-          // ถ้าไม่มี profile หรือ role ให้แสดงทั้งหมดเป็นค่าเริ่มต้นกันหน้าค้าง
           filtered = allKpis;
         }
 
@@ -85,15 +80,21 @@ export default function Strategic() {
     } catch (err) {
       console.error("Unexpected error:", err);
     } finally {
-      // บังคับให้ปิดสถานะ Loading เสมอ ไม่ว่าจะสำเร็จหรือพัง
       setLoading(false);
     }
   }, []);
 
-  // 👈 เพิ่ม useEffect ตรงนี้เพื่อให้มันเริ่มดึงข้อมูลทันทีที่เปิดหน้าเว็บ
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // 📌 ฟังก์ชันเปิด Modal และกรองข้อมูลรายเดือนตามปีที่คลิก
+  const handleOpenDetail = (kpi: any, year: number) => {
+    const entries = kpi.kpi_entries || [];
+    const filteredEntries = entries.filter((entry: any) => Number(entry.year) === Number(year));
+    setModalData({ kpi, year, entries: filteredEntries });
+    setIsDetailModalOpen(true);
+  };
 
   const currentStrategic = strategicGoals.find((g) => g.id === selectedStrategic);
   const isDiseaseStrategy = currentStrategic?.name === "Service Excellence";
@@ -186,7 +187,14 @@ export default function Strategic() {
                           return (
                             <td key={year} className="p-4 text-center">
                               {hasData ? (
-                                <span className={`px-2 py-1 rounded-md font-bold text-xs ${pass ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>
+                                /* 📌 เพิ่ม onClick และเปลี่ยนสไตล์ให้รู้ว่ากดได้ */
+                                <span 
+                                  onClick={() => handleOpenDetail(kpi, year)}
+                                  className={`px-2 py-1 rounded-md font-bold text-xs cursor-pointer hover:opacity-80 transition-all inline-block ${
+                                    pass ? "bg-green-50 text-green-700 border border-green-200" : "bg-red-50 text-red-700 border border-red-200"
+                                  }`}
+                                  title="คลิกเพื่อดูรายละเอียดรายเดือน"
+                                >
                                   {avg}
                                 </span>
                               ) : (
@@ -237,6 +245,74 @@ export default function Strategic() {
             <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
               <h3 className="font-bold text-gray-800 mb-6">บันทึกผลการดำเนินงาน</h3>
               <AddEntryForm kpiId={selectedKpi.id} type={selectedKpi.Type} onSuccess={() => { setSelectedKpi(null); fetchData(); }} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 📌 ส่วน Modal สำหรับแสดงรายละเอียดรายเดือน (ปี, เดือน, ตัวตั้ง, ตัวหาร, ผลลัพธ์) */}
+      {isDetailModalOpen && modalData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-3xl shadow-xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
+            <div className="p-6 border-b bg-gray-50 flex justify-between items-center">
+              <div>
+                <h3 className="font-bold text-gray-900 text-lg">{modalData.kpi.name}</h3>
+                <p className="text-xs text-gray-500 mt-1">ประจำปีพุทธศักราช {modalData.year} (ชนิด KPI: {modalData.kpi.Type})</p>
+              </div>
+              <button 
+                onClick={() => setIsDetailModalOpen(false)}
+                className="text-gray-400 hover:text-gray-600 font-bold text-xl px-2"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="p-6 max-h-[60vh] overflow-y-auto">
+              <table className="w-full text-left border-collapse text-sm">
+                <thead>
+                  <tr className="border-b text-xs text-gray-500 uppercase bg-gray-50/50">
+                    <th className="p-3">เดือน</th>
+                    {modalData.kpi.Type !== 'count' && (
+                      <>
+                        <th className="p-3 text-center">ตัวตั้ง (Numerator)</th>
+                        <th className="p-3 text-center">ตัวหาร (Denominator)</th>
+                      </>
+                    )}
+                    <th className="p-3 text-center">ผลลัพธ์ (Result)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {modalData.entries.length > 0 ? (
+                    modalData.entries.map((entry: any, index: number) => (
+                      <tr key={index} className="hover:bg-gray-50">
+                        <td className="p-3 font-medium text-gray-800">{entry.month || `เดือนที่ ${index + 1}`}</td>
+                        {modalData.kpi.Type !== 'count' && (
+                          <>
+                            <td className="p-3 text-center text-gray-600">{entry.numerator ?? '-'}</td>
+                            <td className="p-3 text-center text-gray-600">{entry.denominator ?? '-'}</td>
+                          </>
+                        )}
+                        <td className="p-3 text-center font-bold text-purple-600">{entry.result ?? entry.value ?? '-'}</td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={4} className="p-8 text-center text-gray-400 italic">
+                        ยังไม่มีข้อมูลการบันทึกในรายเดือนของปีนี้
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            <div className="p-4 border-t bg-gray-50 flex justify-end">
+              <button 
+                onClick={() => setIsDetailModalOpen(false)}
+                className="px-5 py-2 bg-gray-800 text-white rounded-xl text-sm font-medium hover:bg-gray-700 transition-all"
+              >
+                ปิดหน้าต่าง
+              </button>
             </div>
           </div>
         </div>

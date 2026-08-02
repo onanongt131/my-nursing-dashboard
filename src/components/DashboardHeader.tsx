@@ -2,9 +2,12 @@
 'use client';
 import LogoutButton from "@/components/LogoutButton";
 import { usePathname } from 'next/navigation';
+import { useState } from 'react';
 
 export const DashboardHeader = ({ title, activeTab, onTabChange, stats }: any) => {
   const pathname = usePathname();
+  // State สำหรับเปิด-ปิดเมนูบนมือถือ
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const tabs = [
     { name: 'dashboard', label: 'หน้าหลัก', path: '/dashboard' },
@@ -19,11 +22,9 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, stats }: any) =
 
   return (
     <div className="bg-white shadow-sm w-full">
-      {/* ส่วน Header หลัก: จัดเรียงแบบ responsive (มือถือเป็นแนวตั้งซ้อนกัน / จอใหญ่เป็นแนวนอน) */}
-      <header className="flex flex-col md:flex-row items-center md:items-center justify-between px-4 sm:px-6 py-4 bg-white gap-4 border-b border-gray-100">
-        
-        {/* ส่วนโลโก้และชื่อองค์กร */}
-        <div className="flex flex-col sm:flex-row items-center sm:items-center gap-3 sm:gap-4 text-center sm:text-left w-full md:w-auto">
+      {/* ส่วน Header หลัก */}
+      <header className="flex flex-col md:flex-row items-center justify-between px-4 sm:px-6 py-4 bg-white gap-4 border-b border-gray-100">
+        <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4 text-center sm:text-left w-full md:w-auto">
           <img 
             src="/Logo-NSO.png" 
             alt="Logo" 
@@ -37,28 +38,45 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, stats }: any) =
           </div>
         </div>
 
-        {/* ปุ่มออกจากระบบ (ให้ชิดขวาบนจอใหญ่ และอยู่ด้านล่าง/เต็มจอสวยๆ บนมือถือ) */}
-        <div className="flex-shrink-0 w-full sm:w-auto flex justify-end">
+        <div className="flex items-center justify-between w-full md:w-auto gap-2">
+          {/* ปุ่มแฮมเบอร์เกอร์สำหรับกดเปิด-ปิดเมนูบนมือถือ */}
+          <button 
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+            className="md:hidden flex items-center gap-2 px-3 py-2 text-sm font-medium text-purple-700 bg-purple-50 rounded-lg border border-purple-200"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              {isMobileMenuOpen ? (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              ) : (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              )}
+            </svg>
+            <span>เมนูนำทาง</span>
+          </button>
+
           <LogoutButton />
         </div>
       </header>
 
-      {/* แถบ Tabs: เปิดใช้งาน overflow-x-auto ให้ปัดเลื่อนซ้าย-ขวาได้อย่างลื่นไหลบนมือถือ */}
-      <div className="w-full overflow-x-auto scrollbar-none border-b border-gray-200 bg-white">
-        <nav className="flex gap-6 sm:gap-8 px-4 sm:px-6 min-w-max" role="tablist">
+      {/* แถบ Tabs: แสดงเป็นแนวตั้งเมื่อกดปุ่มบนมือถือ และแสดงเป็นแนวนอนปกติบนจอคอม/ไอแพด */}
+      <div className={`w-full bg-white border-b border-gray-200 ${isMobileMenuOpen ? 'block' : 'hidden'} md:block`}>
+        <nav className="flex flex-col md:flex-row gap-1 md:gap-8 px-4 sm:px-6 py-3 md:py-0" role="tablist">
           {tabs.map((tab) => {
             const isActive = pathname === tab.path || activeTab === tab.name;
 
             return (
               <button
                 key={tab.name}
-                onClick={() => onTabChange && onTabChange(tab.name)}
+                onClick={() => {
+                  onTabChange && onTabChange(tab.name);
+                  setIsMobileMenuOpen(false); // กดเลือกเมนูแล้วปิดอัตโนมัติบนมือถือ
+                }}
                 aria-selected={isActive}
                 role="tab"
-                className={`py-3 px-1 font-medium text-sm sm:text-base transition-all border-b-2 duration-300 whitespace-nowrap ${
+                className={`py-2.5 md:py-3 px-3 md:px-1 font-medium text-sm md:text-base transition-all text-left md:text-center rounded-lg md:rounded-none md:border-b-2 ${
                   isActive 
-                    ? 'border-purple-600 text-purple-700' 
-                    : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                    ? 'bg-purple-50 md:bg-transparent text-purple-700 md:border-purple-600 font-semibold' 
+                    : 'text-gray-600 hover:bg-gray-50 md:hover:bg-transparent md:hover:text-gray-900 md:border-transparent'
                 }`}
               >
                 {tab.label}

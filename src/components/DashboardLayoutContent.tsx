@@ -52,10 +52,10 @@ export default function DashboardLayoutContent({ profile, children }: DashboardL
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
+    <div className="min-h-screen bg-gray-50 p-4 md:p-6">
       {/* แสดงข้อมูลผู้ใช้และ Role */}
       {profile && (
-        <div className="mb-4 text-xs text-gray-500 flex justify-between items-center">
+        <div className="mb-4 text-xs text-gray-500 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
           <span>ผู้ใช้งาน: <strong className="text-gray-700">{profile.full_name}</strong></span>
           <span className="bg-indigo-50 text-indigo-700 px-2 py-1 rounded font-medium uppercase">
             สิทธิ์: {profile.role} {profile.group ? `(${profile.group})` : ''}
@@ -63,12 +63,22 @@ export default function DashboardLayoutContent({ profile, children }: DashboardL
         </div>
       )}
 
-      <DashboardHeader 
-        title="กลุ่มภารกิจด้านการพยาบาล" 
-        activeTab={activeTab}
-        onTabChange={handleTabChange}
-        stats={{ total: 12 }} 
-      />
+      {/* 
+        ครอบ DashboardHeader ด้วย Container ที่รองรับ Responsive Scroll 
+        เพื่อให้แถบเมนูด้านในยืดหยุ่น ปัดเลื่อนซ้าย-ขวาได้บนมือถือ และขยายเต็มพื้นที่บนไอแพด/คอมพิวเตอร์ 
+      */}
+      <div className="w-full bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="w-full overflow-x-auto scrollbar-none">
+          <div className="min-w-max px-2">
+            <DashboardHeader 
+              title="กลุ่มภารกิจด้านการพยาบาล" 
+              activeTab={activeTab}
+              onTabChange={handleTabChange}
+              stats={{ total: 12 }} 
+            />
+          </div>
+        </div>
+      </div>
       
       <main className="mt-6">
         {children}
@@ -76,7 +86,7 @@ export default function DashboardLayoutContent({ profile, children }: DashboardL
 
       {/* Modal แจ้งเตือนก่อน Logout อัตโนมัติ เมื่อไม่มีการเคลื่อนไหวครบกำหนด */}
       {showWarning && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center animate-in fade-in duration-300">
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
           <div className="bg-white p-6 rounded-2xl shadow-xl max-w-sm w-full text-center space-y-4">
             <h3 className="text-lg font-bold text-gray-800">ไม่มีการเคลื่อนไหว</h3>
             <p className="text-sm text-gray-500">

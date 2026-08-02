@@ -18,28 +18,33 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, stats }: any) =
   ];
 
   return (
-    <div className="bg-white shadow-sm">
-      {/* ส่วน Header หลัก: ปรับให้ยืดหยุ่นบนมือถือ (จัดเรียงแนวตั้งหรือแนวนอนตามขนาดจอ) */}
-      <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between px-4 sm:px-6 py-4 bg-white gap-4">
-        <div className="flex items-center gap-3 sm:gap-4">
+    <div className="bg-white shadow-sm w-full">
+      {/* ส่วน Header หลัก: จัดเรียงแบบ responsive (มือถือเป็นแนวตั้งซ้อนกัน / จอใหญ่เป็นแนวนอน) */}
+      <header className="flex flex-col md:flex-row items-center md:items-center justify-between px-4 sm:px-6 py-4 bg-white gap-4 border-b border-gray-100">
+        
+        {/* ส่วนโลโก้และชื่อองค์กร */}
+        <div className="flex flex-col sm:flex-row items-center sm:items-center gap-3 sm:gap-4 text-center sm:text-left w-full md:w-auto">
           <img 
             src="/Logo-NSO.png" 
             alt="Logo" 
-            className="h-12 w-12 sm:h-14 sm:w-14 object-contain"
+            className="h-12 w-12 sm:h-14 sm:w-14 object-contain flex-shrink-0"
             onError={(e) => { e.currentTarget.style.display = 'none'; }}
           />
           <div>
-            {/* ใช้ prop title ที่ส่งเข้ามา หรือแสดงค่ากลางตามที่ต้องการ */}
-            <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-800">
-              {title || "กลุ่มภารกิจด้านการพยาบาล"}
+            <h1 className="text-lg sm:text-2xl md:text-3xl font-bold text-gray-800 leading-snug">
+              {title || "กลุ่มภารกิจด้านการพยาบาล โรงพยาบาลวชิระภูเก็ต"}
             </h1>
           </div>
         </div>
-        <LogoutButton />
+
+        {/* ปุ่มออกจากระบบ (ให้ชิดขวาบนจอใหญ่ และอยู่ด้านล่าง/เต็มจอสวยๆ บนมือถือ) */}
+        <div className="flex-shrink-0 w-full sm:w-auto flex justify-end">
+          <LogoutButton />
+        </div>
       </header>
 
-      {/* แถบ Tabs: ใส่ overflow-x-auto เพื่อให้ปัดเลื่อนซ้าย-ขวาได้บนมือถือ */}
-      <div className="w-full overflow-x-auto scrollbar-none border-b border-gray-200">
+      {/* แถบ Tabs: เปิดใช้งาน overflow-x-auto ให้ปัดเลื่อนซ้าย-ขวาได้อย่างลื่นไหลบนมือถือ */}
+      <div className="w-full overflow-x-auto scrollbar-none border-b border-gray-200 bg-white">
         <nav className="flex gap-6 sm:gap-8 px-4 sm:px-6 min-w-max" role="tablist">
           {tabs.map((tab) => {
             const isActive = pathname === tab.path || activeTab === tab.name;
@@ -50,7 +55,7 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, stats }: any) =
                 onClick={() => onTabChange && onTabChange(tab.name)}
                 aria-selected={isActive}
                 role="tab"
-                className={`pb-3 px-1 font-medium text-sm sm:text-base transition-all border-b-2 duration-300 whitespace-nowrap ${
+                className={`py-3 px-1 font-medium text-sm sm:text-base transition-all border-b-2 duration-300 whitespace-nowrap ${
                   isActive 
                     ? 'border-purple-600 text-purple-700' 
                     : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'

@@ -6,14 +6,14 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, stats }: any) =
   const pathname = usePathname();
 
   const tabs = [
-    { name: 'dashboard', label: 'ภาพรวม', path: '/dashboard' },
-    { name: 'category', label: 'รายหมวด', path: '/dashboard/category' },
-    { name: 'strategy', label: 'แผนยุทธศาสตร์', path: '/dashboard/strategy' },
-    { name: 'unit', label: 'รายหน่วยงาน', path: '/dashboard/departments' }, // ปรับ path ให้ตรงกับฟังก์ชัน handleTabChange ของคุณ
+    { name: 'dashboard', label: 'หน้าหลัก', path: '/dashboard' },
+    { name: 'category', label: 'KPI รายหมวด', path: '/dashboard/category' },
+    { name: 'strategy', label: 'KPI แผนยุทธศาสตร์', path: '/dashboard/strategy' },
     { name: 'productivity', label: 'Productivity', path: '/dashboard/productivity' },
     { name: 'wp-qa', label: 'WP/QA', path: '/dashboard/wp-qa' },
     { name: 'audit-chart', label: 'Audit chart', path: '/dashboard/audit-chart' },
-    { name: 'iv-care', label: 'IV care', path: '/dashboard/iv-care' }
+    { name: 'iv-care', label: 'IV care', path: '/dashboard/iv-care' },
+    { name: 'unit', label: 'หน่วยงาน', path: '/dashboard/departments' } // ปรับ path ให้ตรงกับฟังก์ชัน handleTabChange ของคุณ
   ];
 
   return (

@@ -5,22 +5,28 @@ import AddEntryForm from '@/components/AddEntryForm';
 import React from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ResponsiveContainer } from 'recharts';
 import { getButtonStyle } from '@/utils/kpiCalculations';
-import { ClipboardDocumentCheckIcon, ShieldExclamationIcon, ExclamationTriangleIcon } from '@heroicons/react/24/solid';
-import AuditChartModal from '@/components/AuditChartModal'; // ปรับตาม path จริง
+import { ClipboardDocumentCheckIcon, ExclamationTriangleIcon } from '@heroicons/react/24/solid';
+import AuditChartModal from '@/components/AuditChartModal'; 
+import WpQaModal from '@/components/WpQaModal'; 
+import IvCareModal from '@/components/IvCareModal'; 
+import FallCareModal from '@/components/FallCareModal'; 
 
 export default function DepartmentPage() {
   const [data, setData] = useState<any[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<string>('');
-  const [selectedDept, setSelectedDept] = useState<string | null>(null);
   const [activeKpi, setActiveKpi] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   
-  // State สำหรับควบคุม Modal ฟอร์มย่อยของหน่วยงาน
-  const [activeModal, setActiveModal] = useState<string | null>(null); // 'audit' | 'iv' | 'fall'
+  // State สำหรับควบคุม Modal และข้อมูลหน่วยงาน (เพิ่ม 'audit' และ 'fall')
+  const [activeModal, setActiveModal] = useState<'wp_qa' | 'iv_care' | 'fall' | 'audit' | null>(null);
+  const [selectedDept, setSelectedDept] = useState<{ id: string | number; name: string } | null>(null);
   const [saving, setSaving] = useState(false);
 
-  // Form State: IV Care
-  const [ivData, setIvData] = useState({ record_date: '', total_iv_patients: 0, phlebitis_cases: 0, extravasation_cases: 0, infiltration_cases: 0, notes: '' });
+  // ฟังก์ชันสำหรับเปิด Modal พร้อมกำหนดหน่วยงานที่เลือก
+  const handleOpenModal = (dept: { id: number | string; name: string }, modalType: 'wp_qa' | 'iv_care' | 'fall' | 'audit') => {
+    setSelectedDept(dept);
+    setActiveModal(modalType);
+  };
 
   // Form State: Fall Incident
   const [fallData, setFallData] = useState({ record_date: '', total_admissions: 0, fall_cases: 0, severity_level: 'ระดับ E ขึ้นไป', patient_hn: '', notes: '' });
@@ -102,45 +108,8 @@ export default function DepartmentPage() {
 
   const uniqueGroups = Array.from(new Set(data.map(d => d.group))).filter(Boolean) as string[];
   const filteredDepartments = data.filter(d => d.group === selectedGroup);
-  const currentDeptObj = data.find(d => String(d.id) === String(selectedDept));
+  const currentDeptObj = data.find(d => String(d.id) === String(selectedDept?.id));
 
-  // ฟังก์ชันบันทึกข้อมูล IV Care
-  const handleSaveIv = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedDept) return;
-    setSaving(true);
-    const { error } = await supabase.from('iv_care_records').insert([{
-      ...ivData,
-      department_id: Number(selectedDept)
-    }]);
-    setSaving(false);
-    if (error) {
-      alert('เกิดข้อผิดพลาด: ' + error.message);
-    } else {
-      alert('บันทึกข้อมูล IV Care สำเร็จ');
-      setActiveModal(null);
-      setIvData({ record_date: '', total_iv_patients: 0, phlebitis_cases: 0, extravasation_cases: 0, infiltration_cases: 0, notes: '' });
-    }
-  };
-
-  // ฟังก์ชันบันทึกข้อมูล Fall
-  const handleSaveFall = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!selectedDept) return;
-    setSaving(true);
-    const { error } = await supabase.from('fall_incident_records').insert([{
-      ...fallData,
-      department_id: Number(selectedDept)
-    }]);
-    setSaving(false);
-    if (error) {
-      alert('เกิดข้อผิดพลาด: ' + error.message);
-    } else {
-      alert('บันทึกข้อมูล Fall สำเร็จ');
-      setActiveModal(null);
-      setFallData({ record_date: '', total_admissions: 0, fall_cases: 0, severity_level: 'ระดับ E ขึ้นไป', patient_hn: '', notes: '' });
-    }
-  };
 
   if (loading) return <div className="p-8 text-center text-gray-500">กำลังโหลดข้อมูลหน่วยงาน...</div>;
 
@@ -179,12 +148,12 @@ export default function DepartmentPage() {
                     <button
                       key={dept.id}
                       onClick={() => {
-                        setSelectedDept(String(dept.id));
+                        setSelectedDept({ id: dept.id, name: dept.Department });
                         setActiveKpi(null);
-                        setActiveModal(null); // <-- เพิ่มบรรทัดนี้เพื่อเคลียร์ Modal ไม่ให้ค้างเปิดขึ้นมา
+                        setActiveModal(null);
                       }}
                       className={`w-full text-left px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
-                        selectedDept === String(dept.id)
+                        selectedDept?.id === dept.id
                           ? "bg-emerald-100 text-emerald-800 font-semibold shadow-sm border border-emerald-200"
                           : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
                       }`}
@@ -213,30 +182,52 @@ export default function DepartmentPage() {
                 <div>
                   <span className="text-xs font-bold text-emerald-600 uppercase tracking-wider">หน่วยงานที่กำลังแสดงผล</span>
                   <h2 className="text-xl font-bold text-gray-800">
-                    {currentDeptObj?.Department || 'ไม่ระบุหน่วยงาน'}
+                    {currentDeptObj?.Department || selectedDept.name}
                   </h2>
                 </div>
 
                 {/* แถบปุ่มทางลัดฟอร์มบันทึก */}
                 <div className="flex flex-wrap items-center gap-2">
                   <button
-                    onClick={() => setActiveModal('audit')}
+                    onClick={() => {
+                      if (currentDeptObj) {
+                        handleOpenModal({ id: currentDeptObj.id, name: currentDeptObj.Department }, 'audit');
+                      }
+                    }}
                     className="bg-emerald-700 hover:bg-emerald-800 text-white px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all"
                   >
                     <ClipboardDocumentCheckIcon className="w-4 h-4 text-amber-300" />
                     <span>บันทึก Audit Chart</span>
                   </button>
 
-                  <button
-                    onClick={() => setActiveModal('iv')}
-                    className="bg-teal-700 hover:bg-teal-800 text-white px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all"
-                  >
-                    <ShieldExclamationIcon className="w-4 h-4 text-amber-300" />
-                    <span>บันทึก IV Care</span>
-                  </button>
+                  {/* ปุ่มบันทึก WP/QA */}
+                <button
+                  onClick={() => setActiveModal('wp_qa')}
+                  className="flex items-center gap-2 px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-medium rounded-xl shadow transition"
+                >
+                  <svg className="w-4 h-4 text-emerald-200" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                  </svg>
+                  บันทึก WP/QA
+                </button>
+
+                {/* ปุ่มบันทึก IV Care */}
+                <button
+                  onClick={() => setActiveModal('iv_care')}
+                  className="flex items-center gap-2 px-4 py-2 bg-cyan-700 hover:bg-cyan-800 text-white text-sm font-medium rounded-xl shadow transition"
+                >
+                  <svg className="w-4 h-4 text-cyan-200" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
+                  </svg>
+                  บันทึก IV Care
+                </button>
 
                   <button
-                    onClick={() => setActiveModal('fall')}
+                    onClick={() => {
+                      if (currentDeptObj) {
+                        handleOpenModal({ id: currentDeptObj.id, name: currentDeptObj.Department }, 'fall');
+                      }
+                    }}
                     className="bg-amber-600 hover:bg-amber-700 text-white px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all"
                   >
                     <ExclamationTriangleIcon className="w-4 h-4 text-white" />
@@ -332,124 +323,63 @@ export default function DepartmentPage() {
                   <AddEntryForm 
                     kpiId={activeKpi.id} 
                     type={activeKpi.type?.toLowerCase() || activeKpi.Type?.toLowerCase() || 'count'} 
-                    deptId={selectedDept || ''}
+                    deptId={selectedDept ? String(selectedDept.id) : ''}
                     onSuccess={() => { setActiveKpi(null); fetchData(); }} 
                   />
                 </div>
               </div>
             </div>
           )}
-
         </div>
       </div>
 
-    {activeModal === 'audit' && selectedDept !== null && (
-    <AuditChartModal
+      {activeModal === 'audit' && selectedDept !== null && (
+        <AuditChartModal
         isOpen={activeModal === 'audit'}
         onClose={() => setActiveModal(null)}
         departmentName={currentDeptObj?.Department || 'ไม่ระบุหน่วยงาน'}
-        departmentId={selectedDept}
+        departmentId={selectedDept ? String(selectedDept.id) : ''}
         supabase={supabase}
         onSuccess={() => {
           setActiveModal(null);
         }}
       />
     )}
-  
 
-      {/* --- MODAL: บันทึก IV Care --- */}
-      {activeModal === 'iv' && selectedDept !== null && (
-        <div className="fixed inset-0 bg-emerald-950/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl border border-emerald-100 space-y-4">
-            <h3 className="text-lg font-extrabold text-emerald-950 flex items-center gap-2">
-              <ShieldExclamationIcon className="w-6 h-6 text-teal-700" />
-              บันทึกภาวะแทรกซ้อน IV Care ({currentDeptObj?.Department})
-            </h3>
-            <form onSubmit={handleSaveIv} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">วันที่บันทึก</label>
-                <input type="date" required value={ivData.record_date} onChange={e => setIvData({...ivData, record_date: e.target.value})} className="w-full border border-gray-300 rounded-lg p-2.5 text-sm" />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">ผู้ป่วยใส่ IV ทั้งหมด</label>
-                  <input type="number" required value={ivData.total_iv_patients} onChange={e => setIvData({...ivData, total_iv_patients: Number(e.target.value)})} className="w-full border border-gray-300 rounded-lg p-2.5 text-sm" />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">Phlebitis (เคส)</label>
-                  <input type="number" value={ivData.phlebitis_cases} onChange={e => setIvData({...ivData, phlebitis_cases: Number(e.target.value)})} className="w-full border border-gray-300 rounded-lg p-2.5 text-sm" />
-                </div>
-              </div>
-              <div className="flex justify-end gap-2 pt-2">
-                <button type="button" onClick={() => setActiveModal(null)} className="px-4 py-2 bg-gray-200 text-gray-800 rounded-xl text-sm font-bold">ยกเลิก</button>
-                <button type="submit" disabled={saving} className="px-4 py-2 bg-teal-700 text-white rounded-xl text-sm font-bold">{saving ? 'กำลังบันทึก...' : 'บันทึกข้อมูล'}</button>
-              </div>
-            </form>
-          </div>
-        </div>
+      {/* Modal: WP/QA */}
+      {selectedDept && currentDeptObj && (
+        <WpQaModal
+          isOpen={activeModal === 'wp_qa'}
+          onClose={() => setActiveModal(null)}
+          departmentId={currentDeptObj.id}
+          departmentName={currentDeptObj.Department}
+          supabase={supabase}
+          onSuccess={() => { fetchData(); }}
+        />
       )}
 
-      {/* --- MODAL: บันทึก Fall --- */}
-      {activeModal === 'fall' && selectedDept !== null && (
-        <div className="fixed inset-0 bg-emerald-950/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-xl border border-emerald-100 space-y-4">
-            <h3 className="text-lg font-extrabold text-emerald-950 flex items-center gap-2">
-              <ExclamationTriangleIcon className="w-6 h-6 text-amber-600" />
-              บันทึกอุบัติการณ์พลัดตกหกล้ม ({currentDeptObj?.Department})
-            </h3>
-            <form onSubmit={handleSaveFall} className="space-y-4">
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">วันที่เกิดเหตุ</label>
-                <input type="date" required value={fallData.record_date} onChange={e => setFallData({...fallData, record_date: e.target.value})} className="w-full border border-gray-300 rounded-lg p-2.5 text-sm" />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">จำนวน Admit ทั้งหมด</label>
-                  <input type="number" required value={fallData.total_admissions} onChange={e => setFallData({...fallData, total_admissions: Number(e.target.value)})} className="w-full border border-gray-300 rounded-lg p-2.5 text-sm" />
-                </div>
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">จำนวนเคส Fall</label>
-                  <input type="number" required value={fallData.fall_cases} onChange={e => setFallData({...fallData, fall_cases: Number(e.target.value)})} className="w-full border border-gray-300 rounded-lg p-2.5 text-sm" />
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">ระดับความรุนแรง</label>
-                <select 
-                  value={fallData.severity_level} 
-                  onChange={e => setFallData({...fallData, severity_level: e.target.value})} 
-                  className="w-full border border-gray-300 rounded-lg p-2.5 text-sm bg-white"
-                >
-                  <option value="ระดับ E ขึ้นไป">ระดับ E ขึ้นไป</option>
-                  <option value="ระดับต่ำกว่า E">ระดับต่ำกว่า E</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">HN ผู้ป่วย (ถ้ามี)</label>
-                <input 
-                  type="text" 
-                  value={fallData.patient_hn} 
-                  onChange={e => setFallData({...fallData, patient_hn: e.target.value})} 
-                  className="w-full border border-gray-300 rounded-lg p-2.5 text-sm" 
-                  placeholder="ระบุ HN"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">หมายเหตุเพิ่มเติม</label>
-                <textarea 
-                  rows={2} 
-                  value={fallData.notes} 
-                  onChange={e => setFallData({...fallData, notes: e.target.value})} 
-                  className="w-full border border-gray-300 rounded-lg p-2 text-sm" 
-                  placeholder="รายละเอียดเหตุการณ์..."
-                />
-              </div>
-              <div className="flex justify-end gap-2 pt-2">
-                <button type="button" onClick={() => setActiveModal(null)} className="px-4 py-2 bg-gray-200 text-gray-800 rounded-xl text-sm font-bold hover:bg-gray-300">ยกเลิก</button>
-                <button type="submit" disabled={saving} className="px-4 py-2 bg-amber-600 text-white rounded-xl text-sm font-bold hover:bg-amber-700">{saving ? 'กำลังบันทึก...' : 'บันทึกข้อมูล'}</button>
-              </div>
-            </form>
-          </div>
-        </div>
+      {/* Modal: IV Care */}
+      {selectedDept && currentDeptObj && (
+        <IvCareModal
+          isOpen={activeModal === 'iv_care'}
+          onClose={() => setActiveModal(null)}
+          departmentId={currentDeptObj.id}
+          departmentName={currentDeptObj.Department}
+          supabase={supabase}
+          onSuccess={() => { fetchData(); }}
+        />
+      )}
+
+      {/* Modal: IV Care */}
+      {selectedDept && currentDeptObj && (
+        <FallCareModal
+          isOpen={activeModal === 'fall'}
+          onClose={() => setActiveModal(null)}
+          departmentId={currentDeptObj.id}
+          departmentName={currentDeptObj.Department}
+          supabase={supabase}
+          onSuccess={() => { fetchData(); }}
+        />
       )}
     </div>
   );

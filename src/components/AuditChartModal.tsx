@@ -19,9 +19,9 @@ export default function AuditChartModal({
   supabase,
   onSuccess,
 }: AuditChartModalProps) {
+  
   const [saving, setSaving] = useState(false);
   const [notes, setNotes] = useState('');
-
   const [auditDate, setAuditDate] = useState('');
   const [patientHn, setPatientHn] = useState('');
   const [disease, setDisease] = useState('');        // <-- เพิ่ม state โรคผู้ป่วย

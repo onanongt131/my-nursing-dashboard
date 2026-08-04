@@ -64,11 +64,12 @@ export default function FallCareModal({
         cause_environment: causeEnvironment || null,
         cause_system: causeSystem || null,
         review_and_solution: reviewAndSolution || null,
+        status: 'pending', // 👈 เพิ่มสถานะเริ่มต้นเพื่อให้หัวหน้าตรวจสอบอนุมัติ
       });
 
       if (error) throw error;
 
-      alert('บันทึกอุบัติการณ์การพลัดตกหกล้มสำเร็จ');
+      alert('บันทึกอุบัติการณ์การพลัดตกหกล้มสำเร็จ (รอหัวหน้าตรวจสอบ)');
       // Reset form
       setHn('');
       setAn('');

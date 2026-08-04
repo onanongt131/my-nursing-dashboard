@@ -82,11 +82,30 @@ export default function WpQaModal({
     setSaving(true);
 
     try {
-      // ตรวจสอบความถูกต้อง: จำนวนประเมินต้องถูกกรอกและเป็นตัวเลขครบทุกแถว
+      // ตรวจสอบความถูกต้อง
       for (const item of wpQaItems) {
         const itemData = formData[item.id];
+        
+        // 1. ตรวจสอบว่ากรอกจำนวนประเมินหรือยัง
         if (!itemData || itemData.total_evaluated === '' || isNaN(Number(itemData.total_evaluated))) {
           alert(`กรุณากรอก "จำนวนประเมิน" เป็นตัวเลขให้ครบทุกหัวข้อ (${item.id})`);
+          setSaving(false);
+          return;
+        }
+
+        const evaluated = Number(itemData.total_evaluated);
+        const practiced = Number(itemData.total_practiced || 0);
+
+        // 2. ห้ามใส่จำนวนประเมินเป็น 0 (ต้องใส่จำนวน หรือถ้าใส่ 0 ต้องบังคับระบุเหตุผล)
+        if (evaluated === 0) {
+          alert(`หัวข้อ ${item.id}: ห้ามใส่จำนวนประเมินเป็น 0 กรุณาระบุจำนวนหรือใส่เหตุผลในช่องหมายเหตุ`);
+          setSaving(false);
+          return;
+        }
+
+        // 3. ถ้าจำนวนปฏิบัติไม่เท่ากับจำนวนประเมิน หรือประเมินเป็น 0 ต้องใส่เหตุผล
+        if (evaluated !== practiced && (!itemData.unpracticed_reasons || itemData.unpracticed_reasons.trim() === '')) {
+          alert(`หัวข้อ ${item.id}: กรุณาระบุ "สิ่งที่ไม่ได้ปฏิบัติ / หมายเหตุ" เนื่องจากจำนวนปฏิบัติไม่ตรงกับจำนวนประเมิน`);
           setSaving(false);
           return;
         }
@@ -105,9 +124,9 @@ export default function WpQaModal({
           wp_name: item.name,
           total_evaluated: evaluated,
           total_practiced: practiced,
-          // บันทึกหมายเหตุเฉพาะกรณีที่ปฏิบัติไม่เท่ากับประเมินเท่านั้น
-          unpracticed_reasons: practiced !== evaluated ? (itemData.unpracticed_reasons || null) : null,
+          unpracticed_reasons: evaluated !== practiced ? (itemData.unpracticed_reasons || null) : null,
           auditor_name: auditorName || null,
+          status: 'pending',
         };
       });
 
@@ -181,7 +200,6 @@ export default function WpQaModal({
                 {wpQaItems.map((item) => {
                   const evaluated = Number(formData[item.id]?.total_evaluated) || 0;
                   const practiced = Number(formData[item.id]?.total_practiced) || 0;
-                  // เช็คว่าจำนวนปฏิบัติ ไม่เท่ากับ จำนวนประเมิน หรือไม่
                   const isNotEqual = formData[item.id]?.total_evaluated !== '' && formData[item.id]?.total_practiced !== '' && evaluated !== practiced;
 
                   return (
@@ -193,11 +211,11 @@ export default function WpQaModal({
                       <td className="p-3 text-center">
                         <input 
                           type="number" 
-                          min="0"
-                          placeholder="0"
+                          min="1"
+                          placeholder="กรอก > 0"
                           value={formData[item.id]?.total_evaluated ?? ''}
                           onChange={(e) => handleChange(item.id, 'total_evaluated', e.target.value)}
-                          className="w-20 mx-auto border border-gray-300 rounded p-1 text-center text-sm font-semibold"
+                          className="w-24 mx-auto border border-gray-300 rounded p-1 text-center text-sm font-semibold"
                           required
                         />
                       </td>
@@ -212,14 +230,14 @@ export default function WpQaModal({
                         />
                       </td>
                       <td className="p-3">
-                        {isNotEqual ? (
+                        {isNotEqual || evaluated === 0 ? (
                           <input 
                             type="text" 
                             placeholder="ระบุเหตุผล/สิ่งที่ไม่ได้ปฏิบัติ..."
                             value={formData[item.id]?.unpracticed_reasons || ''}
                             onChange={(e) => handleChange(item.id, 'unpracticed_reasons', e.target.value)}
                             className="w-full border border-amber-300 bg-amber-50/30 rounded p-1.5 text-xs focus:ring-2 focus:ring-emerald-500 animate-fadeIn"
-                            required={isNotEqual}
+                            required
                           />
                         ) : (
                           <span className="text-xs text-gray-400 italic">- ครบถ้วน / ปกติ -</span>

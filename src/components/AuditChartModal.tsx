@@ -1,3 +1,5 @@
+'use client';
+
 import React, { useState } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import { ClipboardDocumentCheckIcon } from '@heroicons/react/24/outline';
@@ -5,7 +7,7 @@ import { ClipboardDocumentCheckIcon } from '@heroicons/react/24/outline';
 interface AuditChartModalProps {
   isOpen: boolean;
   onClose: () => void;
-  departmentName?: string | any; // ปรับให้รองรับค่าที่เป็น any หรือ null ได้
+  departmentName?: string | any;
   departmentId: string | null;
   supabase: ReturnType<typeof createClient>;
   onSuccess: () => void;
@@ -21,14 +23,9 @@ export default function AuditChartModal({
 }: AuditChartModalProps) {
   
   const [saving, setSaving] = useState(false);
-  const [notes, setNotes] = useState('');
-  const [auditDate, setAuditDate] = useState('');
-  const [patientHn, setPatientHn] = useState('');
-  const [disease, setDisease] = useState('');        // <-- เพิ่ม state โรคผู้ป่วย
-  const [auditorName, setAuditorName] = useState('');  // <-- เพิ่ม state ชื่อพยาบาลด้านล่างสุด
-
-  // 1. เพิ่ม State ตรงนี้เพื่อเก็บค่าข้อมูลการ Audit ตาม item.id
-  const [auditData, setAuditData] = useState<Record<string, string>>({});
+  const [auditData, setAuditData] = useState<Record<string, any>>({
+    audit_date: new Date().toISOString().split('T')[0],
+  });
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,23 +33,21 @@ export default function AuditChartModal({
     
     setSaving(true);
 
-    // (ปรับชื่อ column ด้านซ้ายให้ตรงกับชื่อคอลัมน์จริงใน Database ของคุณครับ)
     const payload: Record<string, any> = {
       department_id: Number(departmentId),
       audit_date: auditData.audit_date || new Date().toISOString().split('T')[0],
       patient_hn: auditData.patient_hn || null,
-      disease: auditData.disease || null,
-      auditor_name: auditData.auditor_name || null,
+      disease: auditData.disease || null,          
+      auditor_name: auditData.auditor_name || null, 
       notes: auditData.notes || null,
+      status: 'pending',
     };
 
-    // 2. นำข้อมูลคะแนนและหมายเหตุแต่ละข้อจาก auditData มาใส่ลงใน payload 
-    // โดยวิ่งผ่าน Object keys ทั้งหมดที่เราเก็บไว้
     Object.keys(auditData).forEach((key) => {
       payload[key] = auditData[key];
     });
 
-    const { error } = await supabase.from('audit_chart_records').insert([payload]);
+    const { error } = await supabase.from('nursing_chart_audits').insert([payload]);
     
     setSaving(false);
     
@@ -61,11 +56,10 @@ export default function AuditChartModal({
     } else {
       alert('บันทึกข้อมูล Audit Chart สำเร็จ');
       onSuccess();
-      onClose(); // ปิด Modal หลังจากบันทึกสำเร็จ
+      onClose();
     }
   };
 
-  // ฟังก์ชันช่วยเรนเดอร์ข้อคำถามในแต่ละหมวดเพื่อให้โค้ดกระชับ
   const renderAuditItems = (items: { id: string; label: string }[]) => {
     return items.map(item => {
       const currentVal = auditData[item.id];
@@ -143,8 +137,8 @@ export default function AuditChartModal({
               <input 
                 type="text" 
                 required 
-                value={auditData.auditor_name || ''} 
-                onChange={e => setAuditData({...auditData, auditor_name: e.target.value})} 
+                value={auditData.disease || ''} 
+                onChange={e => setAuditData({...auditData, disease: e.target.value})} 
                 className="w-full border border-gray-300 rounded-lg p-2.5 text-sm bg-white" 
                 placeholder="ใส่โรค" 
               />
@@ -243,7 +237,7 @@ export default function AuditChartModal({
             </div>
           </div>
 
-          {/* ส่วนที่ 3: การประเมินและบันทึกทางการแพทย์เฉพาะโรค/หัตถการ */}
+          {/* ส่วนที่ 3: การวางแผนจำหน่าย */}
           <div className="space-y-4 pt-2">
             <h4 className="font-extrabold text-emerald-900 bg-emerald-50 px-3 py-2 rounded-lg text-sm">ส่วนที่ 3: การวางแผนจำหน่าย</h4>
             <div className="space-y-3 pl-2 border-l-2 border-emerald-200">
@@ -257,7 +251,7 @@ export default function AuditChartModal({
             </div>
           </div>
 
-          {/* ส่วนที่ 4: การจำหน่ายผู้ป่วย (Discharge Planning) */}
+          {/* ส่วนที่ 4: การบันทึกวันจำหน่าย */}
           <div className="space-y-4 pt-2">
             <h4 className="font-extrabold text-emerald-900 bg-emerald-50 px-3 py-2 rounded-lg text-sm">ส่วนที่ 4: การบันทึกวันจำหน่าย</h4>
             <div className="space-y-3 pl-2 border-l-2 border-emerald-200">
@@ -272,7 +266,7 @@ export default function AuditChartModal({
             </div>
           </div>
 
-          {/* ส่วนที่ 5: ความถูกต้องตามกฎหมายและมาตรฐานวิชาชีพ */}
+          {/* ส่วนที่ 5: การให้สารน้ำ/ยาทางหลอดเลือดดำ */}
           <div className="space-y-4 pt-2">
             <h4 className="font-extrabold text-emerald-900 bg-emerald-50 px-3 py-2 rounded-lg text-sm">ส่วนที่ 5: การให้สารน้ำ/ยาทางหลอดเลือดดำ</h4>
             <div className="space-y-3 pl-2 border-l-2 border-emerald-200">
@@ -294,27 +288,37 @@ export default function AuditChartModal({
             />
           </div>
 
-          {/* ส่วนล่างสุด: ชื่อพยาบาล (Auditor) และปุ่มบันทึก */}
-        <div className="pt-2 flex flex-col md:flex-row justify-between items-end gap-4">
-          <div className="w-full md:w-1/2">
-            <label className="block text-sm font-semibold text-emerald-900 mb-1">พยาบาลผู้ตรวจประเมิน (Auditor)</label>
-            <input 
-              type="text" 
-              placeholder="ใส่ชื่อพยาบาล"
-              value={auditorName}
-              onChange={(e) => setAuditorName(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
-            />
-          </div>
+          {/* ส่วนล่างสุด: ชื่อพยาบาล และปุ่มจัดการ */}
+          <div className="pt-2 flex flex-col md:flex-row justify-between items-end gap-4">
+            <div className="w-full md:w-1/2">
+              <label className="block text-sm font-semibold text-emerald-900 mb-1">พยาบาลผู้ตรวจประเมิน (Auditor)</label>
+              <input 
+                type="text" 
+                placeholder="ใส่ชื่อพยาบาล"
+                value={auditData.auditor_name || ''} 
+                onChange={(e) => setAuditData({...auditData, auditor_name: e.target.value})} 
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+              />
+            </div>
 
-          <button 
-            type="submit"
-            className="w-full md:w-auto px-6 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-lg shadow transition-colors text-sm"
-          >
-            บันทึกข้อมูล
-          </button>
-        </div>
-      </form>
+            <div className="flex gap-2 w-full md:w-auto">
+              <button 
+                type="button"
+                onClick={onClose}
+                className="flex-1 md:flex-none px-6 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold rounded-lg shadow transition-colors text-sm"
+              >
+                ยกเลิก
+              </button>
+              <button 
+                type="submit"
+                disabled={saving}
+                className="flex-1 md:flex-none px-6 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-lg shadow transition-colors text-sm"
+              >
+                {saving ? 'กำลังบันทึก...' : 'บันทึกข้อมูล'}
+              </button>
+            </div>
+          </div>
+        </form>
       </div>
     </div>
   );

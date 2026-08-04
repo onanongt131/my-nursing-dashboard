@@ -88,11 +88,12 @@ export default function IvCareModal({
         factor_fluid: factorFluid || null,
         factor_patient: factorPatient || null,
         factor_personnel: factorPersonnel || null,
+        status: 'pending', // 👈 เพิ่มสถานะเริ่มต้นเพื่อให้หัวหน้าตรวจสอบอนุมัติ
       });
 
       if (error) throw error;
 
-      alert('บันทึกภาวะแทรกซ้อน IV Care สำเร็จ');
+      alert('บันทึกภาวะแทรกซ้อน IV Care สำเร็จ (รอหัวหน้าตรวจสอบ)');
       setHn('');
       setAn('');
       setComplication('');
@@ -105,6 +106,7 @@ export default function IvCareModal({
       setFactorPatient('');
       setFactorPersonnel('');
       onSuccess();
+      onClose(); // เพิ่มการปิด Modal หลังจากบันทึกสำเร็จ (ตามความเหมาะสม)
     } catch (error: any) {
       alert('เกิดข้อผิดพลาด: ' + error.message);
     } finally {

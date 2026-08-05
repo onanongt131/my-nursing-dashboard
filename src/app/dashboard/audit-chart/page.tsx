@@ -16,32 +16,41 @@ export default function AuditChartPage() {
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
-      const [auditRes, deptRes] = await Promise.all([
-        supabase.from('audit_chart_data').select('*'),
-        supabase.from('departments').select('*')
-      ]);
+      try {
+        const [auditRes, deptRes] = await Promise.all([
+          supabase.from('audit_chart_data').select('*'),
+          supabase.from('departments').select('*')
+        ]);
 
-      if (auditRes.error) {
-        console.error('Error fetching audit data:', auditRes.error.message);
-      } else {
-        setData(auditRes.data || []);
+        if (auditRes.error) {
+          console.error('Error fetching audit data:', auditRes.error.message);
+        } else {
+          setData(auditRes.data || []);
+        }
+
+        if (deptRes.error) {
+          console.error('Error fetching departments:', deptRes.error.message);
+        } else {
+          setDepartments(deptRes.data || []);
+        }
+      } catch (err) {
+        console.error('Unexpected error:', err);
+      } finally {
+        setLoading(false);
       }
-
-      if (deptRes.error) {
-        console.error('Error fetching departments:', deptRes.error.message);
-      } else {
-        setDepartments(deptRes.data || []);
-      }
-
-      setLoading(false);
     };
     fetchData();
   }, [supabase]);
 
+  // ปรับการ Map ให้แปลง id เป็น String ทั้งสองฝั่ง ป้องกันปัญหาชนิดข้อมูลไม่ตรงกัน
   const departmentMapName = useMemo(() => {
     const map: { [key: string]: string } = {};
     departments.forEach((dept) => {
-      map[String(dept.id)] = dept.Department;
+      // แปลง id ของตาราง departments เป็น String เพื่อให้ตรงกับ department_id (ที่เป็น text)
+      const deptId = String(dept.id);
+      // ดึงค่าจากคอลัมน์ Department (ตัว D ใหญ่ตามภาพโครงสร้างฐานข้อมูลของคุณ)
+      const deptName = dept.Department || dept.department_name || `หน่วยงาน ${deptId}`;
+      map[deptId] = deptName;
     });
     return map;
   }, [departments]);

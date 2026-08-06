@@ -1,16 +1,17 @@
 'use client';
 
-import React, { useState } from 'react';
-import { createClient } from '@/utils/supabase/client';
+import React, { useState, useEffect } from 'react';
 import { ClipboardDocumentCheckIcon } from '@heroicons/react/24/outline';
 
 interface AuditChartModalProps {
   isOpen: boolean;
   onClose: () => void;
-  departmentName?: string | any;
-  departmentId: string | null;
-  supabase: ReturnType<typeof createClient>;
-  onSuccess: () => void;
+  departmentName: string;
+  departmentId: string;
+  supabase: any;
+  onSuccess?: () => void;
+  initialMode?: 'form' | 'pending'; 
+  initialData?: any;
 }
 
 export default function AuditChartModal({
@@ -20,12 +21,72 @@ export default function AuditChartModal({
   departmentId,
   supabase,
   onSuccess,
+  initialMode = 'form', 
+  initialData
 }: AuditChartModalProps) {
-  
+
+  const [currentMode, setCurrentMode] = useState<'form' | 'pending'>(initialMode);
+  const [pendingList, setPendingList] = useState<any[]>([]);
+  const [loadingList, setLoadingList] = useState(false);
   const [saving, setSaving] = useState(false);
-  const [auditData, setAuditData] = useState<Record<string, any>>({
-    audit_date: new Date().toISOString().split('T')[0],
-  });
+  const [isViewingExisting, setIsViewingExisting] = useState<boolean>(!!initialData);
+  const [auditData, setAuditData] = useState<Record<string, any>>(
+    initialData || {
+      audit_date: new Date().toISOString().split('T')[0],
+    }
+  );
+
+  // ซิงค์สถานะเมื่อเปิด Modal หรือมีการเปลี่ยน Props
+  useEffect(() => {
+    if (isOpen) {
+      setCurrentMode(initialMode);
+      setIsViewingExisting(!!initialData);
+      setAuditData(initialData || { audit_date: new Date().toISOString().split('T')[0] });
+      
+      if (initialMode === 'pending') {
+        fetchPendingAudits();
+      }
+    }
+  }, [isOpen, initialMode, initialData, departmentId]);
+
+  const fetchPendingAudits = async () => {
+    if (!departmentId) return;
+    setLoadingList(true);
+    const { data, error } = await supabase
+      .from('nursing_chart_audits')
+      .select('*')
+      .eq('department_id', Number(departmentId))
+      .eq('status', 'pending')
+      .order('audit_date', { ascending: false });
+
+    if (!error && data) {
+      setPendingList(data);
+    }
+    setLoadingList(false);
+  };
+
+  if (!isOpen) return null;
+
+  const handleApprove = async (id?: string) => {
+    const targetId = id || auditData.id;
+    if (!targetId) return;
+
+    setSaving(true);
+    const { error } = await supabase
+      .from('nursing_chart_audits')
+      .update({ status: 'approved' })
+      .eq('id', targetId);
+
+    setSaving(false);
+
+    if (error) {
+      alert('เกิดข้อผิดพลาดในการอนุมัติ: ' + error.message);
+    } else {
+      alert('อนุมัติรายการสำเร็จ');
+      onSuccess?.();
+      onClose();
+    }
+  };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -33,7 +94,6 @@ export default function AuditChartModal({
     
     setSaving(true);
 
-    // ฟังก์ชันช่วยรวมข้อความหมายเหตุของแต่ละส่วน (Section)
     const compileNotes = (labels: string[]) => {
       let notesList: string[] = [];
       labels.forEach(id => {
@@ -45,10 +105,9 @@ export default function AuditChartModal({
       return notesList.length > 0 ? notesList.join('\n') : null;
     };
 
-    // รายการรหัสข้อในแต่ละส่วน (ปรับให้ตรงกับฐานข้อมูลจริง)
     const s1Keys = ['s1_1_1', 's1_1_2', 's1_1_3', 's1_1_4', 's1_1_5', 's1_1_6', 's1_2_1', 's1_2_2', 's1_2_3', 's1_2_4', 's1_2_5', 's1_3_1', 's1_4_1', 's1_4_2'];
     const s2Keys = ['s2_1_a', 's2_1_p', 's2_1_i', 's2_1_e', 's2_1_name', 's2_2_a', 's2_2_p', 's2_2_i', 's2_2_e', 's2_2_name', 's2_3_a', 's2_3_p', 's2_3_i', 's2_3_e', 's2_3_name', 's2_4_a', 's2_4_p', 's2_4_i', 's2_4_e', 's2_4_name'];
-    const s3Keys = ['s3_1', 's3_2', 's3_3', 's3_4', 's3_5'];
+    const s3Keys = ['s3_a', 's3_p', 's3_i', 's3_e', 's3_name'];
     const s4Keys = ['s4_1', 's4_2', 's4_3', 's4_4', 's4_5', 's4_6'];
     const s5Keys = ['s5_1'];
 
@@ -60,7 +119,6 @@ export default function AuditChartModal({
       auditor_name: auditData.auditor_name || null, 
       notes: auditData.notes || null,
       status: 'pending',
-      // รวมโน้ตลงในคอลัมน์ข้อใหญ่ตามตารางฐานข้อมูล
       s1_notes: compileNotes(s1Keys),
       s2_notes: compileNotes(s2Keys),
       s3_notes: compileNotes(s3Keys),
@@ -68,7 +126,6 @@ export default function AuditChartModal({
       s5_notes: compileNotes(s5Keys),
     };
 
-    // นำค่าคะแนนตัวรายการปกติใส่เข้าไปใน payload (กรองไม่เอาฟิลด์ _note ออก)
     Object.keys(auditData).forEach((key) => {
       if (!key.endsWith('_note')) {
         payload[key] = auditData[key];
@@ -83,7 +140,7 @@ export default function AuditChartModal({
       alert('เกิดข้อผิดพลาดในการบันทึก: ' + error.message);
     } else {
       alert('บันทึกข้อมูล Audit Chart สำเร็จ');
-      onSuccess();
+      onSuccess?.();
       onClose();
     }
   };
@@ -106,7 +163,8 @@ export default function AuditChartModal({
               }} 
               placeholder="1-4 หรือ NA"
               maxLength={2}
-              className="w-20 border rounded p-1 text-center font-bold text-sm bg-gray-50 uppercase" 
+              disabled={isViewingExisting}
+              className="w-20 border rounded p-1 text-center font-bold text-sm bg-gray-50 uppercase disabled:bg-gray-100" 
             />
           </div>
           {currentVal !== '' && currentVal !== 'NA' && Number(currentVal) < 4 && (
@@ -116,7 +174,8 @@ export default function AuditChartModal({
               value={auditData[item.id + '_note'] || ''} 
               onChange={e => setAuditData({...auditData, [item.id + '_note']: e.target.value})} 
               placeholder="⚠️ ระบุหมายเหตุข้อบกพร่อง..." 
-              className="w-full border border-amber-300 bg-amber-50 rounded p-1.5 text-xs text-gray-800" 
+              disabled={isViewingExisting}
+              className="w-full border border-amber-300 bg-amber-50 rounded p-1.5 text-xs text-gray-800 disabled:bg-gray-100" 
             />
           )}
         </div>
@@ -124,6 +183,85 @@ export default function AuditChartModal({
     });
   };
 
+  // --- ส่วนที่ 1: แสดงรายการรอตรวจสอบ (Pending View) ---
+  if (currentMode === 'pending') {
+    return (
+      <div className="fixed inset-0 bg-emerald-950/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-2xl max-w-5xl w-full p-6 shadow-xl border border-emerald-100 space-y-6 max-h-[90vh] overflow-y-auto">
+          <div className="flex justify-between items-center border-b pb-3">
+            <h3 className="text-lg font-extrabold text-emerald-950 flex items-center gap-2">
+              <ClipboardDocumentCheckIcon className="w-6 h-6 text-emerald-700" />
+              รายการ Audit Chart รอตรวจสอบ ({departmentName || 'ไม่ระบุหน่วยงาน'})
+            </h3>
+            <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 font-bold text-lg">✕</button>
+          </div>
+
+          <div className="space-y-4">
+            {loadingList ? (
+              <p className="text-center py-8 text-gray-500">กำลังโหลดข้อมูล...</p>
+            ) : pendingList.length === 0 ? (
+              <p className="text-center py-8 text-gray-500 bg-gray-50 rounded-xl border">ไม่มีรายการที่รอตรวจสอบในขณะนี้</p>
+            ) : (
+              <div className="overflow-x-auto border rounded-xl">
+                <table className="w-full text-left border-collapse text-sm">
+                  <thead className="bg-emerald-50 text-emerald-900 border-b">
+                    <tr>
+                      <th className="p-3">วันที่ Audit</th>
+                      <th className="p-3">AN ผู้ป่วย</th>
+                      <th className="p-3">โรค</th>
+                      <th className="p-3">ผู้ตรวจ (Auditor)</th>
+                      <th className="p-3 text-center">สถานะ</th>
+                      <th className="p-3 text-center">จัดการ</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {pendingList.map((item) => (
+                      <tr key={item.id} className="hover:bg-gray-50">
+                        <td className="p-3">{item.audit_date}</td>
+                        <td className="p-3 font-semibold">{item.patient_hn}</td>
+                        <td className="p-3">{item.disease || '-'}</td>
+                        <td className="p-3">{item.auditor_name || '-'}</td>
+                        <td className="p-3 text-center">
+                          <span className="px-2.5 py-1 bg-amber-100 text-amber-800 rounded-full text-xs font-bold">
+                            รอตรวจสอบ
+                          </span>
+                        </td>
+                        <td className="p-3 text-center">
+                          <button 
+                            type="button"
+                            onClick={() => {
+                              setAuditData(item);
+                              setIsViewingExisting(true);
+                              setCurrentMode('form'); // สลับไปโหมดฟอร์มเพื่อดูรายละเอียดและอนุมัติ
+                            }}
+                            className="px-3.5 py-1.5 bg-sky-100 hover:bg-sky-200 text-sky-800 rounded-lg text-xs font-bold transition"
+                          >
+                            ดูรายละเอียดเพื่ออนุมัติ
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            <div className="flex justify-end pt-4 border-t">
+              <button 
+                type="button"
+                onClick={onClose}
+                className="px-5 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 rounded-lg text-sm font-bold transition"
+              >
+                ปิด
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // --- ส่วนที่ 2: ฟอร์มกรอกข้อมูล / ตรวจสอบและอนุมัติ (Form View) ---
   return (
     <div className="fixed inset-0 bg-emerald-950/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl max-w-3xl w-full p-6 shadow-xl border border-emerald-100 space-y-6 max-h-[90vh] overflow-y-auto">
@@ -131,12 +269,24 @@ export default function AuditChartModal({
         <div className="flex justify-between items-center border-b pb-3">
           <h3 className="text-lg font-extrabold text-emerald-950 flex items-center gap-2">
             <ClipboardDocumentCheckIcon className="w-6 h-6 text-emerald-700" />
-            บันทึกผล Audit Chart ({departmentName || 'ไม่ระบุหน่วยงาน'}) - คะแนนเต็ม 184
+            {isViewingExisting ? 'ตรวจสอบรายละเอียดและอนุมัติ Audit Chart' : 'บันทึกผล Audit Chart'} ({departmentName || 'ไม่ระบุหน่วยงาน'})
           </h3>
-          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 font-bold text-lg">✕</button>
+          <div className="flex items-center gap-3">
+            {initialMode === 'pending' && (
+              <button 
+                type="button" 
+                onClick={() => setCurrentMode('pending')}
+                className="text-xs text-emerald-700 hover:underline font-bold"
+              >
+                ← กลับไปหน้าตารางรายการ
+              </button>
+            )}
+            <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 font-bold text-lg">✕</button>
+          </div>
         </div>
         
-        <form onSubmit={handleSave} className="space-y-6">
+        <form onSubmit={isViewingExisting ? (e) => { e.preventDefault(); handleApprove(); } : handleSave} className="space-y-6">
+          
           {/* ข้อมูลทั่วไป */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-gray-50 p-4 rounded-xl border">
             <div>
@@ -147,6 +297,7 @@ export default function AuditChartModal({
                 value={auditData.audit_date || ''} 
                 onChange={e => setAuditData({...auditData, audit_date: e.target.value})} 
                 className="w-full border border-gray-300 rounded-lg p-2.5 text-sm bg-white" 
+                disabled={isViewingExisting}
               />
             </div>
             <div>
@@ -158,6 +309,7 @@ export default function AuditChartModal({
                 onChange={e => setAuditData({...auditData, patient_hn: e.target.value})} 
                 className="w-full border border-gray-300 rounded-lg p-2.5 text-sm bg-white" 
                 placeholder="ใส่เลข AN เช่น 6900xxxxx" 
+                disabled={isViewingExisting}
               />
             </div>
             <div>
@@ -169,6 +321,7 @@ export default function AuditChartModal({
                 onChange={e => setAuditData({...auditData, disease: e.target.value})} 
                 className="w-full border border-gray-300 rounded-lg p-2.5 text-sm bg-white" 
                 placeholder="ใส่โรค" 
+                disabled={isViewingExisting}
               />
             </div>
           </div>
@@ -313,6 +466,7 @@ export default function AuditChartModal({
               onChange={e => setAuditData({...auditData, notes: e.target.value})} 
               className="w-full border border-gray-300 rounded-lg p-2 text-sm bg-white" 
               placeholder="บันทึกข้อเสนอแนะเพิ่มเติม..." 
+              disabled={isViewingExisting}
             />
           </div>
 
@@ -326,25 +480,40 @@ export default function AuditChartModal({
                 value={auditData.auditor_name || ''} 
                 onChange={(e) => setAuditData({...auditData, auditor_name: e.target.value})} 
                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-emerald-500 text-sm"
+                disabled={isViewingExisting}
               />
             </div>
 
             <div className="flex gap-2 w-full md:w-auto">
-              <button 
-                type="button"
-                onClick={onClose}
-                className="flex-1 md:flex-none px-6 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold rounded-lg shadow transition-colors text-sm"
-              >
-                ยกเลิก
-              </button>
-              <button 
-                type="submit"
-                disabled={saving}
-                className="flex-1 md:flex-none px-6 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-lg shadow transition-colors text-sm"
-              >
-                {saving ? 'กำลังบันทึก...' : 'บันทึกข้อมูล'}
-              </button>
-            </div>
+  <button 
+    type="button"
+    onClick={onClose}
+    className="flex-1 md:flex-none px-6 py-2.5 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold rounded-lg shadow transition-colors text-sm"
+  >
+    ปิด
+  </button>
+  {isViewingExisting ? (
+    <button 
+      type="submit"
+      disabled={saving || auditData.status === 'approved'}
+      className={`flex-1 md:flex-none px-6 py-2.5 font-bold rounded-lg shadow transition-colors text-sm ${
+        auditData.status === 'approved' 
+          ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
+          : 'bg-emerald-600 hover:bg-emerald-700 text-white cursor-pointer'
+      }`}
+    >
+      {saving ? 'กำลังอนุมัติ...' : auditData.status === 'approved' ? 'อนุมัติแล้ว' : 'อนุมัติรายการนี้'}
+    </button>
+  ) : (
+    <button 
+      type="submit"
+      disabled={saving}
+      className="flex-1 md:flex-none px-6 py-2.5 bg-emerald-700 hover:bg-emerald-800 text-white font-bold rounded-lg shadow transition-colors text-sm cursor-pointer"
+    >
+      {saving ? 'กำลังบันทึก...' : 'บันทึกข้อมูล'}
+    </button>
+  )}
+</div>
           </div>
         </form>
       </div>

@@ -12,31 +12,44 @@ import IvCareModal from '@/components/IvCareModal';
 import FallCareModal from '@/components/FallCareModal'; 
 
 const YEARS = [2565, 2566, 2567, 2568, 2569] as const;
-
 export default function DepartmentPage() {
   const [data, setData] = useState<any[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<string>('');
   const [activeKpi, setActiveKpi] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  
+  const [selectedAuditItem, setSelectedAuditItem] = useState<any>(null);
   const [activeModal, setActiveModal] = useState<'wp_qa' | 'iv_care' | 'fall' | 'audit' | null>(null);
   const [selectedDept, setSelectedDept] = useState<{ id: string | number; name: string } | null>(null);
+  const [auditModalMode, setAuditModalMode] = useState<'form' | 'pending'>('form');
   
-  const [pendingWpQa, setPendingWpQa] = useState<any[]>([]);
+  // ปรับเปลี่ยน State ของรายการรออนุมัติให้เก็บรวมทุกประเภท[cite: 1]
+  const [pendingItems, setPendingItems] = useState<{
+    wp_qa: any[];
+    audit: any[];
+    iv_care: any[];
+    fall: any[];
+  }>({ wp_qa: [], audit: [], iv_care: [], fall: [] });
+  
   const [pendingLoading, setPendingLoading] = useState(false);
-  const [viewingBatchGroup, setViewingBatchGroup] = useState<{ audit_month: string; items: any[] } | null>(null);
-  
+  const [viewingBatchGroup, setViewingBatchGroup] = useState<{ 
+      type: 'wp_qa' | 'audit' | 'iv_care' | 'fall'; 
+      audit_month: string; 
+      items: any[];
+      auditor_name?: string;
+      evaluator?: string;
+      status?: string; // <--- เพิ่มบรรทัดนี้เพื่อให้ TypeScript รู้จัก property status
+    } | null>(null);
   const [showPendingTable, setShowPendingTable] = useState(false);
-  const [userProfile, setUserProfile] = useState<any>(null);
-
+  const [userProfile, setUserProfile] = useState<any>({
+  role: 'admin',
+  department_id: 1
+});
   const supabase = createClient();
-
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
       let profileData = null;
-
       if (user) {
         const { data } = await supabase
           .from('profiles')
@@ -46,35 +59,29 @@ export default function DepartmentPage() {
         profileData = data;
         setUserProfile(data);
       }
-
       const [deptRes, kpiRes, entryRes, mapRes] = await Promise.all([
         supabase.from('departments').select('*'),
         supabase.from('kpis').select('*'),
         supabase.from('kpi_entries').select('*'),
         supabase.from('kpi_department_map').select('department_id, kpi_id')
       ]);
-
       if (deptRes.error || kpiRes.error || entryRes.error || mapRes.error) {
         console.error("Supabase Error:", deptRes.error || kpiRes.error || entryRes.error || mapRes.error);
         return;
       }
-
       let depts = deptRes.data || [];
       const kpis = kpiRes.data || [];
       const entries = entryRes.data || [];
       const maps = mapRes.data || [];
-
       if (profileData?.role) {
         const { role, department_id: userDeptId } = profileData;
         const userGroup = (profileData.departments as any)?.group;
-
         if (role === 'staff' || role === 'head_department') {
           depts = depts.filter(d => d.id === userDeptId);
         } else if (role === 'head_group' && userGroup) {
           depts = depts.filter(d => d.group === userGroup);
         }
       }
-
       const formattedData = depts.map(dept => ({
         ...dept,
         kpis: maps
@@ -96,92 +103,134 @@ export default function DepartmentPage() {
       setLoading(false);
     }
   }, [supabase]);
-
+  // ฟังก์ชันดึงข้อมูลรออนุมัติจากทั้ง 4 ตาราง[cite: 1]
   const fetchPendingApproval = useCallback(async (deptId: string | number) => {
     setPendingLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('wp_qa_records')
-        .select('*')
-        .eq('department_id', deptId)
-        .eq('status', 'pending');
-
-      if (error) throw error;
-      
-      const groupedMap = (data || []).reduce((acc: any, item: any) => {
-        const month = item.audit_month || 'ไม่ระบุเดือน';
-        if (!acc[month]) {
-          acc[month] = {
-            audit_month: month,
-            auditor_name: item.auditor_name,
-            created_at: item.created_at,
-            items: []
-          };
-        }
-        acc[month].items.push(item);
-        return acc;
-      }, {});
-
-      setPendingWpQa(Object.values(groupedMap));
+      const [wpRes, auditRes, ivRes, fallRes] = await Promise.all([
+        supabase.from('wp_qa_records').select('*').eq('department_id', deptId).eq('status', 'pending'),
+        supabase.from('nursing_chart_audits').select('*').eq('department_id', deptId).eq('status', 'pending'),
+        supabase.from('iv_care_records').select('*').eq('department_id', deptId).eq('status', 'pending'),
+        supabase.from('fall_care_records').select('*').eq('department_id', deptId).eq('status', 'pending'),
+      ]);
+      setPendingItems({
+        wp_qa: wpRes.data || [],
+        audit: auditRes.data || [],
+        iv_care: ivRes.data || [],
+        fall: fallRes.data || [],
+      });
     } catch (err) {
       console.error("Error fetching pending records:", err);
     } finally {
       setPendingLoading(false);
     }
   }, [supabase]);
-
+  
   const canApprove = (targetDeptId: string | number) => {
-    if (!userProfile) return false;
-    const { role, department_id } = userProfile;
-    if (role === 'head_department' && Number(department_id) === Number(targetDeptId)) return true;
-    if (role === 'head_group' && Number(department_id) === Number(targetDeptId)) return true;
-    return false;
-  };
+  if (!userProfile) return false;
+  
+  const { role, department_id } = userProfile;
+  
+  // 1. ถ้าเป็น admin ให้มีสิทธิ์อนุมัติได้ทุกแผนกทันที
+  if (role === 'admin') return true; 
+  
+  // 2. สำหรับตำแหน่งอื่นๆ ต้องอยู่แผนกเดียวกับรายการนั้นๆ
+  const allowedRoles = ['head_department', 'head_group', 'head_nurse'];
+  if (allowedRoles.includes(role) && Number(department_id) === Number(targetDeptId)) {
+    return true;
+  }
+  
+  return false;
+};
 
-  const handleApproveBatch = async (auditMonth: string) => {
+  // ฟังก์ชันอนุมัติแยกตามประเภทตาราง[cite: 1]
+  const handleApproveBatch = async (type: 'wp_qa' | 'audit' | 'iv_care' | 'fall', auditMonth: string) => {
     if (!selectedDept) return;
+    
+    const tableMap = {
+      wp_qa: 'wp_qa_records',
+      audit: 'nursing_chart_audits',
+      iv_care: 'iv_care_records',
+      fall: 'fall_care_records'
+    };
     try {
       const { error } = await supabase
-        .from('wp_qa_records')
+        .from(tableMap[type])
         .update({ status: 'approved' })
         .eq('department_id', selectedDept.id)
         .eq('audit_month', auditMonth)
         .eq('status', 'pending');
-
       if (error) throw error;
-      alert(`อนุมัติรายการ WP/QA ประจำเดือน ${auditMonth} ทั้งชุดสำเร็จ`);
+      alert(`อนุมัติรายการ ${type.toUpperCase()} ประจำเดือน ${auditMonth} สำเร็จ`);
       setViewingBatchGroup(null); 
       fetchPendingApproval(selectedDept.id);
     } catch (err: any) {
       alert('เกิดข้อผิดพลาดในการอนุมัติ: ' + err.message);
     }
   };
-
   useEffect(() => {
     fetchData();
   }, [fetchData]);
-
   useEffect(() => {
     if (selectedDept) {
       fetchPendingApproval(selectedDept.id);
       setShowPendingTable(false);
     } else {
-      setPendingWpQa([]);
+      setPendingItems({ wp_qa: [], audit: [], iv_care: [], fall: [] });
       setShowPendingTable(false);
     }
   }, [selectedDept, fetchPendingApproval]);
-
   const uniqueGroups = Array.from(new Set(data.map(d => d.group))).filter(Boolean) as string[];
   const filteredDepartments = data.filter(d => d.group === selectedGroup);
   const currentDeptObj = data.find(d => String(d.id) === String(selectedDept?.id));
-
+  
+  // คำนวณจำนวนรายการรออนุมัติรวมทั้งหมดเพื่อแสดงที่ปุ่ม[cite: 1]
+  const totalPendingCount = 
+    pendingItems.wp_qa.length + 
+    pendingItems.audit.length + 
+    pendingItems.iv_care.length + 
+    pendingItems.fall.length;
+  // จัดกลุ่มข้อมูลแต่ละประเภทตามเดือน สำหรับแสดงในตารางรวม[cite: 1]
+  const getGroupedList = (items: any[], typeName: string) => {
+    const groupedMap = items.reduce((acc: any, item: any) => {
+      let month = item.audit_month || item.month;
+      if (!month && item.audit_date) {
+        month = item.audit_date.substring(0, 7); 
+      }
+      if (!month) month = 'ไม่ระบุเดือน';
+      if (!acc[month]) {
+        acc[month] = {
+          type: typeName,
+          audit_month: month,
+          auditor_name: item.auditor_name || item.evaluator || item.staff_name || '-',
+          items: []
+        };
+      }
+      acc[month].items.push(item);
+      return acc;
+    }, {});
+    return Object.values(groupedMap);
+  };
+  const allPendingRows = [
+    ...getGroupedList(pendingItems.wp_qa, 'wp_qa'),
+    ...getGroupedList(pendingItems.audit, 'audit'),
+    ...getGroupedList(pendingItems.iv_care, 'iv_care'),
+    ...getGroupedList(pendingItems.fall, 'fall'),
+  ];
   if (loading) return <div className="p-8 text-center text-gray-500">กำลังโหลดข้อมูลหน่วยงาน...</div>;
+
+  // ย้ายมาไว้ข้างนอกตรงส่วนการทำงานปกติ (เช่น ด้านใน Component หรือก่อนเรนเดอร์)
+console.log("Viewing Status:", viewingBatchGroup?.status);
+console.log("Item Status:", viewingBatchGroup?.items?.[0]?.status);
+console.log("Can Approve Result:", canApprove(selectedDept?.id || ''));
+console.log("Selected Dept ID:", selectedDept?.id);
+console.log("User Profile:", userProfile);
 
   return (
     <div className="px-2 py-2 max-w-full mx-auto">
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
         
-        {/* --- Sidebar (ฝั่งซ้าย: col-span-1) --- */}
+        {/* --- Sidebar --- */}
         <div className="lg:col-span-1 bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-6 sticky top-4">
           <div className="space-y-2">
             <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">เลือกกลุ่มงาน</label>
@@ -200,9 +249,7 @@ export default function DepartmentPage() {
               ))}
             </select>
           </div>
-
           <hr className="border-gray-100" />
-
           <div className="space-y-2">
             <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">เลือกหอผู้ป่วย / หน่วยงาน</label>
             {selectedGroup ? (
@@ -234,14 +281,12 @@ export default function DepartmentPage() {
             )}
           </div>
         </div>
-
-        {/* --- Content (ฝั่งขวา: col-span-4) --- */}
+        {/* --- Content --- */}
         <div className="lg:col-span-4 space-y-6">
           {selectedDept && !activeKpi && (
             <div className="space-y-6">
               <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-6">
                 
-                {/* --- Header Row --- */}
                 <div className="border-b pb-4 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
                   <div>
                     <span className="text-xs font-bold text-emerald-600 uppercase tracking-wider">หน่วยงานที่กำลังแสดงผล</span>
@@ -249,9 +294,8 @@ export default function DepartmentPage() {
                       {currentDeptObj?.Department || selectedDept.name}
                     </h2>
                   </div>
-
                   <div className="flex flex-wrap items-center gap-2">
-                    {pendingWpQa.length > 0 && (
+                    {totalPendingCount > 0 && (
                       <button
                         onClick={() => setShowPendingTable(!showPendingTable)}
                         className={`flex items-center gap-2 px-3 py-2 rounded-xl transition-all shadow-sm border cursor-pointer ${
@@ -260,61 +304,42 @@ export default function DepartmentPage() {
                       >
                         <ExclamationTriangleIcon className="w-5 h-5 text-red-500 animate-pulse" />
                         <span className="bg-red-600 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow">
-                          {pendingWpQa.length} รออนุมัติ
+                          {totalPendingCount} รออนุมัติ
                         </span>
                       </button>
                     )}
-
-                    <button
-                      onClick={() => setActiveModal('audit')}
-                      className="bg-emerald-700 hover:bg-emerald-800 text-white px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all"
-                    >
+                    <button onClick={() => setActiveModal('audit')} className="bg-emerald-700 hover:bg-emerald-800 text-white px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all">
                       <ClipboardDocumentCheckIcon className="w-4 h-4 text-amber-300" />
                       <span>ลงข้อมูล Audit Chart</span>
                     </button>
 
-                    <button
-                      onClick={() => setActiveModal('wp_qa')}
-                      className="bg-emerald-700 hover:bg-emerald-800 text-white px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all"
-                    >
+
+                    <button onClick={() => setActiveModal('wp_qa')} className="bg-emerald-700 hover:bg-emerald-800 text-white px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all">
                       <ClipboardDocumentCheckIcon className="w-4 h-4 text-emerald-300" />
                       <span>ประเมิน WP/QA</span>
                     </button>
-
-                    <button
-                      onClick={() => setActiveModal('iv_care')}
-                      className="bg-cyan-700 hover:bg-cyan-800 text-white px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all"
-                    >
+                    <button onClick={() => setActiveModal('iv_care')} className="bg-cyan-700 hover:bg-cyan-800 text-white px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all">
                       <CheckCircleIcon className="w-4 h-4 text-cyan-200" />
                       <span>บันทึก IV Care</span>
                     </button>
-
-                    <button
-                      onClick={() => setActiveModal('fall')}
-                      className="bg-amber-600 hover:bg-amber-700 text-white px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all"
-                    >
+                    <button onClick={() => setActiveModal('fall')} className="bg-amber-600 hover:bg-amber-700 text-white px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all">
                       <ExclamationTriangleIcon className="w-4 h-4 text-white" />
                       <span>บันทึก Fall</span>
                     </button>
                   </div>
                 </div>
-
-                {/* --- Pending Table Section --- */}
-                {showPendingTable && pendingWpQa.length > 0 && (
+                {/* --- Pending Table Section (รวมทุกระบบ) --- */}
+                {showPendingTable && totalPendingCount > 0 && (
                   <div className="border rounded-xl p-4 space-y-3 bg-red-50/60 border-red-200 shadow-sm transition-all animate-fadeIn">
                     <div className="flex justify-between items-center">
                       <h3 className="text-sm font-bold text-red-900 flex items-center gap-2">
                         <ExclamationTriangleIcon className="w-4 h-4 text-red-600 animate-pulse" />
-                        <span>รายการ WP/QA ที่รอการตรวจสอบและอนุมัติของหน่วยงานนี้</span>
+                        <span>รายการรอการตรวจสอบและอนุมัติทั้งหมด (WP/QA, Audit Chart, IV Care, Fall Care)</span>
                       </h3>
-                      <button 
-                        onClick={() => setShowPendingTable(false)}
-                        className="text-gray-400 hover:text-gray-600 text-xs font-bold px-2 py-1 bg-white rounded border shadow-sm"
-                      >
+                      <button onClick={() => setShowPendingTable(false)} className="text-gray-400 hover:text-gray-600 text-xs font-bold px-2 py-1 bg-white rounded border shadow-sm">
                         ซ่อนตาราง ✕
                       </button>
                     </div>
-
                     {pendingLoading ? (
                       <p className="text-xs text-gray-500 py-2">กำลังโหลดรายการรออนุมัติ...</p>
                     ) : (
@@ -322,18 +347,20 @@ export default function DepartmentPage() {
                         <table className="w-full text-left text-xs border-collapse">
                           <thead className="bg-red-100 text-red-900">
                             <tr>
+                              <th className="p-3">ประเภทระบบ</th>
                               <th className="p-3">ประจำเดือน</th>
-                              <th className="p-3">จำนวนหัวข้อย่อยในชุด</th>
-                              <th className="p-3">ผู้ประเมิน</th>
+                              <th className="p-3">จำนวนรายการ</th>
+                              <th className="p-3">ผู้บันทึก / ผู้ประเมิน</th>
                               <th className="p-3 text-center">สถานะ</th>
                               <th className="p-3 text-center">จัดการ</th>
                             </tr>
                           </thead>
                           <tbody className="divide-y divide-gray-100">
-                            {pendingWpQa.map((batch: any) => (
-                              <tr key={batch.audit_month} className="hover:bg-gray-50">
+                            {allPendingRows.map((batch: any, index: number) => (
+                              <tr key={index} className="hover:bg-gray-50">
+                                <td className="p-3 font-bold text-emerald-800 uppercase">{batch.type}</td>
                                 <td className="p-3 font-bold text-gray-800">{batch.audit_month}</td>
-                                <td className="p-3 text-red-700 font-semibold">{batch.items.length} หัวข้อ</td>
+                                <td className="p-3 text-red-700 font-semibold">{batch.items.length} รายการ</td>
                                 <td className="p-3">{batch.auditor_name || '-'}</td>
                                 <td className="p-3 text-center">
                                   <span className="px-2.5 py-0.5 bg-red-100 text-red-800 rounded-full font-bold text-[10px] animate-pulse">
@@ -341,18 +368,31 @@ export default function DepartmentPage() {
                                   </span>
                                 </td>
                                 <td className="p-3 text-center flex items-center justify-center gap-2">
-                                  <button onClick={() => setViewingBatchGroup(batch)} className="px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg font-bold shadow-sm transition flex items-center gap-1">
-                                    <EyeIcon className="w-4 h-4" />
-                                    <span>ดูรายละเอียด</span>
-                                  </button>
-                                  {canApprove(selectedDept?.id || '') ? (
-                                    <button onClick={() => handleApproveBatch(batch.audit_month)} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-bold shadow-sm transition">
-                                      อนุมัติทั้งชุด
-                                    </button>
-                                  ) : (
-                                    <span className="text-gray-400 text-[10px] italic bg-gray-100 px-2 py-1 rounded">(สิทธิ์ดูเท่านั้น)</span>
-                                  )}
-                                </td>
+  <button 
+    onClick={() => {
+      if (batch.type === 'audit') {
+        setSelectedAuditItem({
+          audit_month: batch.audit_month,
+          items: batch.items
+        });
+        setAuditModalMode('pending');
+        setActiveModal('audit');
+      } else {
+        setViewingBatchGroup({
+          type: batch.type,
+          audit_month: batch.audit_month,
+          items: batch.items,
+          auditor_name: batch.auditor_name,
+          status: batch.items?.[0]?.status || 'pending' // ส่งสถานะเข้าไปด้วยเพื่อให้ Modal อ่านค่าได้ถูกต้อง
+        });
+      }
+    }} 
+    className="px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg font-bold shadow-sm transition flex items-center gap-1"
+  >
+    <EyeIcon className="w-4 h-4" />
+    <span>ดูรายละเอียด</span>
+  </button>
+</td>
                               </tr>
                             ))}
                           </tbody>
@@ -361,7 +401,6 @@ export default function DepartmentPage() {
                     )}
                   </div>
                 )}
-
                 {/* KPI Tables */}
                 {Object.entries(
                   (currentDeptObj?.kpis || []).reduce((acc: any, kpi: any) => {
@@ -413,13 +452,11 @@ export default function DepartmentPage() {
               </div>
             </div>
           )}
-
           {!selectedDept && !loading && (
             <div className="bg-white p-12 rounded-2xl border border-gray-200 shadow-sm text-center text-gray-400">
               <p className="text-base font-medium">กรุณาเลือกกลุ่มงาน และเลือกหอผู้ป่วย / หน่วยงานจากเมนูด้านซ้ายเพื่อดูข้อมูล</p>
             </div>
           )}
-
           {activeKpi && (
             <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-6">
               <button onClick={() => setActiveKpi(null)} className="text-emerald-700 font-bold hover:underline text-sm">← ย้อนกลับไปตารางข้อมูล</button>
@@ -441,7 +478,6 @@ export default function DepartmentPage() {
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
-
                 <div className="bg-gray-50 p-6 rounded-xl border">
                   <h4 className="text-md font-bold mb-4 text-gray-700">บันทึกข้อมูลผลงาน</h4>
                   <AddEntryForm 
@@ -456,77 +492,120 @@ export default function DepartmentPage() {
           )}
         </div>
       </div>
-
-      {/* Modals */}
+      {/* Modal ดูรายละเอียดรายการรออนุมัติรวม */}
       {viewingBatchGroup && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-5xl w-full p-6 space-y-5 shadow-2xl max-h-[90vh] overflow-y-auto">
             <div className="flex justify-between items-center border-b pb-3">
               <div>
-                <span className="text-xs font-bold text-emerald-600 uppercase">รายละเอียดผลการประเมิน WP/QA ทั้งชุด</span>
-                <h3 className="text-lg font-bold text-gray-900">ประจำเดือน: {viewingBatchGroup.audit_month}</h3>
+                <span className="text-xs font-bold text-emerald-600 uppercase">รายละเอียดผลการประเมิน ({viewingBatchGroup.type.toUpperCase()})</span>
+                <h3 className="text-lg font-bold text-gray-900">ประจำเดือน / วันที่: {viewingBatchGroup.audit_month}</h3>
               </div>
               <button onClick={() => setViewingBatchGroup(null)} className="text-gray-400 hover:text-gray-600 font-bold text-xl px-2">✕</button>
             </div>
-
             <div className="grid grid-cols-3 gap-4 text-sm bg-gray-50 p-4 rounded-xl">
               <div><span className="font-semibold text-gray-500">หน่วยงาน:</span> {currentDeptObj?.Department || selectedDept?.name}</div>
-              <div><span className="font-semibold text-gray-500">ผู้ประเมิน:</span> {viewingBatchGroup.items[0]?.auditor_name || '-'}</div>
-              <div><span className="font-semibold text-gray-500">สถานะ:</span> <span className="text-amber-600 font-bold">รออนุมัติทั้งชุด (Pending)</span></div>
+              <div><span className="font-semibold text-gray-500">ผู้ประเมิน:</span> {viewingBatchGroup.auditor_name || viewingBatchGroup.evaluator || '-'}</div>
+              <div><span className="font-semibold text-gray-500">สถานะ:</span> <span className="text-amber-600 font-bold">รออนุมัติ (Pending)</span></div>
             </div>
-
             <div className="space-y-2">
-              <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">รายการหัวข้อย่อยทั้งหมด ({viewingBatchGroup.items.length} หัวข้อ)</h4>
+              <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">รายการข้อมูล ({viewingBatchGroup.items.length} รายการ)</h4>
               <div className="border border-gray-200 rounded-xl overflow-hidden max-h-96 overflow-y-auto">
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead className="bg-gray-100 text-gray-700 sticky top-0">
-                    <tr>
-                      <th className="p-2.5 w-[18%]">รหัส WP</th>
-                      <th className="p-2.5 w-[36%]">ชื่อหัวข้อ WP</th>
-                      <th className="p-2.5 text-center w-[12%]">ประเมิน</th>
-                      <th className="p-2.5 text-center w-[12%]">ปฏิบัติ</th>
-                      <th className="p-2.5 w-[22%]">เหตุผล / ข้อเสนอแนะ</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100 bg-white">
-                    {viewingBatchGroup.items.map((subItem: any, idx: number) => (
-                      <tr key={idx} className="hover:bg-gray-50">
-                        <td className="p-2.5 font-mono font-medium text-gray-600">{subItem.wp_id}</td>
-                        <td className="p-2.5 font-medium text-gray-800">{subItem.wp_name}</td>
-                        <td className="p-2.5 text-center font-bold text-emerald-700">{subItem.total_evaluated ?? '-'}</td>
-                        <td className="p-2.5 text-center font-bold text-sky-700">{subItem.total_practiced ?? '-'}</td>
-                        <td className="p-2.5 text-gray-600 italic">{subItem.unpracticed_reasons || '-'}</td>
+                
+                {/* --- แสดงผลแบบตารางแยกตามประเภทระบบ --- */}
+                {viewingBatchGroup.type === 'wp_qa' ? (
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead className="bg-emerald-100 text-emerald-900 sticky top-0">
+                      <tr>
+                        <th className="p-2.5">รหัส WP</th>
+                        <th className="p-2.5">หัวข้อ WP</th>
+                        <th className="p-2.5 text-center">ประเมินแล้ว</th>
+                        <th className="p-2.5 text-center">ปฏิบัติจริง</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 bg-white">
+                      {viewingBatchGroup.items.map((item: any, idx: number) => (
+                        <tr key={idx} className="hover:bg-gray-50">
+                          <td className="p-2.5 font-bold text-emerald-800">{item.wp_id}</td>
+                          <td className="p-2.5 text-gray-800">{item.wp_name}</td>
+                          <td className="p-2.5 text-center font-semibold">{item.total_evaluated}</td>
+                          <td className="p-2.5 text-center font-semibold text-emerald-600">{item.total_practiced}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                ) : (
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead className="bg-gray-100 text-gray-700 sticky top-0">
+                      <tr>
+                        <th className="p-2.5">ข้อมูลรายการ</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100 bg-white">
+                      {viewingBatchGroup.items.map((subItem: any, idx: number) => (
+                        <tr key={idx} className="hover:bg-gray-50">
+                          <td className="p-2.5 font-medium text-gray-800">
+                            <pre className="whitespace-pre-wrap font-sans text-xs">{JSON.stringify(subItem, null, 2)}</pre>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                )}
               </div>
             </div>
-
             <div className="flex justify-end gap-3 pt-4 border-t">
-              <button onClick={() => setViewingBatchGroup(null)} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-sm font-bold transition">ปิดหน้าต่าง</button>
-              {canApprove(selectedDept?.id || '') && (
-                <button onClick={() => handleApproveBatch(viewingBatchGroup.audit_month)} className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold shadow transition flex items-center gap-1.5">
-                  <CheckCircleIcon className="w-5 h-5" />
-                  <span>อนุมัติรายการทั้งหมดในชุดนี้</span>
-                </button>
-              )}
-            </div>
+  <button 
+    onClick={() => setViewingBatchGroup(null)} 
+    className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-sm font-bold transition"
+  >
+    ปิดหน้าต่าง
+  </button>
+
+  {/* เช็คสถานะจาก item แรกในกลุ่ม และเช็คสิทธิ์การอนุมัติ */}
+  {viewingBatchGroup.items?.[0]?.status === 'pending' && canApprove(selectedDept?.id || '') && (
+    <button 
+      onClick={() => {
+        handleApproveBatch(viewingBatchGroup.type, viewingBatchGroup.audit_month);
+        setViewingBatchGroup(null);
+      }} 
+      className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold shadow transition flex items-center gap-1.5"
+    >
+      <CheckCircleIcon className="w-5 h-5" />
+      <span>อนุมัติรายการชุดนี้</span>
+    </button>
+  )}
+</div>
           </div>
         </div>
       )}
-
       {activeModal === 'audit' && selectedDept && (
-        <AuditChartModal isOpen={true} onClose={() => setActiveModal(null)} departmentName={currentDeptObj?.Department || 'ไม่ระบุหน่วยงาน'} departmentId={String(selectedDept.id)} supabase={supabase} onSuccess={() => setActiveModal(null)} />
+        <AuditChartModal 
+          isOpen={true} 
+          onClose={() => {
+            setActiveModal(null);
+            setSelectedAuditItem(null); // เคลียร์ค่าเมื่อปิด
+          }} 
+          departmentName={currentDeptObj?.Department || 'ไม่ระบุหน่วยงาน'} 
+          departmentId={String(selectedDept.id)} 
+          supabase={supabase} 
+          initialMode={auditModalMode}
+          initialData={selectedAuditItem} // ส่งข้อมูลเคสเข้าไปทันทีเพื่อข้ามขั้นตอนกลาง
+          onSuccess={() => { 
+            setActiveModal(null); 
+            setSelectedAuditItem(null);
+            fetchPendingApproval(currentDeptObj.id); 
+          }} 
+        />
       )}
-
       {selectedDept && currentDeptObj && (
         <>
           <WpQaModal isOpen={activeModal === 'wp_qa'} onClose={() => setActiveModal(null)} departmentId={currentDeptObj.id} departmentName={currentDeptObj.Department} supabase={supabase} onSuccess={() => { fetchData(); fetchPendingApproval(currentDeptObj.id); }} />
-          <IvCareModal isOpen={activeModal === 'iv_care'} onClose={() => setActiveModal(null)} departmentId={currentDeptObj.id} departmentName={currentDeptObj.Department} supabase={supabase} onSuccess={fetchData} />
-          <FallCareModal isOpen={activeModal === 'fall'} onClose={() => setActiveModal(null)} departmentId={currentDeptObj.id} departmentName={currentDeptObj.Department} supabase={supabase} onSuccess={fetchData} />
+          <IvCareModal isOpen={activeModal === 'iv_care'} onClose={() => setActiveModal(null)} departmentId={currentDeptObj.id} departmentName={currentDeptObj.Department} supabase={supabase} onSuccess={() => { fetchData(); fetchPendingApproval(currentDeptObj.id); }} />
+          <FallCareModal isOpen={activeModal === 'fall'} onClose={() => setActiveModal(null)} departmentId={currentDeptObj.id} departmentName={currentDeptObj.Department} supabase={supabase} onSuccess={() => { fetchData(); fetchPendingApproval(currentDeptObj.id); }} />
         </>
       )}
     </div>
   );
 }
+

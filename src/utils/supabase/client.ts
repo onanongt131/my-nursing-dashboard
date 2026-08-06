@@ -1,11 +1,13 @@
-// src/utils/supabase/client.ts
 import { createBrowserClient } from '@supabase/ssr'
 
-let supabase: any = null;
-
-export function createClient() {
-  return createBrowserClient(
+export const createClient = () =>
+  createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      auth: {
+        persistSession: false, // ปิดการจำ Session ข้ามการปิดเบราว์เซอร์
+        autoRefreshToken: true,
+      },
+    }
   );
-}

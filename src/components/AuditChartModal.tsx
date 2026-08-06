@@ -33,6 +33,25 @@ export default function AuditChartModal({
     
     setSaving(true);
 
+    // ฟังก์ชันช่วยรวมข้อความหมายเหตุของแต่ละส่วน (Section)
+    const compileNotes = (prefix: string, labels: string[]) => {
+      let notesList: string[] = [];
+      labels.forEach(id => {
+        const noteVal = auditData[id + '_note'];
+        if (noteVal) {
+          notesList.FromString ? notesList.push(`${id}: ${noteVal}`) : notesList.push(`${id}: ${noteVal}`);
+        }
+      });
+      return notesList.length > 0 ? notesList.join('\n') : null;
+    };
+
+    // รายการรหัสข้อในแต่ละส่วนสำหรับนำมาทำรวมโน้ต
+    const s1Keys = ['s1_1_1', 's1_1_2', 's1_1_3', 's1_1_4', 's1_1_5', 's1_1_6', 's1_2_1', 's1_2_2', 's1_2_3', 's1_2_4', 's1_2_5', 's1_3_1', 's1_4_1', 's1_4_2'];
+    const s2Keys = ['s2_1_1_a', 's2_1_1_p', 's2_1_1_i', 's2_1_1_e', 's2_1_1_n', 's2_2_1_a', 's2_2_1_p', 's2_2_1_i', 's2_2_1_e', 's2_2_1_n', 's2_3_1_a', 's2_3_1_p', 's2_3_1_i', 's2_3_1_e', 's2_3_1_n', 's2_4_1_a', 's2_4_1_p', 's2_4_1_i', 's2_4_1_e', 's2_4_1_n'];
+    const s3Keys = ['s3_1', 's3_2', 's3_3', 's3_4', 's3_5'];
+    const s4Keys = ['s4_1', 's4_2', 's4_3', 's4_4', 's4_5', 's4_6'];
+    const s5Keys = ['s5_1'];
+
     const payload: Record<string, any> = {
       department_id: Number(departmentId),
       audit_date: auditData.audit_date || new Date().toISOString().split('T')[0],
@@ -41,10 +60,19 @@ export default function AuditChartModal({
       auditor_name: auditData.auditor_name || null, 
       notes: auditData.notes || null,
       status: 'pending',
+      // รวมโน้ตลงในคอลัมน์ข้อใหญ่ตามตารางฐานข้อมูล
+      s1_notes: compileNotes('s1', s1Keys),
+      s2_notes: compileNotes('s2', s2Keys),
+      s3_notes: compileNotes('s3', s3Keys),
+      s4_notes: compileNotes('s4', s4Keys),
+      s5_notes: compileNotes('s5', s5Keys),
     };
 
+    // นำค่าคะแนนตัวรายการปกติใส่เข้าไปใน payload (กรองไม่เอาฟิลด์ _note ออก)
     Object.keys(auditData).forEach((key) => {
-      payload[key] = auditData[key];
+      if (!key.endsWith('_note')) {
+        payload[key] = auditData[key];
+      }
     });
 
     const { error } = await supabase.from('nursing_chart_audits').insert([payload]);

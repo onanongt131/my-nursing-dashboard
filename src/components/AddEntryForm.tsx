@@ -113,10 +113,7 @@ export default function AddEntryForm({ kpiId, type, deptId, onSuccess }: {
       
     } catch (err: any) {
       console.error("Error saving numeric entry:", err);
-      
-      // ดึงข้อความจากทุกรูปแบบที่เป็นไปได้ของ Error
-      const errorMsg = err?.message || err?.error_description || JSON.stringify(err);
-      alert("เกิดข้อผิดพลาดในการบันทึก: " + (errorMsg === "{}" ? "Unknown database error" : errorMsg));
+      alert("เกิดข้อผิดพลาดในการบันทึก: " + (err.message || "กรุณาลองใหม่อีกครั้ง"));
     } finally {
       setIsSavingNum(false);
     }

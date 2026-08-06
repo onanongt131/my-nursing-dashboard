@@ -127,7 +127,6 @@ export default function IvCareModal({
         total_sites: Number(totalSites) || 0,
         total_punctures: Number(totalPunctures) || 0,
         first_attempt_punctures: Number(firstAttemptPunctures) || 0,
-        discrepancy: discrepancy || null,
         over_count: overCount !== '' ? Number(overCount) : null,
         under_count: underCount !== '' ? Number(underCount) : null,
       }, { onConflict: 'department_id, audit_month' });

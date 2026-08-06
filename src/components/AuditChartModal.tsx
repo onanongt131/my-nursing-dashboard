@@ -157,7 +157,7 @@ export default function AuditChartModal({
                 value={auditData.patient_hn || ''} 
                 onChange={e => setAuditData({...auditData, patient_hn: e.target.value})} 
                 className="w-full border border-gray-300 rounded-lg p-2.5 text-sm bg-white" 
-                placeholder="ใส่เลข HN เช่น 6900xxxxx" 
+                placeholder="ใส่เลข AN เช่น 6900xxxxx" 
               />
             </div>
             <div>

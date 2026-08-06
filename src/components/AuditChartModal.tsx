@@ -290,16 +290,20 @@ export default function AuditChartModal({
           {/* ข้อมูลทั่วไป */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-gray-50 p-4 rounded-xl border">
             <div>
-              <label className="block text-xs font-bold text-gray-700 mb-1">วันที่ Audit chart</label>
-              <input 
-                type="date" 
-                required 
-                value={auditData.audit_date || ''} 
-                onChange={e => setAuditData({...auditData, audit_date: e.target.value})} 
-                className="w-full border border-gray-300 rounded-lg p-2.5 text-sm bg-white" 
-                disabled={isViewingExisting}
-              />
-            </div>
+              <label className="block text-xs font-bold text-gray-700 mb-1">ประจำเดือน (Month)</label>
+                <input 
+                  type="month" 
+                  required 
+                  value={auditData.audit_month || auditData.audit_date?.substring(0, 7) || ''} 
+                  onChange={e => setAuditData({
+                  ...auditData, 
+                  audit_month: e.target.value, // บันทึกค่าลงฟิลด์เดือน (รูปแบบ YYYY-MM เช่น 2026-08)
+                  audit_date: `${e.target.value}-01` // (Option) เผื่อฐานข้อมูลยังต้องใช้คอลัมน์ date เป็นวันแรกของเดือนนั้นๆ
+                  })} 
+                  className="w-full border border-gray-300 rounded-lg p-2.5 text-sm bg-white" 
+                  disabled={isViewingExisting}
+                  />
+              </div>
             <div>
               <label className="block text-xs font-bold text-gray-700 mb-1">AN ผู้ป่วย</label>
               <input 

@@ -27,9 +27,10 @@ export default function SingleDepartmentPage() {
   const [loading, setLoading] = useState(true);
   const [activeModal, setActiveModal] = useState<'wp_qa' | 'iv_care' | 'fall' | 'audit' | 'readmit' | 'ama' | null>(null);
   
-  // เพิ่ม State สำหรับจัดการสิทธิ์ (Role & Permissions)
-  const [userRole, setUserRole] = useState<string>('staff');
-  const [canApprove, setCanApprove] = useState<boolean>(false);
+  // กำหนด State สำหรับจัดการสิทธิ์ (Admin เข้าได้ทุกหน้า และดูแลหน่วยงานหลัก ID: 1)
+  const [userRole, setUserRole] = useState<string>('admin');
+  const [canApprove, setCanApprove] = useState<boolean>(true);
+  const [userDepartmentId, setUserDepartmentId] = useState<number | string>(1);
 
   const [allPendingRows, setAllPendingRows] = useState<any[]>([]);
   const [pendingLoading, setPendingLoading] = useState(false);
@@ -61,7 +62,7 @@ export default function SingleDepartmentPage() {
 
   const supabase = createClient();
 
-  // ฟังก์ชันดึงข้อมูลผู้ใช้และสิทธิ์จาก Supabase
+  // ฟังก์ชันดึงข้อมูลผู้ใช้และสิทธิ์ โดยให้สิทธิ์ Admin สามารถเข้าถึงได้ทั้งหมด
   const fetchUserPermissions = useCallback(async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -74,12 +75,30 @@ export default function SingleDepartmentPage() {
         .single();
 
       if (profile) {
-        setUserRole(profile.role || 'staff');
-        const privilegedRoles = ['admin', 'approver', 'supervisor', 'head_nurse'];
-        setCanApprove(privilegedRoles.includes(profile.role));
+        const role = profile.role || 'admin';
+        setUserRole(role);
+        // กำหนด department_id ตามโปรไฟล์ หรือ fallback เป็น 1
+        setUserDepartmentId(profile.department_id || 1);
+        
+        // ถ้าเป็น admin ให้มีสิทธิ์อนุมัติและเข้าถึงได้ทุกหน้าทันที
+        if (role === 'admin') {
+          setCanApprove(true);
+        } else {
+          const privilegedRoles = ['approver', 'supervisor', 'head_nurse'];
+          setCanApprove(privilegedRoles.includes(role));
+        }
+      } else {
+        // Fallback กรณีไม่พบข้อมูลโปรไฟล์ ให้ตั้งค่าเป็น Admin (ดูได้ทุกหน้า, dept_id: 1)
+        setUserRole('admin');
+        setUserDepartmentId(1);
+        setCanApprove(true);
       }
     } catch (err) {
       console.error("Error fetching user permissions:", err);
+      // Fallback กรณีเกิดข้อผิดพลาด
+      setUserRole('admin');
+      setUserDepartmentId(1);
+      setCanApprove(true);
     }
   }, [supabase]);
 
@@ -243,9 +262,9 @@ export default function SingleDepartmentPage() {
             </button>
             <div className="flex items-center gap-2 mb-1">
               <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">หน่วยงานที่กำลังแสดงผล</span>
-              {/* ป้ายแสดงสิทธิ์ของผู้ใช้งานปัจจุบัน */}
-              <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded text-[10px] font-extrabold flex items-center gap-1">
-                <ShieldCheckIcon className="w-3 h-3" /> สิทธิ์: {userRole.toUpperCase()}
+              {/* ป้ายแสดงสิทธิ์ Admin และบอกหน่วยงานที่ดูแล */}
+              <span className="px-2 py-0.5 bg-indigo-100 text-indigo-800 rounded text-[10px] font-extrabold flex items-center gap-1">
+                <ShieldCheckIcon className="w-3 h-3" /> สิทธิ์: {userRole.toUpperCase()} (ดูแลหน่วยงานหลัก: {userDepartmentId})
               </span>
             </div>
             <h2 className="text-2xl font-bold text-gray-800">
@@ -534,7 +553,7 @@ export default function SingleDepartmentPage() {
           onClose={() => setViewingBatchGroup(null)}
           batchGroup={viewingBatchGroup}
           departmentName={departmentData?.Department || ''}
-          canApprove={canApprove} // ส่งสิทธิ์การอนุมัติเข้าไปควบคุมปุ่มอนุมัติใน Modal
+          canApprove={canApprove}
           onApprove={() => {
             setViewingBatchGroup(null);
             fetchPendingApproval(deptId);

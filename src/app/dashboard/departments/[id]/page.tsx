@@ -264,7 +264,7 @@ export default function SingleDepartmentPage() {
               <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">หน่วยงานที่กำลังแสดงผล</span>
               {/* ป้ายแสดงสิทธิ์ Admin และบอกหน่วยงานที่ดูแล */}
               <span className="px-2 py-0.5 bg-indigo-100 text-indigo-800 rounded text-[10px] font-extrabold flex items-center gap-1">
-                <ShieldCheckIcon className="w-3 h-3" /> สิทธิ์: {userRole.toUpperCase()} (ดูแลหน่วยงานหลัก: {userDepartmentId})
+                <ShieldCheckIcon className="w-3 h-3" /> สิทธิ์: {userRole.toUpperCase()}
               </span>
             </div>
             <h2 className="text-2xl font-bold text-gray-800">

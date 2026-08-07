@@ -10,41 +10,54 @@ import AuditChartModal from '@/components/AuditChartModal';
 import WpQaModal from '@/components/WpQaModal'; 
 import IvCareModal from '@/components/IvCareModal'; 
 import FallCareModal from '@/components/FallCareModal'; 
+import ReadmitModal from '@/components/ReadmitModal';
+import AgainstMedicalAdviceModal from '@/components/AgainstMedicalAdviceModal';
+import BatchDetailModal from '@/components/BatchDetailModal';
 
 const YEARS = [2565, 2566, 2567, 2568, 2569] as const;
+
 export default function DepartmentPage() {
   const [data, setData] = useState<any[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<string>('');
   const [activeKpi, setActiveKpi] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [selectedAuditItem, setSelectedAuditItem] = useState<any>(null);
-  const [activeModal, setActiveModal] = useState<'wp_qa' | 'iv_care' | 'fall' | 'audit' | null>(null);
+  const [activeModal, setActiveModal] = useState<'wp_qa' | 'iv_care' | 'fall' | 'audit' | 'readmit' | 'ama' | null>(null);
   const [selectedDept, setSelectedDept] = useState<{ id: string | number; name: string } | null>(null);
   const [auditModalMode, setAuditModalMode] = useState<'form' | 'pending'>('form');
   
-  // ปรับเปลี่ยน State ของรายการรออนุมัติให้เก็บรวมทุกประเภท[cite: 1]
+  // State สำหรับจัดการ Tab ในส่วนการแสดงผลข้อมูลหน่วยงาน ('cases' = ตารางรายเคส, 'summary' = สรุปรายเดือน)
+  const [activeTab, setActiveTab] = useState<'cases' | 'summary'>('cases');
+  
+  // ปรับเปลี่ยน State ของรายการรออนุมัติให้เก็บรวมทุกประเภท
   const [pendingItems, setPendingItems] = useState<{
     wp_qa: any[];
     audit: any[];
     iv_care: any[];
     fall: any[];
-  }>({ wp_qa: [], audit: [], iv_care: [], fall: [] });
-  
+    readmit: any[];
+    ama: any[];
+  }>({ wp_qa: [], audit: [], iv_care: [], fall: [], readmit: [], ama: [] });
+
   const [pendingLoading, setPendingLoading] = useState(false);
-  const [viewingBatchGroup, setViewingBatchGroup] = useState<{ 
-      type: 'wp_qa' | 'audit' | 'iv_care' | 'fall'; 
-      audit_month: string; 
-      items: any[];
-      auditor_name?: string;
-      evaluator?: string;
-      status?: string; // <--- เพิ่มบรรทัดนี้เพื่อให้ TypeScript รู้จัก property status
-    } | null>(null);
   const [showPendingTable, setShowPendingTable] = useState(false);
+  
+  const [viewingBatchGroup, setViewingBatchGroup] = useState<{ 
+    type: 'wp_qa' | 'audit' | 'iv_care' | 'fall' | 'readmit' | 'ama'; 
+    audit_month: string; 
+    items: any[];
+    auditor_name?: string;
+    evaluator?: string;
+    status?: string;
+  } | null>(null);
+
   const [userProfile, setUserProfile] = useState<any>({
-  role: 'admin',
-  department_id: 1
-});
+    role: 'admin',
+    department_id: 1
+  });
+
   const supabase = createClient();
+
   const fetchData = useCallback(async () => {
     setLoading(true);
     try {
@@ -103,21 +116,26 @@ export default function DepartmentPage() {
       setLoading(false);
     }
   }, [supabase]);
-  // ฟังก์ชันดึงข้อมูลรออนุมัติจากทั้ง 4 ตาราง[cite: 1]
+
+  // ฟังก์ชันดึงข้อมูลรออนุมัติ
   const fetchPendingApproval = useCallback(async (deptId: string | number) => {
     setPendingLoading(true);
     try {
-      const [wpRes, auditRes, ivRes, fallRes] = await Promise.all([
+      const [wpRes, auditRes, ivRes, fallRes, readmitRes, amaRes] = await Promise.all([
         supabase.from('wp_qa_records').select('*').eq('department_id', deptId).eq('status', 'pending'),
         supabase.from('nursing_chart_audits').select('*').eq('department_id', deptId).eq('status', 'pending'),
         supabase.from('iv_care_records').select('*').eq('department_id', deptId).eq('status', 'pending'),
         supabase.from('fall_care_records').select('*').eq('department_id', deptId).eq('status', 'pending'),
+        supabase.from('readmit_incident_records').select('*').eq('department_id', deptId).eq('status', 'pending'),
+        supabase.from('ama_incident_records').select('*').eq('department_id', deptId).eq('status', 'pending'),
       ]);
       setPendingItems({
         wp_qa: wpRes.data || [],
         audit: auditRes.data || [],
         iv_care: ivRes.data || [],
         fall: fallRes.data || [],
+        readmit: readmitRes.data || [],
+        ama: amaRes.data || [],
       });
     } catch (err) {
       console.error("Error fetching pending records:", err);
@@ -127,76 +145,68 @@ export default function DepartmentPage() {
   }, [supabase]);
   
   const canApprove = (targetDeptId: string | number) => {
-  if (!userProfile) return false;
-  
-  const { role, department_id } = userProfile;
-  
-  // 1. ถ้าเป็น admin ให้มีสิทธิ์อนุมัติได้ทุกแผนกทันที
-  if (role === 'admin') return true; 
-  
-  // 2. สำหรับตำแหน่งอื่นๆ ต้องอยู่แผนกเดียวกับรายการนั้นๆ
-  const allowedRoles = ['head_department', 'head_group', 'head_nurse'];
-  if (allowedRoles.includes(role) && Number(department_id) === Number(targetDeptId)) {
-    return true;
-  }
-  
-  return false;
-};
+    if (!userProfile) return false;
+    const { role, department_id } = userProfile;
+    if (role === 'admin') return true; 
+    const allowedRoles = ['head_department', 'head_group', 'head_nurse'];
+    if (allowedRoles.includes(role) && Number(department_id) === Number(targetDeptId)) {
+      return true;
+    }
+    return false;
+  };
 
-  // ฟังก์ชันอนุมัติแยกตามประเภทตาราง[cite: 1]
-  const handleApproveBatch = async (type: 'wp_qa' | 'audit' | 'iv_care' | 'fall', auditMonth: string) => {
+  const handleApproveBatch = async (type: 'wp_qa' | 'audit' | 'iv_care' | 'fall' | 'readmit' | 'ama', auditMonth: string) => {
     if (!selectedDept) return;
     
     const tableMap = {
       wp_qa: 'wp_qa_records',
       audit: 'nursing_chart_audits',
       iv_care: 'iv_care_records',
-      fall: 'fall_care_records'
+      fall: 'fall_care_records',
+      readmit: 'readmit_incident_records',
+      ama: 'ama_incident_records'
     };
     try {
       const { error } = await supabase
         .from(tableMap[type])
         .update({ status: 'approved' })
         .eq('department_id', selectedDept.id)
-        .eq('audit_month', auditMonth)
         .eq('status', 'pending');
+        
       if (error) throw error;
       alert(`อนุมัติรายการ ${type.toUpperCase()} ประจำเดือน ${auditMonth} สำเร็จ`);
       setViewingBatchGroup(null); 
       fetchPendingApproval(selectedDept.id);
+      fetchData();
     } catch (err: any) {
       alert('เกิดข้อผิดพลาดในการอนุมัติ: ' + err.message);
     }
   };
+
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
   useEffect(() => {
     if (selectedDept) {
       fetchPendingApproval(selectedDept.id);
       setShowPendingTable(false);
     } else {
-      setPendingItems({ wp_qa: [], audit: [], iv_care: [], fall: [] });
+      setPendingItems({ wp_qa: [], audit: [], iv_care: [], fall: [], readmit: [], ama: [] });
       setShowPendingTable(false);
     }
   }, [selectedDept, fetchPendingApproval]);
+
+
   const uniqueGroups = Array.from(new Set(data.map(d => d.group))).filter(Boolean) as string[];
   const filteredDepartments = data.filter(d => d.group === selectedGroup);
   const currentDeptObj = data.find(d => String(d.id) === String(selectedDept?.id));
   
-  // คำนวณจำนวนรายการรออนุมัติรวมทั้งหมดเพื่อแสดงที่ปุ่ม[cite: 1]
-  const totalPendingCount = 
-    pendingItems.wp_qa.length + 
-    pendingItems.audit.length + 
-    pendingItems.iv_care.length + 
-    pendingItems.fall.length;
-  // จัดกลุ่มข้อมูลแต่ละประเภทตามเดือน สำหรับแสดงในตารางรวม[cite: 1]
-  const getGroupedList = (items: any[], typeName: string) => {
+  const totalPendingCount = Object.values(pendingItems).reduce((sum, arr) => sum + arr.length, 0);
+
+  const getGroupedList = (items: any[], typeName: any) => {
     const groupedMap = items.reduce((acc: any, item: any) => {
-      let month = item.audit_month || item.month;
-      if (!month && item.audit_date) {
-        month = item.audit_date.substring(0, 7); 
-      }
+      let month = item.audit_month || item.month || item.incident_date?.substring(0, 7) || item.admit_date?.substring(0, 7);
       if (!month) month = 'ไม่ระบุเดือน';
       if (!acc[month]) {
         acc[month] = {
@@ -211,76 +221,70 @@ export default function DepartmentPage() {
     }, {});
     return Object.values(groupedMap);
   };
+
   const allPendingRows = [
     ...getGroupedList(pendingItems.wp_qa, 'wp_qa'),
     ...getGroupedList(pendingItems.audit, 'audit'),
     ...getGroupedList(pendingItems.iv_care, 'iv_care'),
     ...getGroupedList(pendingItems.fall, 'fall'),
+    ...getGroupedList(pendingItems.readmit, 'readmit'),
+    ...getGroupedList(pendingItems.ama, 'ama'),
   ];
-  if (loading) return <div className="p-8 text-center text-gray-500">กำลังโหลดข้อมูลหน่วยงาน...</div>;
 
-  // ย้ายมาไว้ข้างนอกตรงส่วนการทำงานปกติ (เช่น ด้านใน Component หรือก่อนเรนเดอร์)
-console.log("Viewing Status:", viewingBatchGroup?.status);
-console.log("Item Status:", viewingBatchGroup?.items?.[0]?.status);
-console.log("Can Approve Result:", canApprove(selectedDept?.id || ''));
-console.log("Selected Dept ID:", selectedDept?.id);
-console.log("User Profile:", userProfile);
+  if (loading) return <div className="p-8 text-center text-gray-500">กำลังโหลดข้อมูลหน่วยงาน...</div>;
 
   return (
     <div className="px-2 py-2 max-w-full mx-auto">
       <div className="grid grid-cols-1 lg:grid-cols-5 gap-6 items-start">
-        
-        {/* --- Sidebar --- */}
-        <div className="lg:col-span-1 bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-6 sticky top-4">
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">เลือกกลุ่มงาน</label>
-            <select
-              value={selectedGroup}
-              onChange={(e) => {
-                setSelectedGroup(e.target.value);
-                setSelectedDept(null);
-                setActiveKpi(null);
-              }}
-              className="w-full p-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
-            >
-              <option value="" disabled>-- กรุณาเลือกกลุ่มงาน --</option>
-              {uniqueGroups.map((groupName) => (
-                <option key={groupName} value={groupName}>{groupName}</option>
-              ))}
-            </select>
-          </div>
-          <hr className="border-gray-100" />
-          <div className="space-y-2">
-            <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">เลือกหอผู้ป่วย / หน่วยงาน</label>
-            {selectedGroup ? (
-              <div className="space-y-1 max-h-[calc(100vh-300px)] overflow-y-auto pr-1">
-                {filteredDepartments.length > 0 ? (
-                  filteredDepartments.map((dept) => (
-                    <button
-                      key={dept.id}
-                      onClick={() => {
-                        setSelectedDept({ id: dept.id, name: dept.Department });
-                        setActiveKpi(null);
-                        setActiveModal(null);
-                      }}
-                      className={`w-full text-left px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
-                        selectedDept?.id === dept.id
-                          ? "bg-emerald-100 text-emerald-800 font-semibold shadow-sm border border-emerald-200"
-                          : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
-                      }`}
-                    >
-                      {dept.Department}
-                    </button>
-                  ))
-                ) : (
-                  <p className="text-xs text-gray-400 py-2">ไม่มีหน่วยงานในกลุ่มนี้</p>
-                )}
+          <div className="lg:col-span-1 bg-white p-5 rounded-2xl border border-gray-200 shadow-sm space-y-6 sticky top-4">
+              <div className="space-y-2">
+                <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">เลือกกลุ่มงาน</label>
+                <select
+                  value={selectedGroup}
+                  onChange={(e) => {
+                    setSelectedGroup(e.target.value);
+                    setSelectedDept(null);
+                    setActiveKpi(null);
+                  }}
+                  className="w-full p-2.5 bg-gray-50 border border-gray-300 rounded-xl text-sm font-medium text-gray-700 focus:outline-none focus:ring-2 focus:ring-emerald-500">
+                  <option value="" disabled>-- กรุณาเลือกกลุ่มงาน --</option>
+                  {uniqueGroups.map((groupName) => (
+                    <option key={groupName} value={groupName}>{groupName}</option>
+                  ))}
+                </select>
               </div>
-            ) : (
-              <p className="text-xs text-gray-400 py-2 italic">กรุณาเลือกกลุ่มงานก่อน</p>
-            )}
-          </div>
-        </div>
+              <hr className="border-gray-100" />
+                <div className="space-y-2">
+                  <label className="text-xs font-bold text-gray-400 uppercase tracking-wider">เลือกหอผู้ป่วย / หน่วยงาน</label>
+                    {selectedGroup ? (
+                    <div className="space-y-1 max-h-[calc(100vh-300px)] overflow-y-auto pr-1">
+                        {filteredDepartments.length > 0 ? (
+                        filteredDepartments.map((dept) => (
+                          <button
+                            key={dept.id}
+                            onClick={() => {
+                              setSelectedDept({ id: dept.id, name: dept.Department });
+                              setActiveKpi(null);
+                              setActiveModal(null);
+                            }}
+                            className={`w-full text-left px-4 py-2.5 rounded-xl text-sm font-medium transition-all duration-200 ${
+                              selectedDept?.id === dept.id
+                                ? "bg-emerald-100 text-emerald-800 font-semibold shadow-sm border border-emerald-200"
+                                : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                            }`}
+                          >
+                            {dept.Department}
+                          </button>
+                                    ))
+                        ) : (
+                          <p className="text-xs text-gray-400 py-2">ไม่มีหน่วยงานในกลุ่มนี้</p>
+                        )}
+                      </div>
+                      ) : (
+                    <p className="text-xs text-gray-400 py-2 italic">กรุณาเลือกกลุ่มงานก่อน</p>
+                    )}
+                </div>
+            </div>
         {/* --- Content --- */}
         <div className="lg:col-span-4 space-y-6">
           {selectedDept && !activeKpi && (
@@ -310,31 +314,45 @@ console.log("User Profile:", userProfile);
                     )}
                     <button onClick={() => setActiveModal('audit')} className="bg-emerald-700 hover:bg-emerald-800 text-white px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all">
                       <ClipboardDocumentCheckIcon className="w-4 h-4 text-amber-300" />
-                      <span>ลงข้อมูล Audit Chart</span>
+                      <span>Audit Chart</span>
                     </button>
-
-
                     <button onClick={() => setActiveModal('wp_qa')} className="bg-emerald-700 hover:bg-emerald-800 text-white px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all">
                       <ClipboardDocumentCheckIcon className="w-4 h-4 text-emerald-300" />
-                      <span>ประเมิน WP/QA</span>
+                      <span>WP/QA</span>
                     </button>
+
                     <button onClick={() => setActiveModal('iv_care')} className="bg-cyan-700 hover:bg-cyan-800 text-white px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all">
                       <CheckCircleIcon className="w-4 h-4 text-cyan-200" />
-                      <span>บันทึก IV Care</span>
+                      <span>IV Care</span>
                     </button>
+
                     <button onClick={() => setActiveModal('fall')} className="bg-amber-600 hover:bg-amber-700 text-white px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all">
                       <ExclamationTriangleIcon className="w-4 h-4 text-white" />
-                      <span>บันทึก Fall</span>
+                      <span>Fall</span>
+                    </button>
+                    <button
+                        onClick={() => setActiveModal('readmit')}
+                        className="bg-teal-700 hover:bg-teal-800 text-white px-3 py-2 rounded-xl text-sm font-bold shadow transition flex items-center gap-1.5"
+                      >
+                        <span>Re-admit</span>
+                    </button>
+
+                    <button
+                      onClick={() => setActiveModal('ama')}
+                      className="bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-xl text-sm font-bold shadow transition flex items-center gap-1.5"
+                    >
+                      <span>จำหน่ายไม่สมัครอยู่</span>
                     </button>
                   </div>
                 </div>
+              </div>
                 {/* --- Pending Table Section (รวมทุกระบบ) --- */}
                 {showPendingTable && totalPendingCount > 0 && (
                   <div className="border rounded-xl p-4 space-y-3 bg-red-50/60 border-red-200 shadow-sm transition-all animate-fadeIn">
                     <div className="flex justify-between items-center">
                       <h3 className="text-sm font-bold text-red-900 flex items-center gap-2">
                         <ExclamationTriangleIcon className="w-4 h-4 text-red-600 animate-pulse" />
-                        <span>รายการรอการตรวจสอบและอนุมัติทั้งหมด (WP/QA, Audit Chart, IV Care, Fall Care)</span>
+                        <span>รายการรอการตรวจสอบและอนุมัติทั้งหมด (WP/QA, Audit Chart, IV Care, Fall Care, Re-admit, A.M.A.)</span>
                       </h3>
                       <button onClick={() => setShowPendingTable(false)} className="text-gray-400 hover:text-gray-600 text-xs font-bold px-2 py-1 bg-white rounded border shadow-sm">
                         ซ่อนตาราง ✕
@@ -368,31 +386,31 @@ console.log("User Profile:", userProfile);
                                   </span>
                                 </td>
                                 <td className="p-3 text-center flex items-center justify-center gap-2">
-  <button 
-    onClick={() => {
-      if (batch.type === 'audit') {
-        setSelectedAuditItem({
-          audit_month: batch.audit_month,
-          items: batch.items
-        });
-        setAuditModalMode('pending');
-        setActiveModal('audit');
-      } else {
-        setViewingBatchGroup({
-          type: batch.type,
-          audit_month: batch.audit_month,
-          items: batch.items,
-          auditor_name: batch.auditor_name,
-          status: batch.items?.[0]?.status || 'pending' // ส่งสถานะเข้าไปด้วยเพื่อให้ Modal อ่านค่าได้ถูกต้อง
-        });
-      }
-    }} 
-    className="px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg font-bold shadow-sm transition flex items-center gap-1"
-  >
-    <EyeIcon className="w-4 h-4" />
-    <span>ดูรายละเอียด</span>
-  </button>
-</td>
+                                  <button 
+                                    onClick={() => {
+                                      if (batch.type === 'audit') {
+                                        setSelectedAuditItem({
+                                          audit_month: batch.audit_month,
+                                          items: batch.items
+                                        });
+                                        setAuditModalMode('pending');
+                                        setActiveModal('audit');
+                                      } else {
+                                        setViewingBatchGroup({
+                                          type: batch.type,
+                                          audit_month: batch.audit_month,
+                                          items: batch.items,
+                                          auditor_name: batch.auditor_name,
+                                          status: batch.items?.[0]?.status || 'pending'
+                                        });
+                                      }
+                                    }} 
+                                    className="px-3 py-1.5 bg-sky-600 hover:bg-sky-700 text-white rounded-lg font-bold shadow-sm transition flex items-center gap-1"
+                                  >
+                                    <EyeIcon className="w-4 h-4" />
+                                    <span>ดูรายละเอียด</span>
+                                  </button>
+                                </td>
                               </tr>
                             ))}
                           </tbody>
@@ -401,211 +419,141 @@ console.log("User Profile:", userProfile);
                     )}
                   </div>
                 )}
-                {/* KPI Tables */}
-                {Object.entries(
-                  (currentDeptObj?.kpis || []).reduce((acc: any, kpi: any) => {
-                    const dim = kpi.dimension || 'มิติอื่นๆ';
-                    if (!acc[dim]) acc[dim] = [];
-                    acc[dim].push(kpi);
-                    return acc;
-                  }, {})
-                )
-                .sort((a, b) => a[0].localeCompare(b[0]))
-                .map(([dimName, kpisInDim]: [string, any]) => (
-                  <div key={dimName} className="mb-8">
-                    <h3 className="text-md font-bold text-emerald-900 mb-3 bg-emerald-50 px-3 py-2 rounded-lg">{dimName}</h3>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm text-left border-collapse border border-gray-200 table-fixed">
-                        <thead className="bg-gray-50 text-gray-600 uppercase border-b border-gray-200 text-xs">
-                          <tr>
-                            <th className="w-[38%] px-3 py-3">ตัวชี้วัด (KPI)</th>
-                            <th className="w-[8%] px-3 py-3 text-center">Goal</th>
-                            {YEARS.map(y => <th key={y} className="w-[8%] px-3 py-3 text-center">{y}</th>)}
-                            <th className="w-[10%] px-3 py-3 text-center">ACTION</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-200">
-                          {kpisInDim.map((kpi: any) => (
-                            <tr key={kpi.id} className="hover:bg-gray-50">
-                              <td className="px-3 py-3 text-gray-800">{kpi.name}</td>
-                              <td className="px-3 py-3 text-center font-bold text-gray-700">{kpi.target_value}</td>
-                              {YEARS.map(year => {
-                                const entry = kpi.entries?.find((e: any) => Number(e.year) === year);
-                                return (
-                                  <td key={year} className="px-3 py-3 text-center text-gray-500 text-xs">
-                                    {entry ? <span className="bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-bold">{entry.value}</span> : "-"}
-                                  </td>
-                                );
-                              })}
-                              <td className="px-3 py-3 text-center">
-                                <button onClick={() => setActiveKpi(kpi)} className={getButtonStyle(kpi.entries || [], kpi.frequency || kpi.Frequency || 'yearly')}>
-                                  เพิ่ม
-                                </button>
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-          {!selectedDept && !loading && (
-            <div className="bg-white p-12 rounded-2xl border border-gray-200 shadow-sm text-center text-gray-400">
-              <p className="text-base font-medium">กรุณาเลือกกลุ่มงาน และเลือกหอผู้ป่วย / หน่วยงานจากเมนูด้านซ้ายเพื่อดูข้อมูล</p>
-            </div>
-          )}
-          {activeKpi && (
-            <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-6">
-              <button onClick={() => setActiveKpi(null)} className="text-emerald-700 font-bold hover:underline text-sm">← ย้อนกลับไปตารางข้อมูล</button>
-              
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-                <div className="space-y-4">
-                  <h3 className="text-lg font-bold text-gray-800">{activeKpi.name}</h3>
-                  <ResponsiveContainer height={250} width="100%">
-                    <BarChart data={YEARS.map(y => {
-                      const entry = activeKpi.entries?.find((e: any) => Number(e.year) === y);
-                      return { year: y, value: entry ? parseFloat(entry.value) || 0 : 0 };
-                    })}>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                      <XAxis dataKey="year" axisLine={false} tickLine={false} />
-                      <YAxis axisLine={false} tickLine={false} />
-                      <Tooltip cursor={{fill: '#f8fafc'}} />
-                      <Bar dataKey="value" fill="#10b981" radius={[6, 6, 0, 0]} barSize={40} />
-                      <ReferenceLine y={activeKpi.target_value} stroke="#f87171" strokeDasharray="3 3" label={{ value: 'Target', position: 'insideTopRight', fill: '#f87171', fontSize: 10 }} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="bg-gray-50 p-6 rounded-xl border">
-                  <h4 className="text-md font-bold mb-4 text-gray-700">บันทึกข้อมูลผลงาน</h4>
-                  <AddEntryForm 
-                    kpiId={activeKpi.id} 
-                    type={activeKpi.type?.toLowerCase() || activeKpi.Type?.toLowerCase() || 'count'} 
-                    deptId={selectedDept ? String(selectedDept.id) : ''}
-                    onSuccess={() => { setActiveKpi(null); fetchData(); }} 
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-      {/* Modal ดูรายละเอียดรายการรออนุมัติรวม */}
-      {viewingBatchGroup && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-5xl w-full p-6 space-y-5 shadow-2xl max-h-[90vh] overflow-y-auto">
-            <div className="flex justify-between items-center border-b pb-3">
-              <div>
-                <span className="text-xs font-bold text-emerald-600 uppercase">รายละเอียดผลการประเมิน ({viewingBatchGroup.type.toUpperCase()})</span>
-                <h3 className="text-lg font-bold text-gray-900">ประจำเดือน / วันที่: {viewingBatchGroup.audit_month}</h3>
-              </div>
-              <button onClick={() => setViewingBatchGroup(null)} className="text-gray-400 hover:text-gray-600 font-bold text-xl px-2">✕</button>
-            </div>
-            <div className="grid grid-cols-3 gap-4 text-sm bg-gray-50 p-4 rounded-xl">
-              <div><span className="font-semibold text-gray-500">หน่วยงาน:</span> {currentDeptObj?.Department || selectedDept?.name}</div>
-              <div><span className="font-semibold text-gray-500">ผู้ประเมิน:</span> {viewingBatchGroup.auditor_name || viewingBatchGroup.evaluator || '-'}</div>
-              <div><span className="font-semibold text-gray-500">สถานะ:</span> <span className="text-amber-600 font-bold">รออนุมัติ (Pending)</span></div>
-            </div>
-            <div className="space-y-2">
-              <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">รายการข้อมูล ({viewingBatchGroup.items.length} รายการ)</h4>
-              <div className="border border-gray-200 rounded-xl overflow-hidden max-h-96 overflow-y-auto">
-                
-                {/* --- แสดงผลแบบตารางแยกตามประเภทระบบ --- */}
-                {viewingBatchGroup.type === 'wp_qa' ? (
-                  <table className="w-full text-left text-xs border-collapse">
-                    <thead className="bg-emerald-100 text-emerald-900 sticky top-0">
-                      <tr>
-                        <th className="p-2.5">รหัส WP</th>
-                        <th className="p-2.5">หัวข้อ WP</th>
-                        <th className="p-2.5 text-center">ประเมินแล้ว</th>
-                        <th className="p-2.5 text-center">ปฏิบัติจริง</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100 bg-white">
-                      {viewingBatchGroup.items.map((item: any, idx: number) => (
-                        <tr key={idx} className="hover:bg-gray-50">
-                          <td className="p-2.5 font-bold text-emerald-800">{item.wp_id}</td>
-                          <td className="p-2.5 text-gray-800">{item.wp_name}</td>
-                          <td className="p-2.5 text-center font-semibold">{item.total_evaluated}</td>
-                          <td className="p-2.5 text-center font-semibold text-emerald-600">{item.total_practiced}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                ) : (
-                  <table className="w-full text-left text-xs border-collapse">
-                    <thead className="bg-gray-100 text-gray-700 sticky top-0">
-                      <tr>
-                        <th className="p-2.5">ข้อมูลรายการ</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100 bg-white">
-                      {viewingBatchGroup.items.map((subItem: any, idx: number) => (
-                        <tr key={idx} className="hover:bg-gray-50">
-                          <td className="p-2.5 font-medium text-gray-800">
-                            <pre className="whitespace-pre-wrap font-sans text-xs">{JSON.stringify(subItem, null, 2)}</pre>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-            </div>
-            <div className="flex justify-end gap-3 pt-4 border-t">
-  <button 
-    onClick={() => setViewingBatchGroup(null)} 
-    className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-sm font-bold transition"
-  >
-    ปิดหน้าต่าง
-  </button>
 
-  {/* เช็คสถานะจาก item แรกในกลุ่ม และเช็คสิทธิ์การอนุมัติ */}
-  {viewingBatchGroup.items?.[0]?.status === 'pending' && canApprove(selectedDept?.id || '') && (
-    <button 
-      onClick={() => {
-        handleApproveBatch(viewingBatchGroup.type, viewingBatchGroup.audit_month);
-        setViewingBatchGroup(null);
-      }} 
-      className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold shadow transition flex items-center gap-1.5"
-    >
-      <CheckCircleIcon className="w-5 h-5" />
-      <span>อนุมัติรายการชุดนี้</span>
-    </button>
-  )}
-</div>
-          </div>
-        </div>
-      )}
-      {activeModal === 'audit' && selectedDept && (
-        <AuditChartModal 
-          isOpen={true} 
-          onClose={() => {
-            setActiveModal(null);
-            setSelectedAuditItem(null); // เคลียร์ค่าเมื่อปิด
-          }} 
-          departmentName={currentDeptObj?.Department || 'ไม่ระบุหน่วยงาน'} 
-          departmentId={String(selectedDept.id)} 
-          supabase={supabase} 
-          initialMode={auditModalMode}
-          initialData={selectedAuditItem} // ส่งข้อมูลเคสเข้าไปทันทีเพื่อข้ามขั้นตอนกลาง
-          onSuccess={() => { 
-            setActiveModal(null); 
-            setSelectedAuditItem(null);
-            fetchPendingApproval(currentDeptObj.id); 
-          }} 
-        />
-      )}
-      {selectedDept && currentDeptObj && (
-        <>
-          <WpQaModal isOpen={activeModal === 'wp_qa'} onClose={() => setActiveModal(null)} departmentId={currentDeptObj.id} departmentName={currentDeptObj.Department} supabase={supabase} onSuccess={() => { fetchData(); fetchPendingApproval(currentDeptObj.id); }} />
-          <IvCareModal isOpen={activeModal === 'iv_care'} onClose={() => setActiveModal(null)} departmentId={currentDeptObj.id} departmentName={currentDeptObj.Department} supabase={supabase} onSuccess={() => { fetchData(); fetchPendingApproval(currentDeptObj.id); }} />
-          <FallCareModal isOpen={activeModal === 'fall'} onClose={() => setActiveModal(null)} departmentId={currentDeptObj.id} departmentName={currentDeptObj.Department} supabase={supabase} onSuccess={() => { fetchData(); fetchPendingApproval(currentDeptObj.id); }} />
-        </>
-      )}
+{/* KPI Tables */}
+{Object.entries(
+  (currentDeptObj?.kpis || []).reduce((acc: any, kpi: any) => {
+    const dim = kpi.dimension || 'มิติอื่นๆ';
+    if (!acc[dim]) acc[dim] = [];
+    acc[dim].push(kpi);
+    return acc;
+  }, {})
+)
+.sort((a, b) => a[0].localeCompare(b[0]))
+.map(([dimName, kpisInDim]: [string, any]) => (
+  <div key={dimName} className="mb-8">
+    <h3 className="text-md font-bold text-emerald-900 mb-3 bg-emerald-50 px-3 py-2 rounded-lg">{dimName}</h3>
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm text-left border-collapse border border-gray-200 table-fixed">
+        <thead className="bg-gray-50 text-gray-600 uppercase border-b border-gray-200 text-xs">
+          <tr>
+            <th className="w-[38%] px-3 py-3">ตัวชี้วัด (KPI)</th>
+            <th className="w-[8%] px-3 py-3 text-center">Goal</th>
+            {YEARS.map(y => <th key={y} className="w-[8%] px-3 py-3 text-center">{y}</th>)}
+            <th className="w-[10%] px-3 py-3 text-center">ACTION</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-gray-200">
+          {kpisInDim.map((kpi: any) => (
+            <tr key={kpi.id} className="hover:bg-gray-50">
+              <td className="px-3 py-3 text-gray-800">{kpi.name}</td>
+              <td className="px-3 py-3 text-center font-bold text-gray-700">{kpi.target_value}</td>
+              {YEARS.map(year => {
+                const entry = kpi.entries?.find((e: any) => Number(e.year) === year);
+                return (
+                  <td key={year} className="px-3 py-3 text-center text-gray-500 text-xs">
+                    {entry ? <span className="bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-bold">{entry.value}</span> : "-"}
+                  </td>
+                );
+              })}
+              <td className="px-3 py-3 text-center">
+                <button onClick={() => setActiveKpi(kpi)} className={getButtonStyle(kpi.entries || [], kpi.frequency || kpi.Frequency || 'yearly')}>
+                  เพิ่ม
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
-  );
-}
+  </div>
+))}
 
+{!selectedDept && !loading && (
+  <div className="bg-white p-12 rounded-2xl border border-gray-200 shadow-sm text-center text-gray-400">
+    <p className="text-base font-medium">กรุณาเลือกกลุ่มงาน และเลือกหอผู้ป่วย / หน่วยงานจากเมนูด้านซ้ายเพื่อดูข้อมูล</p>
+  </div>
+)}
+
+{activeKpi && (
+  <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-6">
+    <button onClick={() => setActiveKpi(null)} className="text-emerald-700 font-bold hover:underline text-sm">← ย้อนกลับไปตารางข้อมูล</button>
+    
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+      <div className="space-y-4">
+        <h3 className="text-lg font-bold text-gray-800">{activeKpi.name}</h3>
+        <ResponsiveContainer height={250} width="100%">
+          <BarChart data={YEARS.map(y => {
+            const entry = activeKpi.entries?.find((e: any) => Number(e.year) === y);
+            return { year: y, value: entry ? parseFloat(entry.value) || 0 : 0 };
+          })}>
+            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+            <XAxis dataKey="year" axisLine={false} tickLine={false} />
+            <YAxis axisLine={false} tickLine={false} />
+            <Tooltip cursor={{fill: '#f8fafc'}} />
+            <Bar dataKey="value" fill="#10b981" radius={[6, 6, 0, 0]} barSize={40} />
+            <ReferenceLine y={activeKpi.target_value} stroke="#f87171" strokeDasharray="3 3" label={{ value: 'Target', position: 'insideTopRight', fill: '#f87171', fontSize: 10 }} />
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+      <div className="bg-gray-50 p-6 rounded-xl border">
+        <h4 className="text-md font-bold mb-4 text-gray-700">บันทึกข้อมูลผลงาน</h4>
+        <AddEntryForm 
+          kpiId={activeKpi.id} 
+          type={activeKpi.type?.toLowerCase() || activeKpi.Type?.toLowerCase() || 'count'} 
+          deptId={selectedDept ? String(selectedDept.id) : ''}
+          onSuccess={() => { setActiveKpi(null); fetchData(); }} 
+        />
+      </div>
+    </div>
+  </div>
+)}
+
+{/* --- เรียกใช้งาน Component Modal ที่ปรับปรุงแล้ว --- */}
+<BatchDetailModal
+  isOpen={!!viewingBatchGroup}
+  onClose={() => setViewingBatchGroup(null)}
+  batchGroup={viewingBatchGroup}
+  departmentName={currentDeptObj?.Department || selectedDept?.name || ''}
+  canApprove={canApprove(selectedDept?.id || '')}
+  onApprove={(type, month) => {
+  handleApproveBatch(type as any, month);
+  setViewingBatchGroup(null);
+}}
+/>
+
+{activeModal === 'audit' && selectedDept && (
+  <AuditChartModal 
+    isOpen={true} 
+    onClose={() => {
+      setActiveModal(null);
+      setSelectedAuditItem(null);
+    }} 
+    departmentName={currentDeptObj?.Department || 'ไม่ระบุหน่วยงาน'} 
+    departmentId={String(selectedDept.id)} 
+    supabase={supabase} 
+    initialMode={auditModalMode}
+    initialData={selectedAuditItem}
+    onSuccess={() => { 
+      setActiveModal(null); 
+      setSelectedAuditItem(null);
+      fetchPendingApproval(currentDeptObj.id); 
+    }} 
+  />
+)}
+
+{selectedDept && currentDeptObj && (
+      <>
+        <WpQaModal isOpen={activeModal === 'wp_qa'} onClose={() => setActiveModal(null)} departmentId={currentDeptObj.id} departmentName={currentDeptObj.Department} supabase={supabase} onSuccess={() => { fetchData(); fetchPendingApproval(currentDeptObj.id); }} />
+        <IvCareModal isOpen={activeModal === 'iv_care'} onClose={() => setActiveModal(null)} departmentId={currentDeptObj.id} departmentName={currentDeptObj.Department} supabase={supabase} onSuccess={() => { fetchData(); fetchPendingApproval(currentDeptObj.id); }} />
+        <FallCareModal isOpen={activeModal === 'fall'} onClose={() => setActiveModal(null)} departmentId={currentDeptObj.id} departmentName={currentDeptObj.Department} supabase={supabase} onSuccess={() => { fetchData(); fetchPendingApproval(currentDeptObj.id); }} />
+        <ReadmitModal isOpen={activeModal === 'readmit'} onClose={() => setActiveModal(null)} departmentId={currentDeptObj.id} departmentName={currentDeptObj.Department} supabase={supabase} onSuccess={() => { fetchData(); fetchPendingApproval(currentDeptObj.id); }} /> 
+        <AgainstMedicalAdviceModal isOpen={activeModal === 'ama'} onClose={() => setActiveModal(null)} departmentId={currentDeptObj.id} departmentName={currentDeptObj.Department} supabase={supabase} onSuccess={() => { fetchData(); fetchPendingApproval(currentDeptObj.id); }} /> 
+      </>
+    )}
+      </div>
+)}
+ </div>
+ </div>
+ </div>
+ )}

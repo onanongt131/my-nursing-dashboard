@@ -5,7 +5,7 @@ import AddEntryForm from '@/components/AddEntryForm';
 import React from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ResponsiveContainer } from 'recharts';
 import { getButtonStyle } from '@/utils/kpiCalculations';
-import { ClipboardDocumentCheckIcon, ExclamationTriangleIcon, CheckCircleIcon, EyeIcon } from '@heroicons/react/24/solid';
+import { ClipboardDocumentCheckIcon, ExclamationTriangleIcon, CheckCircleIcon, EyeIcon, ShieldCheckIcon } from '@heroicons/react/24/solid';
 import { useParams, useRouter } from 'next/navigation';
 import AuditChartModal from '@/components/AuditChartModal';
 import WpQaModal from '@/components/WpQaModal'; 
@@ -27,6 +27,10 @@ export default function SingleDepartmentPage() {
   const [loading, setLoading] = useState(true);
   const [activeModal, setActiveModal] = useState<'wp_qa' | 'iv_care' | 'fall' | 'audit' | 'readmit' | 'ama' | null>(null);
   
+  // เพิ่ม State สำหรับจัดการสิทธิ์ (Role & Permissions)
+  const [userRole, setUserRole] = useState<string>('staff');
+  const [canApprove, setCanApprove] = useState<boolean>(false);
+
   const [allPendingRows, setAllPendingRows] = useState<any[]>([]);
   const [pendingLoading, setPendingLoading] = useState(false);
   const [showPendingTable, setShowPendingTable] = useState(false);
@@ -56,6 +60,28 @@ export default function SingleDepartmentPage() {
   } | null>(null);
 
   const supabase = createClient();
+
+  // ฟังก์ชันดึงข้อมูลผู้ใช้และสิทธิ์จาก Supabase
+  const fetchUserPermissions = useCallback(async () => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role, department_id')
+        .eq('id', user.id)
+        .single();
+
+      if (profile) {
+        setUserRole(profile.role || 'staff');
+        const privilegedRoles = ['admin', 'approver', 'supervisor', 'head_nurse'];
+        setCanApprove(privilegedRoles.includes(profile.role));
+      }
+    } catch (err) {
+      console.error("Error fetching user permissions:", err);
+    }
+  }, [supabase]);
 
   const fetchDepartmentData = useCallback(async () => {
     if (!deptId) return;
@@ -172,8 +198,9 @@ export default function SingleDepartmentPage() {
   }, [supabase]);
 
   useEffect(() => {
+    fetchUserPermissions();
     fetchDepartmentData();
-  }, [fetchDepartmentData]);
+  }, [fetchUserPermissions, fetchDepartmentData]);
 
   useEffect(() => {
     if (deptId) {
@@ -182,17 +209,15 @@ export default function SingleDepartmentPage() {
     }
   }, [deptId, fetchPendingApproval, fetchMonthlyRecords]);
   
-  // Logic ตรวจสอบว่า "เดือนก่อนหน้า" มีการบันทึกข้อมูลแล้วหรือยัง
   const hasSubmittedPreviousMonth = (records: any[]) => {
     const now = new Date();
-    // ถอยหลังไป 1 เดือน
     now.setMonth(now.getMonth() - 1);
     
     const prevYear = now.getFullYear();
     const prevMonth = String(now.getMonth() + 1).padStart(2, '0');
     
     const prevMonthStr = `${prevYear}-${prevMonth}`;
-    const thaiYearStr = `${prevYear + 543}-${prevMonth}`; // เผื่อกรณีใช้ปี พ.ศ.
+    const thaiYearStr = `${prevYear + 543}-${prevMonth}`;
 
     return records.some(item => {
       const itemMonth = item.audit_month || item.month || item.incident_date?.substring(0, 7) || item.admit_date?.substring(0, 7) || '';
@@ -216,13 +241,18 @@ export default function SingleDepartmentPage() {
             >
               ← กลับหน้าหลัก
             </button>
-            <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">หน่วยงานที่กำลังแสดงผล</span>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">หน่วยงานที่กำลังแสดงผล</span>
+              {/* ป้ายแสดงสิทธิ์ของผู้ใช้งานปัจจุบัน */}
+              <span className="px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded text-[10px] font-extrabold flex items-center gap-1">
+                <ShieldCheckIcon className="w-3 h-3" /> สิทธิ์: {userRole.toUpperCase()}
+              </span>
+            </div>
             <h2 className="text-2xl font-bold text-gray-800">
               {departmentData.Department}
             </h2>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            {/* ปุ่มรออนุมัติ */}
             <button 
               onClick={() => {
                 if (totalPendingCount > 0) {
@@ -243,9 +273,7 @@ export default function SingleDepartmentPage() {
               <span>รออนุมัติ</span>
             </button>
 
-            {/* --- ปุ่มเมนูระบบต่างๆ พร้อมเงื่อนไขเตือน (เช็คเดือนก่อนหน้า) --- */}
-            
-            {/* 1. Audit Chart */}
+            {/* Audit Chart */}
             {(() => {
               const needWarning = !hasSubmittedPreviousMonth(monthlyRecords.audit);
               return (
@@ -262,7 +290,7 @@ export default function SingleDepartmentPage() {
               );
             })()}
 
-            {/* 2. WP/QA */}
+            {/* WP/QA */}
             {(() => {
               const needWarning = !hasSubmittedPreviousMonth(monthlyRecords.wp_qa);
               return (
@@ -279,7 +307,7 @@ export default function SingleDepartmentPage() {
               );
             })()}
 
-            {/* 3. IV Care */}
+            {/* IV Care */}
             {(() => {
               const needWarning = !hasSubmittedPreviousMonth(monthlyRecords.iv_care);
               return (
@@ -296,7 +324,7 @@ export default function SingleDepartmentPage() {
               );
             })()}
 
-            {/* 4. Fall */}
+            {/* Fall */}
             {(() => {
               const needWarning = !hasSubmittedPreviousMonth(monthlyRecords.fall);
               return (
@@ -313,7 +341,7 @@ export default function SingleDepartmentPage() {
               );
             })()}
 
-            {/* 5. Re-admit */}
+            {/* Re-admit */}
             {(() => {
               const needWarning = !hasSubmittedPreviousMonth(monthlyRecords.readmit);
               return (
@@ -329,7 +357,7 @@ export default function SingleDepartmentPage() {
               );
             })()}
 
-            {/* 6. จำหน่ายไม่สมัครอยู่ */}
+            {/* จำหน่ายไม่สมัครอยู่ */}
             {(() => {
               const needWarning = !hasSubmittedPreviousMonth(monthlyRecords.ama);
               return (
@@ -506,7 +534,7 @@ export default function SingleDepartmentPage() {
           onClose={() => setViewingBatchGroup(null)}
           batchGroup={viewingBatchGroup}
           departmentName={departmentData?.Department || ''}
-          canApprove={true}
+          canApprove={canApprove} // ส่งสิทธิ์การอนุมัติเข้าไปควบคุมปุ่มอนุมัติใน Modal
           onApprove={() => {
             setViewingBatchGroup(null);
             fetchPendingApproval(deptId);

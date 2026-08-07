@@ -9,7 +9,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   const supabase = await createClient();
 
-  // ดึงข้อมูล profile พร้อมทั้ง join หรือดึงข้อมูล group จากตาราง departments ของผู้ใช้คนนี้
+  // 1. ดึงข้อมูล profile และ join ข้อมูล departments
   const { data: profile } = await supabase
     .from('profiles')
     .select(`
@@ -21,7 +21,12 @@ export default async function DashboardLayout({ children }: { children: React.Re
     .eq('id', session.user.id)
     .single();
 
-  // จัดรูป ให้อยู่ในโครงสร้างที่เรียกใช้ง่าย (เช่น profile.group)
+  // 2. ดึงรายชื่อหน่วยงานทั้งหมดสำหรับนำไปแสดงในเมนูดรอปดาวน์ของ Header
+  const { data: departments } = await supabase
+    .from('departments')
+    .select('*');
+
+  // จัดรูปแบบ profile ให้เรียกใช้ง่าย
   const userProfile = profile ? {
     ...profile,
     group: (profile.departments as any)?.group || null
@@ -29,7 +34,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
-      <DashboardLayoutContent profile={userProfile}>
+      {/* 3. ส่ง departments เข้าไปที่ DashboardLayoutContent ด้วย */}
+      <DashboardLayoutContent profile={userProfile} departments={departments || []}>
         {children}
       </DashboardLayoutContent>
     </div>

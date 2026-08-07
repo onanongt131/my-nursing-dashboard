@@ -2,7 +2,7 @@
 'use client';
 import { usePathname, useRouter } from 'next/navigation';
 import { DashboardHeader } from '@/components/DashboardHeader';
-import { useIdleLogout } from '@/hooks/useIdleLogout'; // 👈 นำเข้า Hook จับเวลาไม่มีการเคลื่อนไหว
+import { useIdleLogout } from '@/hooks/useIdleLogout';
 
 interface DashboardLayoutContentProps {
   profile?: {
@@ -11,14 +11,14 @@ interface DashboardLayoutContentProps {
     full_name?: string;
     group?: string;
   } | null;
+  departments?: any[]; // เพิ่มรับ prop departments
   children: React.ReactNode;
 }
 
-export default function DashboardLayoutContent({ profile, children }: DashboardLayoutContentProps) {
+export default function DashboardLayoutContent({ profile, departments = [], children }: DashboardLayoutContentProps) {
   const pathname = usePathname();
   const router = useRouter();
   
-  // เรียกใช้งาน Idle Logout ตั้งเวลา 5 นาที (สามารถปรับเปลี่ยนเวลาได้ตามต้องการ)
   const { showWarning, setShowWarning } = useIdleLogout(5);
 
   const getActiveTab = () => {
@@ -28,8 +28,8 @@ export default function DashboardLayoutContent({ profile, children }: DashboardL
     if (pathname.startsWith('/dashboard/departments')) return 'unit';
     if (pathname.startsWith('/dashboard/productivity')) return 'productivity';
     if (pathname.startsWith('/dashboard/wp-qa')) return 'wp-qa';
-    if (pathname.startsWith('/dashboard/audit-chart')) return 'Audit chart';
-    if (pathname.startsWith('/dashboard/iv-care')) return 'IV care';
+    if (pathname.startsWith('/dashboard/audit-chart')) return 'audit-chart';
+    if (pathname.startsWith('/dashboard/iv-care')) return 'iv-care';
     return 'dashboard';
   };
 
@@ -38,9 +38,9 @@ export default function DashboardLayoutContent({ profile, children }: DashboardL
   const handleTabChange = (tabName: string) => {
     const paths: Record<string, string> = {
       dashboard: '/dashboard',
+      unit: '/dashboard/departments',
       category: '/dashboard/category',
       strategy: '/dashboard/strategy',
-      unit: '/dashboard/departments',
       productivity: '/dashboard/productivity',
       'wp-qa': '/dashboard/wp-qa',
       'audit-chart': '/dashboard/audit-chart',
@@ -53,7 +53,6 @@ export default function DashboardLayoutContent({ profile, children }: DashboardL
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-6">
-      {/* แสดงข้อมูลผู้ใช้และ Role */}
       {profile && (
         <div className="mb-4 text-xs text-gray-500 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
           <span>ผู้ใช้งาน: <strong className="text-gray-700">{profile.full_name}</strong></span>
@@ -63,28 +62,19 @@ export default function DashboardLayoutContent({ profile, children }: DashboardL
         </div>
       )}
 
-      {/* 
-        ครอบ DashboardHeader ด้วย Container ที่รองรับ Responsive Scroll 
-        เพื่อให้แถบเมนูด้านในยืดหยุ่น ปัดเลื่อนซ้าย-ขวาได้บนมือถือ และขยายเต็มพื้นที่บนไอแพด/คอมพิวเตอร์ 
-      */}
-      <div className="w-full bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="w-full overflow-x-auto scrollbar-none">
-          <div className="min-w-max px-2">
-            <DashboardHeader 
-              title="กลุ่มภารกิจด้านการพยาบาล" 
-              activeTab={activeTab}
-              onTabChange={handleTabChange}
-              stats={{ total: 12 }} 
-            />
-          </div>
-        </div>
+      <div className="w-full bg-white rounded-2xl shadow-sm border border-gray-100">
+        <DashboardHeader 
+          title="กลุ่มภารกิจด้านการพยาบาล" 
+          activeTab={activeTab}
+          onTabChange={handleTabChange}
+          departments={departments} // ส่งรายการ departments เข้าไปที่ Header เพื่อให้เลือกเมนูหน่วยงานได้ถูกต้อง
+        />
       </div>
       
       <main className="mt-6">
         {children}
       </main>
 
-      {/* Modal แจ้งเตือนก่อน Logout อัตโนมัติ เมื่อไม่มีการเคลื่อนไหวครบกำหนด */}
       {showWarning && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 animate-in fade-in duration-300">
           <div className="bg-white p-6 rounded-2xl shadow-xl max-w-sm w-full text-center space-y-4">

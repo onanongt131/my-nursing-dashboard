@@ -254,12 +254,6 @@ export default function SingleDepartmentPage() {
       <div className="bg-white p-6 rounded-2xl border border-gray-200 shadow-sm space-y-6">
         <div className="border-b pb-4 flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
           <div>
-            <button 
-              onClick={() => router.back()} 
-              className="text-xs font-bold text-emerald-600 hover:underline uppercase tracking-wider mb-1 block cursor-pointer"
-            >
-              ← กลับหน้าหลัก
-            </button>
             <div className="flex items-center gap-2 mb-1">
               <span className="text-xs font-bold text-gray-400 uppercase tracking-wider">หน่วยงานที่กำลังแสดงผล</span>
               {/* ป้ายแสดงสิทธิ์ Admin และบอกหน่วยงานที่ดูแล */}

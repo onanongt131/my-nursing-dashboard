@@ -92,9 +92,9 @@ export default function AddEntryForm({ kpiId, type, deptId, onSuccess }: {
         finalValue = Number(Number(rawFinalValue).toFixed(2));
       }
       
-      // ตัดฟิลด์ type ออกเพื่อไม่ให้ติดปัญหาเรื่องคอลัมน์ในตาราง entries
       const payload = {
         kpi_id: Number(kpiId),
+        department_id: deptId ? Number(deptId) : null, // <--- เพิ่มตรงนี้เพื่อผูกข้อมูลกับหน่วยงาน
         year: Number(formData.year),
         month: formData.month,
         value: finalValue,

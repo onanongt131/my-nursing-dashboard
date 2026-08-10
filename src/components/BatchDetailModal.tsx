@@ -3,7 +3,6 @@
 import React, { useState } from 'react';
 import { CheckCircleIcon, XMarkIcon, ExclamationTriangleIcon } from '@heroicons/react/24/solid';
 
-// กำหนด Interface สำหรับ Item และ BatchGroup เพื่อความปลอดภัยทางประเภทข้อมูล (Type Safety)
 interface BatchItem {
   id?: string | number;
   source_table?: string;
@@ -52,7 +51,7 @@ interface BatchItem {
   fiscal_year?: string | number;
   patient_days?: number;
   status?: string;
-  [key: string]: any; // รองรับฟิลด์เสริมอื่นๆ
+  [key: string]: any;
 }
 
 interface BatchGroup {
@@ -87,86 +86,87 @@ export default function BatchDetailModal({
 
   if (!isOpen || !batchGroup) return null;
 
+  const typeLower = batchGroup.type.toLowerCase();
+  const isWpQa = typeLower.includes('wp_qa');
+  const isReadmit = typeLower.includes('readmit');
+  const isFall = typeLower.includes('fall');
+  const isAma = typeLower.includes('ama') || typeLower.includes('against_medical_advice') || typeLower.includes('ไม่สมัคร');
+  const isIvCare = typeLower.includes('iv_care');
+
   const handleApproveAll = async () => {
-    if (!confirm(`คุณต้องการอนุมัติข้อมูลประจำเดือน ${batchGroup.audit_month} ทั้งหมด ${batchGroup.items.length} รายการ ใช่หรือไม่?`)) {
+    const activeSupabase = supabase; 
+
+    if (!activeSupabase) {
+      alert('ไม่พบการเชื่อมต่อ Supabase Client');
       return;
     }
 
-    if (supabase) {
-      setLoading(true);
-      try {
-        const tablesMap = batchGroup.items.reduce((acc: Record<string, (string | number)[]>, item: BatchItem) => {
-          const table = item.source_table;
-          if (!table || item.id === undefined) return acc;
-          if (!acc[table]) acc[table] = [];
-          acc[table].push(item.id);
-          return acc;
-        }, {});
+    const auditMonthStr = String(batchGroup.audit_month || '').trim();
+    const typeStr = batchGroup.type ? String(batchGroup.type).toLowerCase() : '';
 
-        for (const [tableName, ids] of Object.entries(tablesMap)) {
-          const { error } = await supabase
-            .from(tableName)
-            .update({ status: 'approved' })
-            .in('id', ids);
-
-          if (error) {
-            console.error(`Error updating table ${tableName}:`, error);
-            alert(`เกิดข้อผิดพลาดในการอนุมัติข้อมูลตาราง ${tableName}: ${error.message}`);
-            setLoading(false);
-            return;
-          }
-        }
-
-        let summaryTableName = '';
-        const typeLower = batchGroup.type.toLowerCase();
-        
-        if (typeLower.includes('iv_care')) summaryTableName = 'iv_care_monthly_summaries';
-        else if (typeLower.includes('fall')) summaryTableName = 'fall_monthly_summary';
-        else if (typeLower.includes('readmit')) summaryTableName = 'readmit_monthly_summary';
-        else if (typeLower.includes('ama') || typeLower.includes('against_medical_advice') || typeLower.includes('ไม่สมัคร')) summaryTableName = 'ama_monthly_summary';
-
-        if (summaryTableName) {
-          let query = supabase
-            .from(summaryTableName)
-            .update({ 
-              status: 'approved',
-              approved_at: new Date().toISOString()
-            })
-            .eq('audit_month', batchGroup.audit_month);
-
-          if (batchGroup.department_id) {
-            query = query.eq('department_id', batchGroup.department_id);
-          }
-
-          const { error: summaryError } = await query;
-          if (summaryError) {
-            console.error(`Error updating summary table ${summaryTableName}:`, summaryError);
-          }
-        }
-
-      } catch (err: any) {
-        console.error('Approval error:', err);
-        alert(`เกิดข้อผิดพลาด: ${err?.message || 'กรุณาลองใหม่อีกครั้ง'}`);
-        setLoading(false);
-        return;
-      } finally {
-        setLoading(false);
-      }
+    if (!confirm(`คุณต้องการอนุมัติข้อมูลประจำเดือน ${auditMonthStr} ของระบบ ${batchGroup.type} ใช่หรือไม่?`)) {
+      return;
     }
 
-    onApprove(batchGroup.type, batchGroup.audit_month);
-    onClose();
+    setLoading(true);
+    try {
+      let targetTable = '';
+      if (typeStr.includes('wp_qa')) {
+        targetTable = 'wp_qa_records';
+      } else if (typeStr.includes('iv_care')) {
+        targetTable = typeStr.includes('summary') ? 'iv_care_monthly_summaries' : 'iv_care_complications';
+      } else if (typeStr.includes('fall')) {
+        targetTable = typeStr.includes('summary') ? 'fall_monthly_summary' : 'fall_incident_records';
+      } else if (typeStr.includes('readmit')) {
+        targetTable = typeStr.includes('summary') ? 'readmit_monthly_summary' : 'readmit_incident_records';
+      } else if (typeStr.includes('ama')) {
+        targetTable = typeStr.includes('summary') ? 'ama_monthly_summary' : 'ama_incident_records';
+      } else {
+        targetTable = batchGroup.type;
+      }
+
+      const ids = batchGroup.items.map(item => item.id).filter(Boolean);
+      console.log(`กำลังอัปเดตตาราง ${targetTable} จำนวน ${ids.length} รายการ`, ids);
+
+      // ส่งเฉพาะฟิลด์ status เพื่อความปลอดภัย ป้องกันปัญหาคอลัมน์ approved_at ไม่มีในตาราง
+      const updatePayload = { status: 'approved' };
+
+      let query = activeSupabase
+        .from(targetTable)
+        .update(updatePayload);
+
+      if (ids.length > 0) {
+        query = query.in('id', ids);
+      } else if (auditMonthStr) {
+        query = query.eq('audit_month', auditMonthStr);
+      }
+
+      const { data, error } = await query.select();
+      if (error) throw error;
+
+      console.log("--- อัปเดตสถานะสำเร็จ ---", data);
+      alert('อนุมัติและบันทึกข้อมูลสำเร็จเรียบร้อย');
+      
+      onApprove(batchGroup.type, batchGroup.audit_month);
+      onClose();
+
+    } catch (err: any) {
+      console.error('Approval error details:', err);
+      alert(`เกิดข้อผิดพลาดในการอนุมัติ: ${err?.message || JSON.stringify(err)}`);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const isSummaryData = batchGroup.type.toLowerCase().includes('summary') || batchGroup.items[0]?.source_table?.includes('summary');
-  const isIvCareSummary = batchGroup.type.toLowerCase().includes('iv_care');
-  const isFallSummary = batchGroup.type.toLowerCase().includes('fall');
+  
+  const isSummaryData = typeLower.includes('summary') || batchGroup.items[0]?.source_table?.includes('summary');
+  const isIvCareSummary = isIvCare && (typeLower.includes('summary') || isSummaryData);
+  const isFallSummary = isFall && (typeLower.includes('summary') || isSummaryData);
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
       <div className="bg-white rounded-2xl max-w-5xl w-full p-6 space-y-5 shadow-2xl relative max-h-[90vh] flex flex-col">
         
-        {/* Modal Header */}
         <div className="flex justify-between items-center border-b pb-3">
           <div>
             <span className="text-xs font-bold text-emerald-600 uppercase">
@@ -183,7 +183,6 @@ export default function BatchDetailModal({
           </button>
         </div>
 
-        {/* Modal Info Bar */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm bg-gray-50 p-4 rounded-xl border border-gray-200">
           <div>
             <span className="font-semibold text-gray-500">หน่วยงาน:</span> {departmentName}
@@ -200,13 +199,12 @@ export default function BatchDetailModal({
           </div>
         </div>
 
-        {/* Data Table Content */}
         <div className="space-y-2 flex-1 overflow-hidden flex flex-col">
           <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">
             รายการข้อมูล ({batchGroup.items.length} รายการ)
           </h4>
           <div className="border border-gray-200 rounded-xl overflow-y-auto flex-1 max-h-96">
-            {batchGroup.type === 'wp_qa' ? (
+            {isWpQa ? (
               <table className="w-full text-left text-xs border-collapse">
                 <thead className="bg-emerald-100 text-emerald-900 sticky top-0 z-10">
                   <tr>
@@ -227,7 +225,7 @@ export default function BatchDetailModal({
                   ))}
                 </tbody>
               </table>
-            ) : batchGroup.type === 'readmit' ? (
+            ) : isReadmit ? (
               <table className="w-full text-left text-xs border-collapse">
                 <thead className="bg-teal-100 text-teal-900 sticky top-0 z-10">
                   <tr>
@@ -260,7 +258,7 @@ export default function BatchDetailModal({
                   ))}
                 </tbody>
               </table>
-            ) : batchGroup.type === 'fall' ? (
+            ) : isFall && !isFallSummary ? (
               <table className="w-full text-left text-xs border-collapse">
                 <thead className="bg-amber-100 text-amber-900 sticky top-0 z-10">
                   <tr>
@@ -285,35 +283,32 @@ export default function BatchDetailModal({
                   ))}
                 </tbody>
               </table>
-            ) : batchGroup.type === 'ama' || 
-                batchGroup.type === 'against_medical_advice' || 
-                batchGroup.type === 'ไม่สมัครอยู่' || 
-                batchGroup.type === 'ไม่สมัครใจอยู่' ? (
-                <table className="w-full text-left text-xs border-collapse">
-                    <thead className="bg-rose-100 text-rose-900 sticky top-0 z-10">
-                    <tr>
-                        <th className="p-2.5 text-center">ลำดับ</th>
-                        <th className="p-2.5">HN</th>
-                        <th className="p-2.5">AN</th>
-                        <th className="p-2.5">วันที่เกิดเหตุ</th>
-                        <th className="p-2.5">สิทธิการรักษา</th>
-                        <th className="p-2.5">สาเหตุที่ไม่สมัครอยู่</th>
+            ) : isAma ? (
+              <table className="w-full text-left text-xs border-collapse">
+                <thead className="bg-rose-100 text-rose-900 sticky top-0 z-10">
+                  <tr>
+                    <th className="p-2.5 text-center">ลำดับ</th>
+                    <th className="p-2.5">HN</th>
+                    <th className="p-2.5">AN</th>
+                    <th className="p-2.5">วันที่เกิดเหตุ</th>
+                    <th className="p-2.5">สิทธิการรักษา</th>
+                    <th className="p-2.5">สาเหตุที่ไม่สมัครอยู่</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 bg-white">
+                  {batchGroup.items.map((item, idx) => (
+                    <tr key={idx} className="hover:bg-gray-50">
+                      <td className="p-2.5 text-center font-bold">{idx + 1}</td>
+                      <td className="p-2.5 font-semibold text-rose-800">{item.hn || '-'}</td>
+                      <td className="p-2.5">{item.an || '-'}</td>
+                      <td className="p-2.5">{item.incident_date || item.discharge_date || '-'}</td>
+                      <td className="p-2.5">{item.treatment_right || '-'}</td>
+                      <td className="p-2.5 font-medium text-gray-800">{item.ama_reason || item.reason || item.cause || '-'}</td>
                     </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100 bg-white">
-                    {batchGroup.items.map((item, idx) => (
-                        <tr key={idx} className="hover:bg-gray-50">
-                        <td className="p-2.5 text-center font-bold">{idx + 1}</td>
-                        <td className="p-2.5 font-semibold text-rose-800">{item.hn || '-'}</td>
-                        <td className="p-2.5">{item.an || '-'}</td>
-                        <td className="p-2.5">{item.incident_date || item.discharge_date || '-'}</td>
-                        <td className="p-2.5">{item.treatment_right || '-'}</td>
-                        <td className="p-2.5 font-medium text-gray-800">{item.ama_reason || item.reason || item.cause || '-'}</td>
-                        </tr>
-                    ))}
-                    </tbody>
-                </table>
-            ) : batchGroup.type === 'iv_care' || batchGroup.type === 'iv_care_comp' ? (
+                  ))}
+                </tbody>
+              </table>
+            ) : isIvCare && !isIvCareSummary ? (
               <table className="w-full text-left text-xs border-collapse">
                 <thead className="bg-cyan-100 text-cyan-900 sticky top-0 z-10">
                   <tr>
@@ -429,7 +424,6 @@ export default function BatchDetailModal({
           </div>
         </div>
 
-        {/* Modal Footer */}
         <div className="flex justify-end gap-3 pt-4 border-t">
           <button
             onClick={onClose}

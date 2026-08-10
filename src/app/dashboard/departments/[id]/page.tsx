@@ -21,7 +21,6 @@ const YEARS = [2565, 2566, 2567, 2568, 2569] as const;
 const RECORD_TABLES = [
   { name: 'nursing_chart_audits', key: 'audit' },
   { name: 'wp_qa_records', key: 'wp_qa' },
-  { name: 'iv_care_data', key: 'iv_care' },
   { name: 'iv_care_complications', key: 'iv_care_comp' },
   { name: 'iv_care_monthly_summaries', key: 'iv_care_summary' },
   { name: 'fall_incident_records', key: 'fall' },
@@ -138,16 +137,21 @@ export default function SingleDepartmentPage() {
   }, [supabase, deptId]);
 
   const fetchMonthlyRecords = useCallback(async (targetDeptId: string | number) => {
+  if (!targetDeptId) return;
     try {
       const results = await Promise.all(
         RECORD_TABLES.map(async t => {
-          const { data } = await supabase.from(t.name).select('*').eq('department_id', targetDeptId);
+          const { data, error } = await supabase.from(t.name).select('*').eq('department_id', targetDeptId);
+          // หากตารางไหนไม่มีฟิลด์ department_id หรือ error ให้คืนค่าเป็น array ว่างแทนเพื่อไม่ให้แอปพัง
+          if (error) {
+            console.warn(`Table ${t.name} might not have department_id or error occurred:`, error.message);
+            return { key: t.key, data: [] };
+          }
           return { key: t.key, data: data || [] };
         })
       );
 
       const recordsMap = results.reduce((acc, curr) => {
-        // หากมีหลายตารางที่ใช้ key เดียวกัน (เช่นหมวดหมู่ย่อย) สามารถรวมกันหรือแยกเก็บได้ตามต้องการ
         if (!acc[curr.key]) {
           acc[curr.key] = curr.data;
         } else {
@@ -220,6 +224,9 @@ export default function SingleDepartmentPage() {
   }, [deptId, fetchPendingApproval, fetchMonthlyRecords]);
   
   const hasSubmittedPreviousMonth = (records: any[]) => {
+    // ป้องกันกรณีที่ records เป็น undefined หรือ null
+    if (!Array.isArray(records)) return false;
+
     const now = new Date();
     now.setMonth(now.getMonth() - 1);
     
@@ -230,6 +237,7 @@ export default function SingleDepartmentPage() {
     const thaiYearStr = `${prevYear + 543}-${prevMonth}`;
 
     return records.some(item => {
+      if (!item) return false;
       const rawMonth = item.audit_month || item.month || item.incident_date?.substring(0, 7) || item.admit_date?.substring(0, 7) || '';
       const itemMonth = typeof rawMonth === 'string' ? rawMonth : String(rawMonth || '');
       return itemMonth.includes(prevMonthStr) || itemMonth.includes(thaiYearStr);
@@ -515,6 +523,7 @@ export default function SingleDepartmentPage() {
             fetchPendingApproval(deptId);
             fetchMonthlyRecords(deptId);
           }}
+          supabase={supabase} // <--- เพิ่มบรรทัดนี้เข้าไปครับ
         />
       )}
 

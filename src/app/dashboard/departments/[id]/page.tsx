@@ -19,12 +19,17 @@ import DepartmentEditor from '@/components/DepartmentEditor';
 const YEARS = [2565, 2566, 2567, 2568, 2569] as const;
 
 const RECORD_TABLES = [
-  { name: 'audit_records', key: 'audit' },
+  { name: 'nursing_chart_audits', key: 'audit' },
   { name: 'wp_qa_records', key: 'wp_qa' },
-  { name: 'iv_care_records', key: 'iv_care' },
-  { name: 'fall_records', key: 'fall' },
-  { name: 'readmit_records', key: 'readmit' },
-  { name: 'ama_records', key: 'ama' },
+  { name: 'iv_care_data', key: 'iv_care' },
+  { name: 'iv_care_complications', key: 'iv_care_comp' },
+  { name: 'iv_care_monthly_summaries', key: 'iv_care_summary' },
+  { name: 'fall_incident_records', key: 'fall' },
+  { name: 'fall_monthly_summary', key: 'fall_summary' },
+  { name: 'readmit_incident_records', key: 'readmit' },
+  { name: 'readmit_monthly_summary', key: 'readmit_summary' },
+  { name: 'ama_incident_records', key: 'ama' },
+  { name: 'ama_monthly_summary', key: 'ama_summary' },
 ] as const;
 
 export default function SingleDepartmentPage() {
@@ -132,7 +137,6 @@ export default function SingleDepartmentPage() {
     }
   }, [supabase, deptId]);
 
-  // 3. ดึงข้อมูลบันทึกรายเดือนทั้งหมดแบบ Parallel (Promise.all)
   const fetchMonthlyRecords = useCallback(async (targetDeptId: string | number) => {
     try {
       const results = await Promise.all(
@@ -143,7 +147,12 @@ export default function SingleDepartmentPage() {
       );
 
       const recordsMap = results.reduce((acc, curr) => {
-        acc[curr.key] = curr.data;
+        // หากมีหลายตารางที่ใช้ key เดียวกัน (เช่นหมวดหมู่ย่อย) สามารถรวมกันหรือแยกเก็บได้ตามต้องการ
+        if (!acc[curr.key]) {
+          acc[curr.key] = curr.data;
+        } else {
+          acc[curr.key] = [...acc[curr.key], ...curr.data];
+        }
         return acc;
       }, {} as Record<string, any[]>);
 
@@ -153,45 +162,50 @@ export default function SingleDepartmentPage() {
     }
   }, [supabase]);
 
-  // 4. ดึงรายการรออนุมัติแบบ Parallel (Promise.all)
   const fetchPendingApproval = useCallback(async (targetDeptId: string | number) => {
-    setPendingLoading(true);
-    try {
-      const results = await Promise.all(
-        RECORD_TABLES.map(async t => {
-          const { data, error } = await supabase
-            .from(t.name)
-            .select('*')
-            .eq('department_id', targetDeptId)
-            .eq('status', 'pending');
+  setPendingLoading(true);
+  try {
+    const results = await Promise.all(
+      RECORD_TABLES.map(async t => {
+        const { data, error } = await supabase
+          .from(t.name)
+          .select('*')
+          .eq('department_id', targetDeptId)
+          .eq('status', 'pending');
 
-          if (!error && data && data.length > 0) {
-            const groupedMap = data.reduce((acc: any, item: any) => {
-              const month = item.audit_month || item.month || item.incident_date?.substring(0, 7) || item.admit_date?.substring(0, 7) || 'ไม่ระบุเดือน';
-              if (!acc[month]) {
-                acc[month] = {
-                  type: t.key,
-                  audit_month: month,
-                  auditor_name: item.auditor_name || item.evaluator || item.staff_name || '-',
-                  items: []
-                };
-              }
-              acc[month].items.push(item);
-              return acc;
-            }, {});
-            return Object.values(groupedMap);
-          }
-          return [];
-        })
-      );
+        if (!error && data && data.length > 0) {
+          const groupedMap = data.reduce((acc: any, item: any) => {
+            // เพิ่ม item.record_date เข้ามาตรวจสอบเป็นอันดับต้นๆ สำหรับตารางที่มีการบันทึกวันที่นี้
+            const rawMonth = item.audit_month || item.month || item.record_date || item.incident_date || item.admit_date || item.created_at || '';
+            const monthStr = typeof rawMonth === 'string' ? rawMonth : String(rawMonth || '');
+            const month = monthStr.substring(0, 7) || 'ไม่ระบุเดือน';
+            
+            const groupKey = `${t.key}_${month}`;
+            
+            if (!acc[groupKey]) {
+              acc[groupKey] = {
+                type: t.key,
+                audit_month: month,
+                auditor_name: item.auditor_name || item.evaluator || item.staff_name || item.recorded_by || '-',
+                items: []
+              };
+            }
+            acc[groupKey].items.push({ ...item, source_table: t.name });
+            return acc;
+          }, {});
+          return Object.values(groupedMap);
+        }
+        return [];
+      })
+    );
 
-      setAllPendingRows(results.flat());
-    } catch (err) {
-      console.error("Error fetching pending:", err);
-    } finally {
-      setPendingLoading(false);
-    }
-  }, [supabase]);
+    setAllPendingRows(results.flat());
+  } catch (err) {
+    console.error("Error fetching pending:", err);
+  } finally {
+    setPendingLoading(false);
+  }
+}, [supabase]);
 
   useEffect(() => {
     fetchUserPermissions();
@@ -216,7 +230,8 @@ export default function SingleDepartmentPage() {
     const thaiYearStr = `${prevYear + 543}-${prevMonth}`;
 
     return records.some(item => {
-      const itemMonth = item.audit_month || item.month || item.incident_date?.substring(0, 7) || item.admit_date?.substring(0, 7) || '';
+      const rawMonth = item.audit_month || item.month || item.incident_date?.substring(0, 7) || item.admit_date?.substring(0, 7) || '';
+      const itemMonth = typeof rawMonth === 'string' ? rawMonth : String(rawMonth || '');
       return itemMonth.includes(prevMonthStr) || itemMonth.includes(thaiYearStr);
     });
   };

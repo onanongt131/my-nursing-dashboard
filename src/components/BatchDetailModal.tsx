@@ -112,7 +112,7 @@ export default function BatchDetailModal({
 
     setLoading(true);
     try {
-      const targetTable = 'nursing_chart_audit_records';
+      const targetTable = 'nursing_chart_audits';
       const ids = batchGroup.items.map(item => item.id).filter(Boolean);
 
       let query = activeSupabase.from(targetTable).update({ status: 'approved' });
@@ -146,7 +146,7 @@ export default function BatchDetailModal({
       try {
         setLoading(true);
         const { error } = await activeSupabase
-          .from('nursing_chart_audit_records')
+          .from('nursing_chart_audits')
           .update({ status: 'approved' })
           .eq('id', item.id);
 

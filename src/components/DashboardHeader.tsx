@@ -27,7 +27,6 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
     setOpenGroups(prev => ({ ...prev, [groupName]: !prev[groupName] }));
   };
 
-  // จัดกลุ่มข้อมูลโดยอ้างอิงจากฟิลด์ 'group' และ 'Department' ตามโครงสร้างตารางจริง และเพิ่ม prefix /dashboard/departments ให้ถูกต้อง
   const nursingGroups = Array.isArray(departments) ? departments.reduce((acc: any[], curr: any) => {
     const groupName = curr.group || curr.group_name || 'กลุ่มงานทั่วไป';
     const deptName = curr.Department || curr.department_name || curr.name;
@@ -42,7 +41,7 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
     
     foundGroup.departments.push({
       name: deptName,
-      path: `/dashboard/departments/${curr.id}` // ใช้ id ตัวเลขตรงๆ เพื่อให้ตรงกับฐานข้อมูล
+      path: `/dashboard/departments/${curr.id}`
     });
     return acc;
   }, []) : [];
@@ -101,14 +100,34 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
   return (
     <div className="bg-white shadow-sm w-full">
       <header className="flex flex-col md:flex-row items-center justify-between px-4 sm:px-6 py-4 bg-white gap-4 border-b border-gray-100">
-        <div className="flex flex-col sm:flex-row items-center gap-3 sm:gap-4 text-center sm:text-left w-full md:w-auto">
-          <img src="/Logo-NSO.png" alt="Logo" className="h-12 w-12 sm:h-14 sm:w-14 object-contain flex-shrink-0" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
-          <h1 className="text-lg sm:text-2xl md:text-3xl font-bold text-gray-800 leading-snug">{title || "กลุ่มภารกิจด้านการพยาบาล โรงพยาบาลวชิระภูเก็ต"}</h1>
+        <div className="flex items-center justify-between w-full md:w-auto">
+          <div className="flex items-center gap-3 sm:gap-4 text-center sm:text-left">
+            <img src="/Logo-NSO.png" alt="Logo" className="h-12 w-12 sm:h-14 sm:w-14 object-contain flex-shrink-0" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
+            <h1 className="text-lg sm:text-2xl md:text-3xl font-bold text-gray-800 leading-snug">{title || "กลุ่มภารกิจด้านการพยาบาล โรงพยาบาลวชิระภูเก็ต"}</h1>
+          </div>
+          
+          <button 
+            type="button" 
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} 
+            className="md:hidden p-2 rounded-lg bg-emerald-900 text-amber-300 hover:bg-emerald-800 focus:outline-none flex-shrink-0 ml-2"
+            aria-label="Toggle Menu"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              {isMobileMenuOpen ? (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              ) : (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              )}
+            </svg>
+          </button>
         </div>
-        <LogoutButton />
+
+        <div className="hidden md:block">
+          <LogoutButton />
+        </div>
       </header>
 
-      <div className={`w-full bg-emerald-900 shadow-md ${isMobileMenuOpen ? 'block' : 'hidden'} md:block`}>
+      <div className={`w-full bg-emerald-900 shadow-md transition-all duration-300 ${isMobileMenuOpen ? 'block' : 'hidden'} md:block`}>
         <nav className="flex flex-col md:flex-row items-start md:items-center justify-start gap-3 px-4 sm:px-6 py-3">
           
           <button type="button" onClick={() => { onTabChange && onTabChange('dashboard'); setIsMobileMenuOpen(false); }} className={`${buttonBaseClass} ${isHomeActive ? activeStyle : inactiveStyle}`}>หน้าหลัก</button>
@@ -120,7 +139,7 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
             </button>
             {isNursingDropdownOpen && (
               <div className="absolute left-0 mt-2 w-full md:w-72 bg-white rounded-xl shadow-2xl border border-amber-200 py-2 z-50 max-h-96 overflow-y-auto">
-                {nursingBranches.map((branch: any, i: number) => <a key={i} href={branch.path} className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-emerald-50 border-b">{branch.name}</a>)}
+                {nursingBranches.map((branch: any, i: number) => <a key={i} href={branch.path} onClick={() => setIsMobileMenuOpen(false)} className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-emerald-50 border-b">{branch.name}</a>)}
               </div>
             )}
           </div>
@@ -132,7 +151,7 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
             </button>
             {isKpiDropdownOpen && (
               <div className="absolute left-0 mt-2 w-full md:w-56 bg-white rounded-xl shadow-2xl border border-amber-200 py-2 z-50">
-                {kpiSubMenus.map((m: any) => <button key={m.name} onClick={() => onTabChange(m.name)} className="w-full text-left px-4 py-2.5 text-sm hover:bg-emerald-50">{m.label}</button>)}
+                {kpiSubMenus.map((m: any) => <button key={m.name} onClick={() => { onTabChange(m.name); setIsMobileMenuOpen(false); }} className="w-full text-left px-4 py-2.5 text-sm hover:bg-emerald-50">{m.label}</button>)}
               </div>
             )}
           </div>
@@ -144,7 +163,7 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
             </button>
             {isMonthlyDropdownOpen && (
               <div className="absolute left-0 mt-2 w-full md:w-56 bg-white rounded-xl shadow-2xl border border-amber-200 py-2 z-50">
-                {monthlySubMenus.map((m: any) => <button key={m.name} onClick={() => onTabChange(m.name)} className="w-full text-left px-4 py-2.5 text-sm hover:bg-emerald-50">{m.label}</button>)}
+                {monthlySubMenus.map((m: any) => <button key={m.name} onClick={() => { onTabChange(m.name); setIsMobileMenuOpen(false); }} className="w-full text-left px-4 py-2.5 text-sm hover:bg-emerald-50">{m.label}</button>)}
               </div>
             )}
           </div>
@@ -179,6 +198,7 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
                               <a 
                                 key={j} 
                                 href={d.path} 
+                                onClick={() => setIsMobileMenuOpen(false)}
                                 className="block px-4 py-2 text-sm text-gray-600 hover:text-emerald-900 hover:bg-emerald-100/60 rounded-lg transition-colors"
                               >
                                 • {d.name}
@@ -192,6 +212,10 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
                 )}
               </div>
             )}
+          </div>
+
+          <div className="w-full pt-2 border-t border-emerald-800 md:hidden flex justify-center">
+            <LogoutButton />
           </div>
 
         </nav>

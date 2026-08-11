@@ -100,68 +100,86 @@ export default function BatchDetailModal({
   const isIvCareSummary = isIvCare && typeLower.includes('summary');
   const isSummaryData = isFallSummary || isIvCareSummary || typeLower.includes('summary');
 
+  const getTargetTable = (type: string): string => {
+  const t = type.toLowerCase();
+  
+  if (t.includes('nursing_chart')) return 'nursing_chart_audits';
+  if (t.includes('wp') || t.includes('qa')) return 'wp_qa_records';
+  
+  if (t.includes('readmit')) {
+    return t.includes('summary') ? 'readmit_monthly_summary' : 'readmit_incident_records';
+  }
+  if (t.includes('fall')) {
+    return t.includes('summary') ? 'fall_monthly_summary' : 'fall_incident_records';
+  }
+  if (t.includes('iv')) {
+    return t.includes('summary') ? 'iv_care_monthly_summaries' : 'iv_care_complications';
+  }
+  if (t.includes('ama')) {
+    return t.includes('summary') ? 'ama_monthly_summary' : 'ama_incident_records';
+  }
+  
+  return 'nursing_chart_audits'; // Default fallback
+};
+
   const handleApproveAll = async () => {
-    const activeSupabase = supabase; 
-    if (!activeSupabase) {
-      alert('ไม่พบการเชื่อมต่อ Supabase Client');
-      return;
+  const activeSupabase = supabase;
+  if (!activeSupabase) return;
+
+  const targetTable = getTargetTable(batchGroup.type);
+  const auditMonthStr = String(batchGroup.audit_month || '').trim();
+  
+  if (!confirm(`ยืนยันอนุมัติข้อมูลทั้งหมดในตาราง ${targetTable}?`)) return;
+
+  setLoading(true);
+  try {
+    const ids = batchGroup.items.map(item => item.id).filter(Boolean);
+
+    let query = activeSupabase.from(targetTable).update({ status: 'approved' });
+    
+    if (ids.length > 0) {
+      query = query.in('id', ids);
+    } else {
+      query = query.eq('audit_month', auditMonthStr);
     }
 
-    const auditMonthStr = String(batchGroup.audit_month || '').trim();
-    if (!confirm(`คุณต้องการอนุมัติข้อมูลประจำเดือน ${auditMonthStr} ทั้งหมดใช่หรือไม่?`)) return;
+    const { error } = await query;
+    if (error) throw error;
 
-    setLoading(true);
-    try {
-      const targetTable = 'nursing_chart_audits';
-      const ids = batchGroup.items.map(item => item.id).filter(Boolean);
-
-      let query = activeSupabase.from(targetTable).update({ status: 'approved' });
-      if (ids.length > 0) {
-        query = query.in('id', ids);
-      } else {
-        query = query.eq('audit_month', auditMonthStr);
-      }
-
-      const { error } = await query.select();
-      if (error) throw error;
-
-      alert('อนุมัติและบันทึกข้อมูลสำเร็จเรียบร้อย');
-      onApprove(batchGroup.type, batchGroup.audit_month);
-      onClose();
-    } catch (err: any) {
-      console.error('Approval error:', err);
-      alert(`เกิดข้อผิดพลาดในการอนุมัติ: ${err?.message || JSON.stringify(err)}`);
-    } finally {
-      setLoading(false);
-    }
-  };
+    alert('อนุมัติสำเร็จ');
+    onApprove(batchGroup.type, batchGroup.audit_month);
+    onClose();
+  } catch (err: any) {
+    alert(`เกิดข้อผิดพลาด: ${err.message}`);
+  } finally {
+    setLoading(false);
+  }
+};
 
   const handleSingleApproval = async (item: BatchItem) => {
-    if (onApproveSingle) {
-      onApproveSingle(item);
-    } else {
-      const activeSupabase = supabase;
-      if (!activeSupabase || !item.id) return;
+  const activeSupabase = supabase;
+  if (!activeSupabase || !item.id) return;
 
-      try {
-        setLoading(true);
-        const { error } = await activeSupabase
-          .from('nursing_chart_audits')
-          .update({ status: 'approved' })
-          .eq('id', item.id);
+  const targetTable = getTargetTable(batchGroup?.type || '');
 
-        if (error) throw error;
-        
-        alert('อนุมัติรายการนี้สำเร็จ');
-        item.status = 'approved';
-        setSelectedAuditItem({ ...item });
-      } catch (err: any) {
-        alert('เกิดข้อผิดพลาด: ' + err.message);
-      } finally {
-        setLoading(false);
-      }
-    }
-  };
+  try {
+    setLoading(true);
+    const { error } = await activeSupabase
+      .from(targetTable)
+      .update({ status: 'approved' })
+      .eq('id', item.id);
+
+    if (error) throw error;
+    
+    alert('อนุมัติรายการนี้สำเร็จ');
+    if (onApprove && batchGroup) onApprove(batchGroup.type, batchGroup.audit_month);
+    setSelectedAuditItem(null);
+  } catch (err: any) {
+    alert('เกิดข้อผิดพลาด: ' + err.message);
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-xs">

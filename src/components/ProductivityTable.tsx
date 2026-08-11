@@ -51,8 +51,10 @@ export const ProductivityTable: React.FC<ProductivityTableProps> = ({ data, sele
       <table className="min-w-full text-sm text-left border-separate border-spacing-x-0 border-spacing-y-2">
         <thead>
           <tr className="text-gray-500 uppercase text-xs bg-gray-50/80">
-            {/* ขยายความกว้างคอลัมน์หน่วยงานให้กว้างขึ้นและมี Padding สบายตา */}
-            <th className="px-6 py-3.5 rounded-l-xl min-w-[260px] font-semibold">หน่วยงาน</th>
+            {/* ตรึงคอลัมน์แรก Header ให้ทึบแสงและอยู่ชั้นบนสุด (z-30) */}
+            <th className="sticky left-0 z-30 bg-gray-50 px-6 py-3.5 rounded-l-xl min-w-[260px] font-semibold shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
+              หน่วยงาน
+            </th>
             {monthLabels.map(m => (
               <th key={m} className="px-3 py-3.5 text-center min-w-[75px] font-semibold">{m}</th>
             ))}
@@ -68,7 +70,8 @@ export const ProductivityTable: React.FC<ProductivityTableProps> = ({ data, sele
 
               return (
                 <tr key={deptName} className="border-b border-gray-50 hover:bg-gray-50/60 transition-colors">
-                  <td className="px-6 py-3 font-medium text-gray-700">
+                  {/* ตรึงคอลัมน์แรกข้อมูล ให้มี bg-white ทึบแสงและ z-20 เพื่อบล็อกไม่ให้ตัวเลขเดือนวิ่งมาทับ */}
+                  <td className="sticky left-0 z-25 bg-white px-6 py-3 font-medium text-gray-700 shadow-[2px_0_5px_-2px_rgba(0,0,0,0.1)]">
                     <button 
                       onClick={() => onViewHistory(deptName)}
                       className="text-indigo-600 hover:text-indigo-900 hover:underline font-medium text-left focus:outline-none flex items-center gap-2"

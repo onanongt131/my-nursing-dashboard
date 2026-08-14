@@ -11,11 +11,11 @@ import { CheckCircleIcon as IconCheck, XCircleIcon as XIcon } from '@heroicons/r
 
 export const categories = [
   { id: 1, name: "หมวด 1 ผลลัพธ์ด้านการนำองค์กร", icon: "🏛️" },
-  { id: 2, name: "หมวด 2 ผลลัพธ์ด้านกลยุทธ์", icon: "🎯" },
+  { id: 2, name: "หมวด 2 ผลลัพธ์ด้านประสิทธิภาพ", icon: "🎯" },
   { id: 3, name: "หมวด 3 ผลลัพธ์ด้านผู้ใช้บริการ", icon: "👥" },
-  { id: 4, name: "หมวด 4 ผลลัพธ์ด้านการวัด", icon: "📊" },
-  { id: 5, name: "หมวด 5 ผลลัพธ์ด้านบุคลากร", icon: "👩‍⚕️" },
-  { id: 6, name: "หมวด 6 ผลลัพธ์ด้านการปฏิบัติ", icon: "📝" },
+  { id: 4, name: "หมวด 4 ผลลัพธ์ด้านบุคลากร", icon: "📊" },
+  { id: 5, name: "หมวด 5 ผลลัพธ์ด้านระบบงานและกระบวนการสำคัญ", icon: "👩‍⚕️" },
+  { id: 6, name: "หมวด 6 ผลลัพธ์ด้านบริการพยาบาล", icon: "📝" },
 ];
 
 export const strategicGoals = [

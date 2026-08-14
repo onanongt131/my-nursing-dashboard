@@ -330,51 +330,6 @@ export default function DashboardPage() {
           </table>
         </div>
       </div>
-
-      {/* --- Header & Stats Section --- */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        
-        {/* Card 1: KPI ทั้งหมด */}
-        <div className="bg-white p-8 rounded-3xl shadow-sm border border-emerald-100 flex flex-col items-center relative overflow-hidden">
-          <div className="absolute top-0 left-0 right-0 h-1 bg-emerald-600"></div>
-          <span className="text-blue-800 font-medium mb-2 text-base">KPI ทั้งหมด</span>
-          <span className="text-8xl font-black text-emerald-950">{stats.total}</span>
-        </div>
-
-        {/* Card 2: ผ่าน/ไม่ผ่าน */}
-        <div className="bg-white p-8 rounded-3xl shadow-sm border border-emerald-100 flex justify-around items-center relative overflow-hidden">
-          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-green-600 to-amber-500"></div>
-          
-          {/* ฝั่ง "ผ่าน" */}
-          <div className="flex flex-col items-center gap-1">
-            <div className="text-green-700 font-bold text-lg">ผ่าน</div>
-            <div className="flex items-center">
-              <IconCheck className="w-20 h-20 text-green-600" />
-              <span className="text-7xl font-black text-green-700 ml-2">{stats.passed}</span>
-            </div>
-          </div>
-
-          {/* เส้นคั่นกลาง */}
-          <div className="w-px h-12 bg-emerald-100"></div>
-
-          {/* ฝั่ง "ไม่ผ่าน" */}
-          <div className="flex flex-col items-center gap-1">
-            <div className="text-red-700 font-bold text-lg">ไม่ผ่าน</div>
-            <div className="flex items-center">
-              <XIcon className="w-8 h-8 text-red-600" />
-              <span className="text-3xl font-black text-red-700 ml-2">{stats.failed}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Card 3: สัดส่วนการผ่าน */}
-        <div className="bg-white p-8 rounded-3xl shadow-sm border border-emerald-100 flex flex-col items-center relative overflow-hidden">
-          <div className="absolute top-0 left-0 right-0 h-1 bg-amber-500"></div>
-          <span className="text-blue-800 font-medium mb-2 text-base">สัดส่วนการผ่าน</span>
-          <span className="text-7xl font-black text-amber-600">{stats.percent}%</span>
-        </div>
-
-      </div>
     </main>
   );
 }

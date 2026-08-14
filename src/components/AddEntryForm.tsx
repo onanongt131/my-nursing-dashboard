@@ -12,7 +12,7 @@ export default function AddEntryForm({ kpiId, type, deptId, onSuccess }: {
   const [isSaving3P, setIsSaving3P] = useState(false);
   
   const [formData, setFormData] = useState({
-    year: new Date().getFullYear().toString(),
+    year: '',
     month: '',
     numerator: '',
     denominator: '',
@@ -157,8 +157,8 @@ export default function AddEntryForm({ kpiId, type, deptId, onSuccess }: {
             <div className="grid grid-cols-2 gap-2">
               <input 
                 type="number" 
-                placeholder="ปี พ.ศ." 
-                className="border p-2 rounded-lg text-sm" 
+                placeholder="ลงปี พ.ศ. เช่น 2569" 
+                className="border p-2 rounded-lg text-sm placeholder-slate-400" 
                 value={formData.year} 
                 onChange={(e) => setFormData({...formData, year: e.target.value})} 
                 required 

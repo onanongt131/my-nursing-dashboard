@@ -4,6 +4,7 @@
 import LogoutButton from "@/components/LogoutButton";
 import { usePathname } from 'next/navigation';
 import { useState, useRef, useEffect } from 'react';
+import { createClient } from '@supabase/supabase-js'; // นำเข้า Supabase client
 
 export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [] }: any) => {
   const pathname = usePathname();
@@ -11,6 +12,58 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
   
   const [isNursingDropdownOpen, setIsNursingDropdownOpen] = useState(false);
   const nursingDropdownRef = useRef<HTMLDivElement>(null);
+  
+  const [nursingBranches, setNursingBranches] = useState<any[]>([
+    { name: 'การพยาบาลวิจัยและพัฒนาการบริการ', path: '/dashboard/nursing/branch-1' },
+    { name: 'การพยาบาลผู้ป่วยหนัก', path: '/dashboard/nursing/branch-2' },
+    { name: 'การพยาบาลผู้ป่วยอุบัติเหตุและฉุกเฉิน', path: '/dashboard/nursing/branch-3' },
+    { name: 'การพยาบาลผู้ป่วยผ่าตัด', path: '/dashboard/nursing/branch-4' },
+    { name: 'การพยาบาลผู้ป่วยอายุรกรรม', path: '/dashboard/nursing/branch-5' },
+    { name: 'การพยาบาลด้านการควบคุมและป้องกันการติดเชื้อ', path: '/dashboard/nursing/branch-6' },
+    { name: 'การพยาบาลผู้ป่วยกุมารเวชกรรม', path: '/dashboard/nursing/branch-7' },
+    { name: 'การพยาบาลผู้ป่วยโสต ศอ นาสิก จักษุ', path: '/dashboard/nursing/branch-8' },
+    { name: 'การพยาบาลตรวจรักษาพิเศษ', path: '/dashboard/nursing/branch-9' },
+    { name: 'การพยาบาลผู้ป่วยศัลยกรรม', path: '/dashboard/nursing/branch-10' },
+    { name: 'การพยาบาลผู้ป่วยสูติ–นรีเวช', path: '/dashboard/nursing/branch-11' },
+    { name: 'การพยาบาลผู้ป่วยจิตเวช', path: '/dashboard/nursing/branch-12' },
+    { name: 'การพยาบาลผู้ป่วยนอก', path: '/dashboard/nursing/branch-13' },
+    { name: 'การพยาบาลวิสัญญี', path: '/dashboard/nursing/branch-14' },
+    { name: 'การพยาบาลผู้คลอด', path: '/dashboard/nursing/branch-15' },
+    { name: 'การพยาบาลผู้ป่วยออร์โธปิดิกส์', path: '/dashboard/nursing/branch-16' },
+  ]);
+  useEffect(() => {
+    const fetchNursingBranches = async () => {
+      try {
+        const supabase = createClient(
+          process.env.NEXT_PUBLIC_SUPABASE_URL!,
+          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+        );
+
+        const { data, error } = await supabase
+          .from('nursing_departments')
+          .select('department_name, path')
+          .order('id', { ascending: true });
+
+        if (error) {
+          console.error('Error fetching nursing departments:', error);
+          return;
+        }
+
+        if (data && data.length > 0) {
+          // Map ข้อมูลให้ตรงกับโครงสร้างที่ใช้แสดงผลในเมนู
+          const formattedBranches = data.map((item: any) => ({
+            name: item.department_name,
+            path: item.path || `/dashboard/nursing/branch-${item.id}`
+          }));
+          setNursingBranches(formattedBranches);
+        }
+      } catch (err) {
+        console.error('Failed to connect supabase:', err);
+      }
+    };
+
+    fetchNursingBranches();
+  }, []);
 
   const [isKpiDropdownOpen, setIsKpiDropdownOpen] = useState(false);
   const kpiDropdownRef = useRef<HTMLDivElement>(null);
@@ -46,25 +99,6 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
     return acc;
   }, []) : [];
 
-  const nursingBranches = [
-    { name: 'การพยาบาลวิจัยและพัฒนาการบริการ', path: '/dashboard/nursing/branch' },
-    { name: 'การพยาบาลผู้ป่วยหนัก', path: '/dashboard/nursing/branch' },
-    { name: 'การพยาบาลผู้ป่วยอุบัติเหตุและฉุกเฉิน', path: '/dashboard/nursing/branch-3' },
-    { name: 'การพยาบาลผู้ป่วยผ่าตัด', path: '/dashboard/nursing/branch-4' },
-    { name: 'การพยาบาลผู้ป่วยอายุรกรรม', path: '/dashboard/nursing/branch-5' },
-    { name: 'การพยาบาลด้านการควบคุมและป้องกันการติดเชื้อ', path: '/dashboard/nursing/branch-6' },
-    { name: 'การพยาบาลผู้ป่วยกุมารเวชกรรม', path: '/dashboard/nursing/branch-7' },
-    { name: 'การพยาบาลผู้ป่วยโสต ศอ นาสิก จักษุ', path: '/dashboard/nursing/branch-8' },
-    { name: 'การพยาบาลตรวจรักษาพิเศษ', path: '/dashboard/nursing/branch-9' },
-    { name: 'การพยาบาลผู้ป่วยศัลยกรรม', path: '/dashboard/nursing/branch-10' },
-    { name: 'การพยาบาลผู้ป่วยสูติ–นรีเวช', path: '/dashboard/nursing/branch-11' },
-    { name: 'การพยาบาลผู้ป่วยจิตเวช', path: '/dashboard/nursing/branch-12' },
-    { name: 'การพยาบาลผู้ป่วยนอก', path: '/dashboard/nursing/branch-13' },
-    { name: 'การพยาบาลวิสัญญี', path: '/dashboard/nursing/branch-14' },
-    { name: 'การพยาบาลผู้คลอด', path: '/dashboard/nursing/branch-15' },
-    { name: 'การพยาบาลผู้ป่วยออร์โธปิดิกส์', path: '/dashboard/nursing/branch-16' },
-  ];
-
   const kpiSubMenus = [
     { name: 'category', label: 'KPI ตามหมวด', path: '/dashboard/category' },
     { name: 'strategy', label: 'KPI ตามแผน', path: '/dashboard/strategy' },
@@ -88,17 +122,19 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const isHomeActive = pathname === '/dashboard' || activeTab === 'dashboard';
+ // 1. เพิ่มตัวเช็คว่าตอนนี้อยู่หน้า nursing หรือไม่
+  const isHomeActive = (pathname === '/dashboard' || activeTab === 'dashboard') && !pathname.startsWith('/dashboard/nursing');
+  const isNursingActive = pathname.startsWith('/dashboard/nursing') || activeTab === 'nursing'; // เพิ่มบรรทัดนี้
   const isUnitActive = pathname.startsWith('/dashboard/departments') || activeTab === 'unit';
   const isKpiActive = pathname.startsWith('/dashboard/category') || pathname.startsWith('/dashboard/strategy') || activeTab === 'category' || activeTab === 'strategy';
   const isMonthlyActive = (pathname.startsWith('/dashboard/productivity') || pathname.startsWith('/dashboard/wp-qa') || pathname.startsWith('/dashboard/iv-care') || pathname.startsWith('/dashboard/audit-chart') || ['productivity', 'wp-qa', 'iv-care', 'audit-chart', 'Audit chart'].includes(activeTab)) && !isUnitActive;
-
   const buttonBaseClass = "w-full md:w-52 h-11 flex items-center justify-center gap-2 px-4 font-semibold text-sm md:text-base rounded-xl transition-all cursor-pointer whitespace-nowrap";
   const activeStyle = "bg-emerald-800 text-amber-300 border border-amber-400";
   const inactiveStyle = "bg-emerald-900 text-amber-100 hover:text-amber-300 hover:bg-emerald-800";
 
   return (
     <div className="bg-white shadow-sm w-full">
+      {/* Header ส่วนบน */}
       <header className="flex flex-col md:flex-row items-center justify-between px-4 sm:px-6 py-4 bg-white gap-4 border-b border-gray-100">
         <div className="flex items-center justify-between w-full md:w-auto">
           <div className="flex items-center gap-3 sm:gap-4 text-center sm:text-left">
@@ -127,23 +163,34 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
         </div>
       </header>
 
+      {/* Navigation เมนูด้านล่าง */}
       <div className={`w-full bg-emerald-900 shadow-md transition-all duration-300 ${isMobileMenuOpen ? 'block' : 'hidden'} md:block`}>
         <nav className="flex flex-col md:flex-row items-start md:items-center justify-start gap-3 px-4 sm:px-6 py-3">
           
           <button type="button" onClick={() => { onTabChange && onTabChange('dashboard'); setIsMobileMenuOpen(false); }} className={`${buttonBaseClass} ${isHomeActive ? activeStyle : inactiveStyle}`}>หน้าหลัก</button>
 
+          {/* Dropdown: การพยาบาล 16 กลุ่มงาน */}
           <div className="relative w-full md:w-auto" ref={nursingDropdownRef}>
-            <button type="button" onClick={() => setIsNursingDropdownOpen(!isNursingDropdownOpen)} className={`${buttonBaseClass} ${isNursingDropdownOpen ? activeStyle : inactiveStyle}`}>
+            <button 
+              type="button" 
+              onClick={() => setIsNursingDropdownOpen(!isNursingDropdownOpen)} 
+              className={`${buttonBaseClass} ${isNursingActive || isNursingDropdownOpen ? activeStyle : inactiveStyle}`}
+            >
               <span>การพยาบาล 16 กลุ่มงาน</span>
               <svg className={`w-4 h-4 ml-1 transition-transform ${isNursingDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
             </button>
             {isNursingDropdownOpen && (
               <div className="absolute left-0 mt-2 w-full md:w-72 bg-white rounded-xl shadow-2xl border border-amber-200 py-2 z-50 max-h-96 overflow-y-auto">
-                {nursingBranches.map((branch: any, i: number) => <a key={i} href={branch.path} onClick={() => setIsMobileMenuOpen(false)} className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-emerald-50 border-b">{branch.name}</a>)}
+                {nursingBranches.map((branch: any, i: number) => (
+                  <a key={i} href={branch.path} onClick={() => setIsMobileMenuOpen(false)} className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-emerald-50 border-b">
+                    {branch.name}
+                  </a>
+                ))}
               </div>
             )}
           </div>
 
+          {/* เมนูอื่นๆ คงเดิม */}
           <div className="relative w-full md:w-auto" ref={kpiDropdownRef}>
             <button type="button" onClick={() => setIsKpiDropdownOpen(!isKpiDropdownOpen)} className={`${buttonBaseClass} ${isKpiActive ? activeStyle : inactiveStyle}`}>
               <span>ตัวชี้วัดตามแผน</span>

@@ -102,6 +102,7 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
   const kpiSubMenus = [
     { name: 'category', label: 'KPI ตามหมวด', path: '/dashboard/category' },
     { name: 'strategy', label: 'KPI ตามแผน', path: '/dashboard/strategy' },
+    { name: 'rm', label: 'KPI RM', path: '/dashboard/rm' }, // เปลี่ยน name เป็น 'rm'
   ];
 
   const monthlySubMenus = [
@@ -197,12 +198,19 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
               <svg className={`w-4 h-4 ml-1 transition-transform ${isKpiDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
             </button>
             {isKpiDropdownOpen && (
-              <div className="absolute left-0 mt-2 w-full md:w-56 bg-white rounded-xl shadow-2xl border border-amber-200 py-2 z-50">
-                {kpiSubMenus.map((m: any) => <button key={m.name} onClick={() => { onTabChange(m.name); setIsMobileMenuOpen(false); }} className="w-full text-left px-4 py-2.5 text-sm hover:bg-emerald-50">{m.label}</button>)}
-              </div>
-            )}
+            <div className="absolute left-0 mt-2 w-full md:w-56 bg-white rounded-xl shadow-2xl border border-amber-200 py-2 z-50 flex flex-col">
+              {kpiSubMenus.map((m: any, index: number) => (
+                <button 
+                  key={`${m.name}-${index}`} 
+                  onClick={() => { onTabChange(m.name); setIsMobileMenuOpen(false); }} 
+                  className="w-full text-left px-4 py-2.5 text-sm text-gray-700 hover:bg-emerald-50 transition-colors"
+                >
+                  {m.label}
+                </button>
+              ))}
+            </div>
+          )}
           </div>
-
           <div className="relative w-full md:w-auto" ref={monthlyDropdownRef}>
             <button type="button" onClick={() => setIsMonthlyDropdownOpen(!isMonthlyDropdownOpen)} className={`${buttonBaseClass} ${isMonthlyActive ? activeStyle : inactiveStyle}`}>
               <span>ตัวชี้วัดรายเดือน</span>

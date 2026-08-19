@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { createClient } from '@/utils/supabase/client';
 
 export default function AuditChartPage() {
@@ -12,6 +12,18 @@ export default function AuditChartPage() {
   
   // State สำหรับ Modal สรุป 3 ย้อนหลัง
   const [selectedDeptModal, setSelectedDeptModal] = useState<{ id: string; name: string } | null>(null);
+
+  // State สำหรับ Modal แสดงรายละเอียด A, P, I, E และ D/C เมื่อคลิกตัวเลขรายเดือน
+  const [cellModalOpen, setCellModalOpen] = useState(false);
+  const [selectedCellDetail, setSelectedCellDetail] = useState<{
+    monthName: string;
+    deptName: string;
+    a: string;
+    p: string;
+    i: string;
+    e: string;
+    dc: string;
+  } | null>(null);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -40,22 +52,35 @@ export default function AuditChartPage() {
       }
     };
     fetchData();
+
+    const channel = supabase
+      .channel('public:audit_chart_data')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'audit_chart_data' },
+        () => {
+          fetchData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [supabase]);
 
   // ปรับการ Map ให้แปลง id เป็น String ทั้งสองฝั่ง ป้องกันปัญหาชนิดข้อมูลไม่ตรงกัน
   const departmentMapName = useMemo(() => {
     const map: { [key: string]: string } = {};
     departments.forEach((dept) => {
-      // แปลง id ของตาราง departments เป็น String เพื่อให้ตรงกับ department_id (ที่เป็น text)
-      const deptId = String(dept.id);
-      // ดึงค่าจากคอลัมน์ Department (ตัว D ใหญ่ตามภาพโครงสร้างฐานข้อมูลของคุณ)
-      const deptName = dept.Department || dept.department_name || `หน่วยงาน ${deptId}`;
+      const deptId = String(dept.id !== undefined ? dept.id : dept.department_id);
+      const deptName = dept.Department || dept.name || dept.department_name || dept.title || `หน่วยงาน ${deptId}`;
       map[deptId] = deptName;
     });
     return map;
   }, [departments]);
 
-  // ฟังก์ชันแปลงชื่อหน่วยงานสำหรับปี 2567 และ 2568 (ตามรูปแบบภาพที่ 1)
+  // ฟังก์ชันแปลงชื่อหน่วยงานสำหรับปี 2566, 2567 และ 2568
   const getMappedDepartmentName = (originalName: string, year: number | string) => {
     const numericYear = Number(year);
     if (numericYear === 2566 || numericYear === 2567 || numericYear === 2568) {
@@ -81,10 +106,10 @@ export default function AuditChartPage() {
       return { A: '0.00', P: '0.00', I: '0.00', E: '0.00', totalAPIE: '0.00' };
     }
 
-    const sumA = filteredDataByYear.reduce((acc, curr) => acc + Number(curr.A || curr.a || 0), 0);
-    const sumP = filteredDataByYear.reduce((acc, curr) => acc + Number(curr.P || curr.p || 0), 0);
-    const sumI = filteredDataByYear.reduce((acc, curr) => acc + Number(curr.I || curr.i || 0), 0);
-    const sumE = filteredDataByYear.reduce((acc, curr) => acc + Number(curr.E || curr.e || 0), 0);
+    const sumA = filteredDataByYear.reduce((acc, curr) => acc + Number(curr.a || curr.A || 0), 0);
+    const sumP = filteredDataByYear.reduce((acc, curr) => acc + Number(curr.p || curr.P || 0), 0);
+    const sumI = filteredDataByYear.reduce((acc, curr) => acc + Number(curr.i || curr.I || 0), 0);
+    const sumE = filteredDataByYear.reduce((acc, curr) => acc + Number(curr.e || curr.E || 0), 0);
     const totalEntries = filteredDataByYear.length;
 
     const pctA = totalEntries > 0 ? (sumA / (totalEntries * 220)) * 100 : 0;
@@ -137,14 +162,14 @@ export default function AuditChartPage() {
       const deptName = getMappedDepartmentName(rawDeptName, selectedYear);
       const month = String(item.month || '');
       
-      const aVal = Number(item.a || 0);
-      const pVal = Number(item.p || 0);
-      const iVal = Number(item.i || 0);
-      const eVal = Number(item.e || 0);
+      const aVal = Number(item.a || item.A || 0);
+      const pVal = Number(item.p || item.P || 0);
+      const iVal = Number(item.i || item.I || 0);
+      const eVal = Number(item.e || item.E || 0);
       
       const sumAPIE = aVal + pVal + iVal + eVal;
       const totalAPIEVal = Number(item.total_apie || 0);
-      const calculatedValue = totalAPIEVal !== 0 ? (sumAPIE / totalAPIEVal) * 100 : 0;
+      const calculatedValue = totalAPIEVal !== 0 ? (sumAPIE / totalAPIEVal) * 100 : (sumAPIE > 0 ? (sumAPIE / 4) : 0);
 
       if (!departmentMap[deptId]) {
         departmentMap[deptId] = {
@@ -202,10 +227,10 @@ export default function AuditChartPage() {
 
       let sumA = 0, sumP = 0, sumI = 0, sumE = 0, cnt = yearRows.length;
       yearRows.forEach(item => {
-        sumA += Number(item.a || 0);
-        sumP += Number(item.p || 0);
-        sumI += Number(item.i || 0);
-        sumE += Number(item.e || 0);
+        sumA += Number(item.a || item.A || 0);
+        sumP += Number(item.p || item.P || 0);
+        sumI += Number(item.i || item.I || 0);
+        sumE += Number(item.e || item.E || 0);
       });
 
       const pctA = (sumA / (cnt * 220)) * 100;
@@ -225,6 +250,39 @@ export default function AuditChartPage() {
     });
   }, [selectedDeptModal, data]);
 
+  const handleCellClick = async (deptId: string, deptName: string, monthCode: string, monthLabel: string) => {
+    const targetRow = data.find(
+      item => String(item.department_id) === deptId && 
+              String(item.fiscal_year) === selectedYear && 
+              String(item.month) === monthCode
+    );
+
+    if (targetRow) {
+      const rawA = Number(targetRow.a || targetRow.A || 0);
+      const rawP = Number(targetRow.p || targetRow.P || 0);
+      const rawI = Number(targetRow.i || targetRow.I || 0);
+      const rawE = Number(targetRow.e || targetRow.E || 0);
+      const rawDC = Number(targetRow.d_c || targetRow.dc || 0);
+
+      // คำนวณเป็นเปอร์เซ็นต์ตามสัดส่วนมาตรฐาน
+      const pctA = ((rawA / 220) * 100).toFixed(1);
+      const pctP = ((rawP / 200) * 100).toFixed(1);
+      const pctI = ((rawI / 120) * 100).toFixed(1);
+      const pctE = ((rawE / 120) * 100).toFixed(1);
+
+      setSelectedCellDetail({
+        monthName: monthLabel,
+        deptName,
+        a: `${pctA}%`,
+        p: `${pctP}%`,
+        i: `${pctI}%`,
+        e: `${pctE}%`,
+        dc: String(rawDC),
+      });
+      setCellModalOpen(true);
+    }
+  };
+  
   if (loading) return <div className="p-6 text-center text-gray-500">กำลังโหลดข้อมูล Audit Chart...</div>;
 
   return (
@@ -240,31 +298,32 @@ export default function AuditChartPage() {
             className="border p-2 rounded-lg font-medium text-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
           >
             {fiscalYears.map((year) => (
-              <option key={year} value={year}>ปีงบประมาณ{year}</option>
+              <option key={year} value={year}>ปีงบประมาณ {year}</option>
             ))}
           </select>
         </div>
       </div>
     
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-4 bg-indigo-50 p-5 rounded-xl border border-indigo-100 shadow-sm">
-        <div className="bg-white p-4 rounded-lg shadow-sm text-center">
-          <p className="text-xl font-medium text-gray-500">A</p>
-          <p className="text-2xl font-bold text-indigo-600">{summaryStats.A}</p>
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 bg-indigo-50/60 p-3.5 rounded-xl border border-indigo-100 shadow-xs">
+        <div className="bg-white p-3 rounded-lg shadow-2xs text-center flex items-center justify-center gap-2">
+          <span className="text-xl font-semibold text-gray-400">A =</span>
+          <span className="text-2xl font-bold text-indigo-600">{summaryStats.A}</span>
         </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm text-center">
-          <p className="text-xl font-medium text-gray-500">P</p>
-          <p className="text-2xl font-bold text-indigo-600">{summaryStats.P}</p>
+        <div className="bg-white p-3 rounded-lg shadow-2xs text-center flex items-center justify-center gap-2">
+          <span className="text-xl font-semibold text-gray-400">P =</span>
+          <span className="text-2xl font-bold text-indigo-600">{summaryStats.P}</span>
         </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm text-center">
-          <p className="text-xl font-medium text-gray-500">I</p>
-          <p className="text-2xl font-bold text-indigo-600">{summaryStats.I}</p>
+        <div className="bg-white p-3 rounded-lg shadow-2xs text-center flex items-center justify-center gap-2">
+          <span className="text-xl font-semibold text-gray-400">I =</span>
+          <span className="text-2xl font-bold text-indigo-600">{summaryStats.I}</span>
         </div>
-        <div className="bg-white p-4 rounded-lg shadow-sm text-center">
-          <p className="text-xl font-medium text-gray-500">E</p>
-          <p className="text-2xl font-bold text-indigo-600">{summaryStats.E}</p>
+        <div className="bg-white p-3 rounded-lg shadow-2xs text-center flex items-center justify-center gap-2">
+          <span className="text-xl font-semibold text-gray-400">E =</span>
+          <span className="text-2xl font-bold text-indigo-600">{summaryStats.E}</span>
         </div>
-        <div className="bg-indigo-600 text-white p-4 rounded-lg shadow-sm col-span-2 md:col-span-1 flex flex-col items-center justify-center min-h-[90px]">
-          <p className="text-3xl font-extrabold">{summaryStats.totalAPIE}%</p>
+        <div className="bg-indigo-600 text-white p-3 rounded-lg shadow-2xs col-span-2 md:col-span-1 flex items-center justify-center gap-2">
+          <span className="text-xl font-medium text-indigo-200">เฉลี่ยรวม =</span>
+          <span className="text-2xl font-extrabold">{summaryStats.totalAPIE}%</span>
         </div>
       </div>
 
@@ -314,15 +373,16 @@ export default function AuditChartPage() {
                       return (
                         <td key={m.code} className="px-1.5 py-3.5 border-r border-gray-100 text-center">
                           {numVal !== undefined && numVal !== null ? (
-                            <span
-                              className={`inline-block px-1.5 py-0.5 rounded text-xs font-semibold ${
+                            <button
+                              onClick={() => handleCellClick(row.departmentId, row.departmentName, m.code, m.label)}
+                              className={`inline-block px-1.5 py-0.5 rounded text-xs font-semibold cursor-pointer hover:scale-105 transition-transform ${
                                 isLow
                                   ? 'bg-red-50 text-red-600 border border-red-200'
                                   : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                               }`}
                             >
                               {numVal.toFixed(1)}
-                            </span>
+                            </button>
                           ) : (
                             <span className="text-gray-300 text-xs">-</span>
                           )}
@@ -369,6 +429,58 @@ export default function AuditChartPage() {
         </table>
       </div>
 
+      {/* Modal แสดงรายละเอียด A, P, I, E และ D/C เมื่อคลิกตัวเลขรายเดือน */}
+      {cellModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden border border-gray-100">
+            <div className="bg-indigo-600 px-6 py-4 flex justify-between items-center text-white">
+              <div>
+                <h3 className="font-bold text-base">รายละเอียด Audit Chart แยกตามหัวข้อ</h3>
+                <p className="text-xs text-indigo-100 opacity-90">{selectedCellDetail?.deptName} (เดือน {selectedCellDetail?.monthName} ปี {selectedYear})</p>
+              </div>
+              <button 
+                onClick={() => setCellModalOpen(false)}
+                className="bg-indigo-700/60 hover:bg-indigo-700 text-white rounded-full p-1.5 w-7 h-7 flex items-center justify-center cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-3">
+              <div className="flex justify-between items-center bg-gray-50 p-3.5 rounded-xl border border-gray-200">
+                <span className="font-semibold text-gray-700 text-sm">A (Assessment)</span>
+                <span className="font-extrabold text-indigo-600 text-base">{selectedCellDetail?.a}</span>
+              </div>
+              <div className="flex justify-between items-center bg-gray-50 p-3.5 rounded-xl border border-gray-200">
+                <span className="font-semibold text-gray-700 text-sm">P (Planning)</span>
+                <span className="font-extrabold text-indigo-600 text-base">{selectedCellDetail?.p}</span>
+              </div>
+              <div className="flex justify-between items-center bg-gray-50 p-3.5 rounded-xl border border-gray-200">
+                <span className="font-semibold text-gray-700 text-sm">I (Implementation)</span>
+                <span className="font-extrabold text-indigo-600 text-base">{selectedCellDetail?.i}</span>
+              </div>
+              <div className="flex justify-between items-center bg-gray-50 p-3.5 rounded-xl border border-gray-200">
+                <span className="font-semibold text-gray-700 text-sm">E (Evaluation)</span>
+                <span className="font-extrabold text-indigo-600 text-base">{selectedCellDetail?.e}</span>
+              </div>
+              <div className="flex justify-between items-center bg-emerald-50/50 p-3.5 rounded-xl border border-emerald-200">
+                <span className="font-semibold text-emerald-800 text-sm">บันทึกจำหน่าย (D/C)</span>
+                <span className="font-extrabold text-emerald-700 text-base">{selectedCellDetail?.dc}</span>
+              </div>
+            </div>
+
+            <div className="bg-gray-50 px-6 py-3 flex justify-end border-t border-gray-100">
+              <button
+                onClick={() => setCellModalOpen(false)}
+                className="bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold px-4 py-2 rounded-xl text-sm cursor-pointer"
+              >
+                ปิดหน้าต่าง
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Modal สรุป 3 ปีย้อนหลัง */}
       {selectedDeptModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
@@ -379,7 +491,7 @@ export default function AuditChartPage() {
               </h3>
               <button 
                 onClick={() => setSelectedDeptModal(null)}
-                className="text-gray-400 hover:text-gray-600 text-xl font-bold px-2"
+                className="text-gray-400 hover:text-gray-600 text-xl font-bold px-2 cursor-pointer"
               >
                 &times;
               </button>
@@ -415,7 +527,7 @@ export default function AuditChartPage() {
             <div className="flex justify-end pt-2">
               <button
                 onClick={() => setSelectedDeptModal(null)}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors"
+                className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-medium hover:bg-indigo-700 transition-colors cursor-pointer"
               >
                 ปิดหน้าต่าง
               </button>

@@ -30,6 +30,28 @@ export default function IvCarePage() {
   const [historicalData, setHistoricalData] = useState<any[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
 
+  // State สำหรับ Modal แยกตามระดับ Phlebitis (ระดับ 1, 2, 3 ขึ้นไป)
+  const [phlebModalOpen, setPhlebModalOpen] = useState(false);
+  const [selectedPhlebDetail, setSelectedPhlebDetail] = useState<{
+    monthName: string;
+    deptName: string;
+    lvl1: string;
+    lvl2: string;
+    lvl3up: string;
+  } | null>(null);
+
+  // State สำหรับ Modal แยกตามระดับ Extravasation / Infiltration ทั้ง 4 ระดับ
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const [selectedCellDetail, setSelectedCellDetail] = useState<{
+    title: string;
+    monthName: string;
+    deptName: string;
+    lvl1: string;
+    lvl2: string;
+    lvl3: string;
+    lvl4: string;
+  } | null>(null);
+
   useEffect(() => {
     fetchDepartmentsAndData();
 
@@ -262,6 +284,58 @@ export default function IvCarePage() {
     setLoadingHistory(false);
   };
 
+  const handleCellClick = async (deptId: number, deptName: string, monthId: number, monthName: string) => {
+    if (activeSubTab === 'success') return;
+
+    setLoadingHistory(true);
+
+    const { data, error } = await supabase
+      .from('iv_care_data')
+      .select('*')
+      .eq('department_id', deptId)
+      .eq('fiscal_year', selectedYear)
+      .eq('month', monthId)
+      .single();
+
+    if (!error && data) {
+      const ivPos = Number(data.iv_position) || 0;
+
+      if (activeSubTab === 'phlebitis') {
+        const p1 = Number(data.phlebitis_1) || 0;
+        const p2 = Number(data.phlebitis_2) || 0;
+        const p3 = Number(data.phlebitis_3) || 0;
+        const p4 = Number(data.phlebitis_4) || 0;
+
+        setSelectedPhlebDetail({
+          monthName,
+          deptName,
+          lvl1: ivPos > 0 ? ((p1 / ivPos) * 100).toFixed(2) : '0.00',
+          lvl2: ivPos > 0 ? ((p2 / ivPos) * 100).toFixed(2) : '0.00',
+          lvl3up: ivPos > 0 ? (((p3 + p4) / ivPos) * 100).toFixed(2) : '0.00',
+        });
+        setPhlebModalOpen(true);
+      } else if (activeSubTab === 'extravasation' || activeSubTab === 'infiltration') {
+        const prefix = activeSubTab === 'extravasation' ? 'extravasation' : 'infiltration';
+        const v1 = Number(data[`${prefix}_1`]) || 0;
+        const v2 = Number(data[`${prefix}_2`]) || 0;
+        const v3 = Number(data[`${prefix}_3`]) || 0;
+        const v4 = Number(data[`${prefix}_4`]) || 0;
+
+        setSelectedCellDetail({
+          title: activeSubTab === 'extravasation' ? 'Extravasation' : 'Infiltration',
+          monthName,
+          deptName,
+          lvl1: ivPos > 0 ? ((v1 / ivPos) * 100).toFixed(2) : '0.00',
+          lvl2: ivPos > 0 ? ((v2 / ivPos) * 100).toFixed(2) : '0.00',
+          lvl3: ivPos > 0 ? ((v3 / ivPos) * 100).toFixed(2) : '0.00',
+          lvl4: ivPos > 0 ? ((v4 / ivPos) * 100).toFixed(2) : '0.00',
+        });
+        setDetailModalOpen(true);
+      }
+    }
+    setLoadingHistory(false);
+  };
+
   return (
     <div className="p-6 bg-gradient-to-br from-slate-50 to-blue-50/40 min-h-screen rounded-3xl shadow-xs border border-gray-100/80 m-4">
       {/* ส่วนหัวข้อและตัวเลือกปีงบประมาณ */}
@@ -284,7 +358,7 @@ export default function IvCarePage() {
         </div>
       </div>
 
-      {/* เมนูแท็บการ์ดด้านบน ดีไซน์แบบแบ่ง 2 ฝั่ง ซ้าย-ขวา */}
+      {/* เมนูแท็บการ์ดด้านบน */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         {[
           { key: 'success', label: 'ความสำเร็จของการให้สารน้ำ', stat: `${summaryStats.success}%` },
@@ -303,17 +377,12 @@ export default function IvCarePage() {
                   : 'bg-white text-gray-700 border border-gray-200/80 hover:border-blue-300 hover:shadow-sm'
               }`}
             >
-              {/* ฝั่งซ้าย: ชื่อหัวข้อ */}
               <div className="w-1/2 pr-3">
                 <span className={`text-base font-extrabold tracking-tight leading-snug block ${isActive ? 'text-white' : 'text-gray-800'}`}>
                   {tab.label}
                 </span>
               </div>
-
-              {/* เส้นคั่นกลาง */}
               <div className={`h-12 w-[1px] ${isActive ? 'bg-blue-400/40' : 'bg-gray-200'}`}></div>
-
-              {/* ฝั่งขวา: คำว่าภาพรวม และ ตัวเลขเปอร์เซ็นต์ */}
               <div className="w-1/2 pl-3 flex flex-col items-end text-right">
                 <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full mb-1 ${
                   isActive ? 'bg-blue-800/80 text-blue-200' : 'bg-gray-100 text-gray-600'
@@ -352,13 +421,9 @@ export default function IvCarePage() {
                 let avgColorClass = "text-blue-700";
                 
                 if (activeSubTab === 'success') {
-                  if (avgNum < 80) {
-                    avgColorClass = "text-red-600";
-                  }
+                  if (avgNum < 80) avgColorClass = "text-red-600";
                 } else {
-                  if (avgNum > 0) {
-                    avgColorClass = "text-red-600";
-                  }
+                  if (avgNum > 0) avgColorClass = "text-red-600";
                 }
 
                 return (
@@ -394,9 +459,21 @@ export default function IvCarePage() {
                         }
                       }
 
+                      const isClickable = activeSubTab !== 'success';
+
                       return (
                         <td key={m.id} className="px-2 py-3 text-sm text-center border-r border-gray-200">
-                          <span className={badgeClass}>{displayText}</span>
+                          {isClickable && val !== null && val !== undefined ? (
+                            <button
+                              onClick={() => handleCellClick(row.department_id, row.department_name, m.id, m.name)}
+                              className={`${badgeClass} cursor-pointer hover:scale-105 transition-transform`}
+                              title="คลิกเพื่อดูรายละเอียดรายระดับ"
+                            >
+                              {displayText}
+                            </button>
+                          ) : (
+                            <span className={badgeClass}>{displayText}</span>
+                          )}
                         </td>
                       );
                     })}
@@ -411,7 +488,7 @@ export default function IvCarePage() {
         </table>
       </div>
 
-      {/* Modal แสดงผลประวัติย้อนหลังรายปีเมื่อคลิกชื่อหน่วยงาน */}
+      {/* Modal ประวัติย้อนหลังรายปี */}
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden border border-gray-100 animate-in fade-in zoom-in-95 duration-150">
@@ -457,6 +534,110 @@ export default function IvCarePage() {
               <button
                 onClick={() => setModalOpen(false)}
                 className="bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold px-5 py-2 rounded-xl text-sm transition-colors cursor-pointer"
+              >
+                ปิดหน้าต่าง
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal แสดงรายละเอียด Phlebitis (ระดับ 1, 2, 3 ขึ้นไป) */}
+      {phlebModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden border border-gray-100">
+            <div className="bg-blue-600 px-6 py-4 flex justify-between items-center text-white">
+              <div>
+                <h3 className="font-bold text-base">รายละเอียด Phlebitis แยกตามระดับ</h3>
+                <p className="text-xs text-blue-100 opacity-90">{selectedPhlebDetail?.deptName} (เดือน {selectedPhlebDetail?.monthName} ปี {selectedYear})</p>
+              </div>
+              <button 
+                onClick={() => setPhlebModalOpen(false)}
+                className="bg-blue-700/60 hover:bg-blue-700 text-white rounded-full p-1.5 w-7 h-7 flex items-center justify-center cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="p-6">
+              {loadingHistory ? (
+                <div className="py-8 text-center text-gray-500 font-medium">กำลังโหลดข้อมูล...</div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center bg-gray-50 p-3.5 rounded-xl border border-gray-200/80">
+                    <span className="font-semibold text-gray-700 text-sm">อัตราการเกิด phlebitis ระดับ 1</span>
+                    <span className="font-extrabold text-blue-600 text-base">{selectedPhlebDetail?.lvl1}%</span>
+                  </div>
+                  <div className="flex justify-between items-center bg-gray-50 p-3.5 rounded-xl border border-gray-200/80">
+                    <span className="font-semibold text-gray-700 text-sm">อัตราการเกิด phlebitis ระดับ 2</span>
+                    <span className="font-extrabold text-blue-600 text-base">{selectedPhlebDetail?.lvl2}%</span>
+                  </div>
+                  <div className="flex justify-between items-center bg-red-50/50 p-3.5 rounded-xl border border-red-100">
+                    <span className="font-semibold text-red-700 text-sm">อัตราการเกิด phlebitis ระดับ 3 ขึ้นไป</span>
+                    <span className="font-extrabold text-red-600 text-base">{selectedPhlebDetail?.lvl3up}%</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="bg-gray-50 px-6 py-3 flex justify-end border-t border-gray-100">
+              <button
+                onClick={() => setPhlebModalOpen(false)}
+                className="bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold px-4 py-2 rounded-xl text-sm cursor-pointer"
+              >
+                ปิดหน้าต่าง
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal แสดงรายละเอียด Extravasation / Infiltration ทั้ง 4 ระดับ */}
+      {detailModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden border border-gray-100">
+            <div className="bg-blue-600 px-6 py-4 flex justify-between items-center text-white">
+              <div>
+                <h3 className="font-bold text-base">รายละเอียด {selectedCellDetail?.title} แยกตามระดับ</h3>
+                <p className="text-xs text-blue-100 opacity-90">{selectedCellDetail?.deptName} (เดือน {selectedCellDetail?.monthName} ปี {selectedYear})</p>
+              </div>
+              <button 
+                onClick={() => setDetailModalOpen(false)}
+                className="bg-blue-700/60 hover:bg-blue-700 text-white rounded-full p-1.5 w-7 h-7 flex items-center justify-center cursor-pointer"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="p-6">
+              {loadingHistory ? (
+                <div className="py-8 text-center text-gray-500 font-medium">กำลังโหลดข้อมูล...</div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center bg-gray-50 p-3 rounded-xl border border-gray-200/80">
+                    <span className="font-semibold text-gray-700 text-sm">อัตราการเกิด {selectedCellDetail?.title} ระดับ 1</span>
+                    <span className="font-extrabold text-blue-600 text-base">{selectedCellDetail?.lvl1}%</span>
+                  </div>
+                  <div className="flex justify-between items-center bg-gray-50 p-3 rounded-xl border border-gray-200/80">
+                    <span className="font-semibold text-gray-700 text-sm">อัตราการเกิด {selectedCellDetail?.title} ระดับ 2</span>
+                    <span className="font-extrabold text-blue-600 text-base">{selectedCellDetail?.lvl2}%</span>
+                  </div>
+                  <div className="flex justify-between items-center bg-gray-50 p-3 rounded-xl border border-gray-200/80">
+                    <span className="font-semibold text-gray-700 text-sm">อัตราการเกิด {selectedCellDetail?.title} ระดับ 3</span>
+                    <span className="font-extrabold text-red-600 text-base">{selectedCellDetail?.lvl3}%</span>
+                  </div>
+                  <div className="flex justify-between items-center bg-red-50/50 p-3 rounded-xl border border-red-100">
+                    <span className="font-semibold text-red-700 text-sm">อัตราการเกิด {selectedCellDetail?.title} ระดับ 4</span>
+                    <span className="font-extrabold text-red-600 text-base">{selectedCellDetail?.lvl4}%</span>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="bg-gray-50 px-6 py-3 flex justify-end border-t border-gray-100">
+              <button
+                onClick={() => setDetailModalOpen(false)}
+                className="bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold px-4 py-2 rounded-xl text-sm cursor-pointer"
               >
                 ปิดหน้าต่าง
               </button>

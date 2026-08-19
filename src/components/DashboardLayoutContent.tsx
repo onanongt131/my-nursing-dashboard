@@ -30,6 +30,7 @@ export default function DashboardLayoutContent({ profile, departments = [], chil
     if (pathname.startsWith('/dashboard/wp-qa')) return 'wp-qa';
     if (pathname.startsWith('/dashboard/audit-chart')) return 'audit-chart';
     if (pathname.startsWith('/dashboard/iv-care')) return 'iv-care';
+    if (pathname.startsWith('/dashboard/rm')) return 'rm'; // <--- เพิ่มตรงนี้เพื่อให้จำแนกหน้า RM ได้
     return 'dashboard';
   };
 
@@ -44,12 +45,14 @@ export default function DashboardLayoutContent({ profile, departments = [], chil
       productivity: '/dashboard/productivity',
       'wp-qa': '/dashboard/wp-qa',
       'audit-chart': '/dashboard/audit-chart',
-      'iv-care': '/dashboard/iv-care' 
+      'iv-care': '/dashboard/iv-care',
+      rm: '/dashboard/rm' // <--- เพิ่มตรงนี้เพื่อให้กดแล้วสั่ง router.push ไปที่ /dashboard/rm
     };
     
     const targetPath = paths[tabName] || '/dashboard';
     router.push(targetPath);
   };
+    
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-6">

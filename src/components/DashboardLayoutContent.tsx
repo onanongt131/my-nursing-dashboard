@@ -30,7 +30,7 @@ export default function DashboardLayoutContent({ profile, departments = [], chil
     if (pathname.startsWith('/dashboard/wp-qa')) return 'wp-qa';
     if (pathname.startsWith('/dashboard/audit-chart')) return 'audit-chart';
     if (pathname.startsWith('/dashboard/iv-care')) return 'iv-care';
-    if (pathname.startsWith('/dashboard/rm')) return 'rm'; // <--- เพิ่มตรงนี้เพื่อให้จำแนกหน้า RM ได้
+    if (pathname.startsWith('/dashboard/rm')) return 'rm';
     return 'dashboard';
   };
 
@@ -46,7 +46,7 @@ export default function DashboardLayoutContent({ profile, departments = [], chil
       'wp-qa': '/dashboard/wp-qa',
       'audit-chart': '/dashboard/audit-chart',
       'iv-care': '/dashboard/iv-care',
-      rm: '/dashboard/rm' // <--- เพิ่มตรงนี้เพื่อให้กดแล้วสั่ง router.push ไปที่ /dashboard/rm
+      rm: '/dashboard/rm'
     };
     
     const targetPath = paths[tabName] || '/dashboard';
@@ -56,21 +56,15 @@ export default function DashboardLayoutContent({ profile, departments = [], chil
 
   return (
     <div className="min-h-screen bg-gray-50 p-4 md:p-6">
-      {profile && (
-        <div className="mb-4 text-xs text-gray-500 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-          <span>ผู้ใช้งาน: <strong className="text-gray-700">{profile.full_name}</strong></span>
-          <span className="bg-indigo-50 text-indigo-700 px-2 py-1 rounded font-medium uppercase">
-            สิทธิ์: {profile.role} {profile.group ? `(${profile.group})` : ''}
-          </span>
-        </div>
-      )}
+      
 
       <div className="w-full bg-white rounded-2xl shadow-sm border border-gray-100">
         <DashboardHeader 
           title="กลุ่มภารกิจด้านการพยาบาล" 
           activeTab={activeTab}
           onTabChange={handleTabChange}
-          departments={departments} // ส่งรายการ departments เข้าไปที่ Header เพื่อให้เลือกเมนูหน่วยงานได้ถูกต้อง
+          departments={departments}
+          userName={profile?.full_name}
         />
       </div>
       

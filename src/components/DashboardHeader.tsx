@@ -1,14 +1,16 @@
-// components/DashboardHeader.tsx
 'use client';
 
 import LogoutButton from "@/components/LogoutButton";
 import { usePathname } from 'next/navigation';
 import { useState, useRef, useEffect } from 'react';
-import { createClient } from '@supabase/supabase-js'; // นำเข้า Supabase client
+import { createClient } from '@/utils/supabase/client';
 
-export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [] }: any) => {
+export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [], userName, userRole, userGroup }: any) => {
+  const supabase = createClient();
   const pathname = usePathname();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  
+  const displayUserName = userName || "ผู้ใช้งานระบบ";
   
   const [isNursingDropdownOpen, setIsNursingDropdownOpen] = useState(false);
   const nursingDropdownRef = useRef<HTMLDivElement>(null);
@@ -31,26 +33,16 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
     { name: 'การพยาบาลผู้คลอด', path: '/dashboard/nursing/branch-15' },
     { name: 'การพยาบาลผู้ป่วยออร์โธปิดิกส์', path: '/dashboard/nursing/branch-16' },
   ]);
+
   useEffect(() => {
     const fetchNursingBranches = async () => {
       try {
-        const supabase = createClient(
-          process.env.NEXT_PUBLIC_SUPABASE_URL!,
-          process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-        );
-
         const { data, error } = await supabase
           .from('nursing_departments')
           .select('department_name, path')
           .order('id', { ascending: true });
 
-        if (error) {
-          console.error('Error fetching nursing departments:', error);
-          return;
-        }
-
-        if (data && data.length > 0) {
-          // Map ข้อมูลให้ตรงกับโครงสร้างที่ใช้แสดงผลในเมนู
+        if (!error && data && data.length > 0) {
           const formattedBranches = data.map((item: any) => ({
             name: item.department_name,
             path: item.path || `/dashboard/nursing/branch-${item.id}`
@@ -58,12 +50,12 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
           setNursingBranches(formattedBranches);
         }
       } catch (err) {
-        console.error('Failed to connect supabase:', err);
+        console.error('Failed to fetch nursing branches:', err);
       }
     };
 
     fetchNursingBranches();
-  }, []);
+  }, [supabase]);
 
   const [isKpiDropdownOpen, setIsKpiDropdownOpen] = useState(false);
   const kpiDropdownRef = useRef<HTMLDivElement>(null);
@@ -102,7 +94,7 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
   const kpiSubMenus = [
     { name: 'category', label: 'KPI ตามหมวด', path: '/dashboard/category' },
     { name: 'strategy', label: 'KPI ตามแผน', path: '/dashboard/strategy' },
-    { name: 'rm', label: 'KPI RM', path: '/dashboard/rm' }, // เปลี่ยน name เป็น 'rm'
+    { name: 'rm', label: 'KPI RM', path: '/dashboard/rm' },
   ];
 
   const monthlySubMenus = [
@@ -123,9 +115,8 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
- // 1. เพิ่มตัวเช็คว่าตอนนี้อยู่หน้า nursing หรือไม่
   const isHomeActive = (pathname === '/dashboard' || activeTab === 'dashboard') && !pathname.startsWith('/dashboard/nursing');
-  const isNursingActive = pathname.startsWith('/dashboard/nursing') || activeTab === 'nursing'; // เพิ่มบรรทัดนี้
+  const isNursingActive = pathname.startsWith('/dashboard/nursing') || activeTab === 'nursing';
   const isUnitActive = pathname.startsWith('/dashboard/departments') || activeTab === 'unit';
   const isKpiActive = pathname.startsWith('/dashboard/category') || pathname.startsWith('/dashboard/strategy') || activeTab === 'category' || activeTab === 'strategy';
   const isMonthlyActive = (pathname.startsWith('/dashboard/productivity') || pathname.startsWith('/dashboard/wp-qa') || pathname.startsWith('/dashboard/iv-care') || pathname.startsWith('/dashboard/audit-chart') || ['productivity', 'wp-qa', 'iv-care', 'audit-chart', 'Audit chart'].includes(activeTab)) && !isUnitActive;
@@ -134,20 +125,19 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
   const inactiveStyle = "bg-emerald-900 text-amber-100 hover:text-amber-300 hover:bg-emerald-800";
 
   return (
-    <div className="bg-white shadow-sm w-full">
-      {/* Header ส่วนบน */}
+    <div className="bg-white shadow-sm w-full rounded-2xl overflow-visible border border-emerald-100">
+      {/* Header ส่วนบน (แสดงโลโก้ ชื่อระบบ และชื่อผู้ใช้ + สิทธิ์) */}
       <header className="flex flex-col md:flex-row items-center justify-between px-4 sm:px-6 py-4 bg-white gap-4 border-b border-gray-100">
         <div className="flex items-center justify-between w-full md:w-auto">
           <div className="flex items-center gap-3 sm:gap-4 text-center sm:text-left">
             <img src="/Logo-NSO.png" alt="Logo" className="h-12 w-12 sm:h-14 sm:w-14 object-contain flex-shrink-0" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
-            <h1 className="text-lg sm:text-2xl md:text-3xl font-bold text-gray-800 leading-snug">{title || "กลุ่มภารกิจด้านการพยาบาล โรงพยาบาลวชิระภูเก็ต"}</h1>
+            <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-800 leading-snug">{title || "กลุ่มภารกิจด้านการพยาบาล"}</h1>
           </div>
           
           <button 
             type="button" 
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} 
             className="md:hidden p-2 rounded-lg bg-emerald-900 text-amber-300 hover:bg-emerald-800 focus:outline-none flex-shrink-0 ml-2"
-            aria-label="Toggle Menu"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               {isMobileMenuOpen ? (
@@ -159,12 +149,28 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
           </button>
         </div>
 
-        <div className="hidden md:block">
+        {/* ส่วนแสดงชื่อ Login และ Badge สิทธิ์ (Desktop View) */}
+        <div className="hidden md:flex items-center gap-3">
+          <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-200">
+            <span className="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
+              <svg className="w-4 h-4 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+              <span>{displayUserName}</span>
+            </span>
+
+            {/* แสดงสิทธิ์ต่อท้ายชื่อ */}
+            {userRole && (
+              <span className="text-xs bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-md font-bold uppercase border border-indigo-100">
+                {userRole} {userGroup ? `(${userGroup})` : ''}
+              </span>
+            )}
+          </div>
           <LogoutButton />
         </div>
       </header>
 
-      {/* Navigation เมนูด้านล่าง */}
+      {/* Navigation เมนูด้านล่าง (ที่เคยหายไป กลับมาแล้ว) */}
       <div className={`w-full bg-emerald-900 shadow-md transition-all duration-300 ${isMobileMenuOpen ? 'block' : 'hidden'} md:block`}>
         <nav className="flex flex-col md:flex-row items-start md:items-center justify-start gap-3 px-4 sm:px-6 py-3">
           
@@ -191,7 +197,7 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
             )}
           </div>
 
-          {/* เมนูอื่นๆ คงเดิม */}
+          {/* Dropdown: ตัวชี้วัดตามแผน */}
           <div className="relative w-full md:w-auto" ref={kpiDropdownRef}>
             <button type="button" onClick={() => setIsKpiDropdownOpen(!isKpiDropdownOpen)} className={`${buttonBaseClass} ${isKpiActive ? activeStyle : inactiveStyle}`}>
               <span>ตัวชี้วัดตามแผน</span>
@@ -211,6 +217,8 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
             </div>
           )}
           </div>
+
+          {/* Dropdown: ตัวชี้วัดรายเดือน */}
           <div className="relative w-full md:w-auto" ref={monthlyDropdownRef}>
             <button type="button" onClick={() => setIsMonthlyDropdownOpen(!isMonthlyDropdownOpen)} className={`${buttonBaseClass} ${isMonthlyActive ? activeStyle : inactiveStyle}`}>
               <span>ตัวชี้วัดรายเดือน</span>
@@ -218,11 +226,12 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
             </button>
             {isMonthlyDropdownOpen && (
               <div className="absolute left-0 mt-2 w-full md:w-56 bg-white rounded-xl shadow-2xl border border-amber-200 py-2 z-50">
-                {monthlySubMenus.map((m: any) => <button key={m.name} onClick={() => { onTabChange(m.name); setIsMobileMenuOpen(false); }} className="w-full text-left px-4 py-2.5 text-sm hover:bg-emerald-50">{m.label}</button>)}
+                {monthlySubMenus.map((m: any) => <button key={m.name} onClick={() => { onTabChange(m.name); setIsMobileMenuOpen(false); }} className="w-full text-left px-4 py-2.5 text-sm hover:bg-emerald-50 text-gray-700">{m.label}</button>)}
               </div>
             )}
           </div>
 
+          {/* Dropdown: หน่วยงาน */}
           <div className="relative w-full md:w-auto" ref={unitDropdownRef}>
             <button type="button" onClick={() => setIsUnitDropdownOpen(!isUnitDropdownOpen)} className={`${buttonBaseClass} ${isUnitActive || isUnitDropdownOpen ? activeStyle : inactiveStyle}`}>
               <span>หน่วยงาน</span>
@@ -269,7 +278,14 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
             )}
           </div>
 
-          <div className="w-full pt-2 border-t border-emerald-800 md:hidden flex justify-center">
+          {/* ส่วนแสดงชื่อ Login สำหรับ Mobile View */}
+          <div className="w-full pt-3 mt-2 border-t border-emerald-800 md:hidden flex flex-col items-center gap-3">
+            <span className="text-sm font-semibold text-amber-200 flex items-center gap-2">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+              <span>{displayUserName}</span>
+            </span>
             <LogoutButton />
           </div>
 

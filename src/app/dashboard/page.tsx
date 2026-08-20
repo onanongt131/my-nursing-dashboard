@@ -5,7 +5,6 @@ import { LayoutDashboard, CheckCircle2, XCircle } from 'lucide-react';
 import AddEntryForm from '@/components/AddEntryForm';
 import KpiCard from "@/components/KpiCard";
 import { getButtonStyle } from "@/utils/kpiCalculations";
-import { DashboardHeader } from "@/components/DashboardHeader";
 import CategoryClient from './category/CategoryClient';
 import { CheckCircleIcon as IconCheck, XCircleIcon as XIcon } from '@heroicons/react/24/solid';
 
@@ -65,18 +64,35 @@ export default function DashboardPage() {
   const [selectedDept, setSelectedDept] = useState<number | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  const [userDisplayName, setUserDisplayName] = useState<string>('');
+  
   const uniqueGroups = useMemo(() => Array.from(new Set(departments.map(d => d.group_name))), [departments]);
   const filteredDepartments = useMemo(() => departments.filter(d => d.group_name === selectedGroup), [departments, selectedGroup]);
 
-  // --- Logic & Data Fetching ---
   const fetchData = useCallback(async () => {
     setLoading(true);
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user?.email) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('email', user.email)
+        .maybeSingle();
+
+      if (profile?.full_name) {
+        setUserDisplayName(profile.full_name);
+      } else {
+        setUserDisplayName(user.email.split('@')[0]);
+      }
+    }
+
     const { data: allKpis } = await supabase.from('kpis').select('*, kpi_entries(*)');
     const { data: depts } = await supabase.from('departments').select('*');
     if (allKpis) setGroupKpis(allKpis.filter((k: any) => k.departments_id === null));
     if (depts) setDepartments(depts);
     setLoading(false);
-  }, []);
+  }, [supabase]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
@@ -100,7 +116,7 @@ export default function DashboardPage() {
         {/* 1. กล่องวิสัยทัศน์ (Vision) */}
         <div className="bg-gradient-to-r from-emerald-900 via-emerald-800 to-teal-900 text-white p-6 rounded-2xl shadow-lg border border-amber-500/30 text-center relative overflow-hidden">
           <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-amber-400/10 rounded-full blur-2xl pointer-events-none"></div>
-          <span className="text-midium font-bold tracking-widest uppercase text-amber-300 mb-1 block">วิสัยทัศน์ (Vision)</span>
+          <span className="text-sm font-bold tracking-widest uppercase text-amber-300 mb-1 block">วิสัยทัศน์ (Vision)</span>
           <h2 className="text-xl md:text-3xl font-extrabold tracking-wide text-amber-100">
             องค์กรพยาบาลที่เป็นเลิศ บุคลากรเก่ง ดี มีสุข ประชาชนเชื่อมั่นในบริการพยาบาล
           </h2>

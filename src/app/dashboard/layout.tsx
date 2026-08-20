@@ -9,17 +9,19 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   const supabase = await createClient();
 
-  // 1. ดึงข้อมูล profile และ join ข้อมูล departments
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select(`
-      role, 
-      department_id, 
-      full_name,
-      departments ( group )
-    `)
-    .eq('id', session.user.id)
-    .single();
+  // ลองเปลี่ยนจาก .eq('id', session.user.id) เป็นค้นหาด้วย email ดูครับ
+const { data: profile, error } = await supabase
+  .from('profiles')
+  .select(`
+    role, 
+    department_id, 
+    full_name,
+    departments ( group )
+  `)
+  .eq('email', session.user.email) // ใช้ email แทน id
+  .single();
+
+console.log("Profile Query Result:", profile, error); // ดู Error ใน Terminal ของ Server
 
   // 2. ดึงรายชื่อหน่วยงานทั้งหมดสำหรับนำไปแสดงในเมนูดรอปดาวน์ของ Header
   const { data: departments } = await supabase

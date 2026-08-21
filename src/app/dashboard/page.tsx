@@ -108,32 +108,71 @@ export default function DashboardPage() {
   if (loading) return <main className="p-8 text-center text-emerald-900">กำลังโหลดข้อมูล...</main>;
 
   return (
-    <main className="px-4 py-3 max-w-full mx-auto space-y-6 bg-gradient-to-b from-emerald-50/40 via-white to-amber-50/20 min-h-screen">
+    <main className="px-4 py-2 max-w-full mx-auto space-y-3 bg-gradient-to-b from-emerald-50/40 via-white to-amber-50/20 min-h-screen">
       
       {/* --- ส่วนแสดง วิสัยทัศน์ พันธกิจ และเป้าหมาย --- */}
-      <div className="space-y-6">
+      <div className="space-y-4">
         
-        {/* 1. กล่องวิสัยทัศน์ (Vision) */}
-        <div className="bg-gradient-to-r from-emerald-900 via-emerald-800 to-teal-900 text-white p-6 rounded-2xl shadow-lg border border-amber-500/30 text-center relative overflow-hidden">
+        {/* 1. กล่องวิสัยทัศน์ (Vision) รูปแบบตารางฝั่งซ้าย-ขวา */}
+        <div className="bg-gradient-to-r from-emerald-900 via-emerald-800 to-teal-900 text-white p-2 rounded-2xl shadow-lg border border-amber-500/30 relative overflow-hidden">
           <div className="absolute -right-10 -bottom-10 w-40 h-40 bg-amber-400/10 rounded-full blur-2xl pointer-events-none"></div>
-          <span className="text-sm font-bold tracking-widest uppercase text-amber-300 mb-1 block">วิสัยทัศน์ (Vision)</span>
-          <h2 className="text-xl md:text-3xl font-extrabold tracking-wide text-amber-100">
-            องค์กรพยาบาลที่เป็นเลิศ บุคลากรเก่ง ดี มีสุข ประชาชนเชื่อมั่นในบริการพยาบาล
-          </h2>
+          
+          <div className="flex flex-col lg:flex-row items-stretch justify-between gap-4 relative z-10">
+            
+            {/* ตารางจำลอง 2 คอลัมน์ */}
+            <div className="flex-1 grid grid-cols-1 md:grid-cols-[220px_1fr] border border-amber-500/40 rounded-xl overflow-hidden bg-emerald-950/40 backdrop-blur-sm py-1">
+              
+              {/* คอลัมน์ซ้าย: หัวข้อวิสัยทัศน์ */}
+              <div className="bg-emerald-950/80 p-3 flex flex-col justify-center items-center text-center border-b md:border-b-0 md:border-r border-amber-500/30">
+                <span className="text-amber-300 font-bold text-lg tracking-wide">วิสัยทัศน์</span>
+                <span className="text-amber-400 font-extrabold text-xl tracking-wider">(VISION)</span>
+              </div>
+
+              {/* คอลัมน์ขวา: ข้อความ 3 บรรทัด จัดเยื้อง layer */}
+              <div className="p-3 flex flex-col justify-center space-y-2 text-center md:text-left">
+                <p className="text-lg md:text-xl font-extrabold text-amber-100 tracking-wide translate-x-0">
+                  องค์กรพยาบาลที่เป็นเลิศ
+                </p>
+                <p className="text-lg md:text-xl font-extrabold text-amber-100 tracking-wide translate-x-4 md:translate-x-6">
+                  บุคลากรเก่ง ดี มีสุข
+                </p>
+                <p className="text-lg md:text-xl font-extrabold text-amber-100 tracking-wide translate-x-8 md:translate-x-12">
+                  ประชาชนเชื่อมั่นในบริการพยาบาล
+                </p>
+              </div>
+
+            </div>
+
+            {/* โปรไฟล์หัวหน้าพยาบาล */}
+            <div className="flex items-center space-x-4 bg-white/10 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/20 shadow-lg shrink-0 self-center lg:self-center">
+              <div className="text-right hidden sm:block">
+                <p className="text-xs text-amber-300 font-medium">หัวหน้าพยาบาล</p>
+                <p className="text-base text-white font-bold">พว.กฤตพร เมืองพร้อม</p>
+              </div>
+              <div className="w-16 h-16 rounded-full overflow-hidden border-2 border-amber-300 shadow-md bg-emerald-800 shrink-0 flex items-center justify-center">
+                <img 
+                  src="/head-nurse.jpg" 
+                  alt="พว.กฤตพร เมืองพร้อม" 
+                  className="w-full h-full object-cover"
+                />
+              </div>
+            </div>
+
+          </div>
         </div>
 
         {/* 2. กล่องพันธกิจ (Mission) และ เป้าหมาย (Goals) */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           
           {/* พันธกิจ (Mission) */}
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-emerald-100 flex flex-col relative overflow-hidden">
+          <div className="bg-white p-5 rounded-2xl shadow-sm border border-emerald-100 flex flex-col relative overflow-hidden">
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-600 to-amber-500"></div>
-            <div className="flex items-center gap-2 mb-4 pb-3 border-b border-emerald-50">
+            <div className="flex items-center gap-2 mb-3 pb-2 border-b border-emerald-50">
               <div className="w-2.5 h-6 bg-amber-500 rounded-full shadow-sm"></div>
               <h3 className="text-lg font-extrabold text-emerald-950 tracking-tight">พันธกิจ (Mission)</h3>
             </div>
             
-            <div className="space-y-3.5 text-sm md:text-base text-gray-700 flex-1">
+            <div className="space-y-3 text-sm md:text-base text-gray-700 flex-1">
               <div>
                 <span className="font-extrabold text-emerald-800 tracking-wide">N - Nursing Excellence</span>
                 <p className="text-gray-600 pl-4 font-normal mt-0.5">: สร้างมาตรฐานเพื่อมุ่งสู่ความเป็นเลิศด้านการพยาบาล</p>
@@ -158,14 +197,14 @@ export default function DashboardPage() {
           </div>
 
           {/* เป้าหมาย (Goals) */}
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-emerald-100 flex flex-col relative overflow-hidden">
+          <div className="bg-white p-5 rounded-2xl shadow-sm border border-emerald-100 flex flex-col relative overflow-hidden">
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500 to-emerald-600"></div>
-            <div className="flex items-center gap-2 mb-4 pb-3 border-b border-emerald-50">
+            <div className="flex items-center gap-2 mb-3 pb-2 border-b border-emerald-50">
               <div className="w-2.5 h-6 bg-emerald-600 rounded-full shadow-sm"></div>
               <h3 className="text-lg font-extrabold text-emerald-950 tracking-tight">เป้าหมาย (Goals)</h3>
             </div>
 
-            <ol className="space-y-3.5 text-sm md:text-base text-gray-700 list-decimal list-inside flex-1 font-medium">
+            <ol className="space-y-3 text-sm md:text-base text-gray-700 list-decimal list-inside flex-1 font-medium">
               <li className="leading-relaxed">
                 พัฒนาระบบการพยาบาลให้มีคุณภาพตามมาตรฐานวิชาชีพ เพื่อมุ่งสู่ความเป็นเลิศด้านบริการพยาบาล
               </li>

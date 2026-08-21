@@ -1,18 +1,100 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
-import AddEntryForm from '@/components/AddEntryForm'; // หรือคอมโพเนนต์ฟอร์มบันทึกของคุณ
+import AddEntryForm from '@/components/AddEntryForm';
 
 export default function RkpRmPage() {
   const supabase = createClient();
   const [parentKpis, setParentKpis] = useState<any[]>([]);
   const [singleKpis, setSingleKpis] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-
-  // เปลี่ยนมาใช้ State เก็บ KPI ที่ถูกเลือกเพื่อแสดงหน้ากราฟและฟอร์มเพิ่มข้อมูล
   const [selectedKpi, setSelectedKpi] = useState<any | null>(null);
 
   const years = [2565, 2566, 2567, 2568, 2569];
+
+  // ฟังก์ชันคำนวณผลรวมรายปีตามประเภทตัวชี้วัด
+  const calculateYearValue = (kpi: any, year: number) => {
+    if (!kpi.kpi_entries || kpi.kpi_entries.length === 0) return null;
+
+    const entriesForYear = kpi.kpi_entries.filter(
+      (e: any) => Number(e.year || e.fiscal_year) === year
+    );
+
+    if (entriesForYear.length === 0) return null;
+
+    const kpiType = kpi.data_type || 'count'; // รองรับประเภท count, percent, rate
+
+    if (kpiType === 'count') {
+      const total = entriesForYear.reduce((sum: number, e: any) => sum + Number(e.value || 0), 0);
+      return Number(total.toFixed(2));
+    } else {
+      // สำหรับ percent และ rate: (ผลรวมตัวตั้ง / ผลรวมตัวหาร) * (ถ้าเป็น percent คูณ 100 ถ้าไม่ใช่คูณ 1)
+      const totalNum = entriesForYear.reduce((sum: number, e: any) => sum + Number(e.numerator || e.num || 0), 0);
+      const totalDen = entriesForYear.reduce((sum: number, e: any) => sum + Number(e.denominator || e.den || 1), 0);
+      
+      if (totalDen === 0) return 0;
+      const result = (totalNum / totalDen) * (kpiType === 'percent' ? 100 : 1);
+      return Number(result.toFixed(2));
+    }
+  };
+
+  // ฟังก์ชันคำนวณ Trend (ปรับปรุงใหม่ให้ดูภาพรวม 3 ปีอย่างแม่นยำขึ้น)
+  const calculateTrend = (kpi: any) => {
+    const availableYears = years
+      .map(year => ({ year, val: calculateYearValue(kpi, year) }))
+      .filter(item => item.val !== null)
+      .sort((a, b) => a.year - b.year);
+
+    const lastThree = availableYears.slice(-3);
+
+    if (lastThree.length < 2) {
+      return <span className="text-xs text-gray-400">-</span>;
+    }
+
+    const latest = lastThree[lastThree.length - 1].val!; // ปีล่าสุด (2569)
+    const prev = lastThree[lastThree.length - 2].val!;    // ปีก่อนหน้า (2568)
+    const oldest = lastThree[0].val!;                    // ปีแรกใน 3 ปี (2567)
+
+    const isLowerIsBetter = Number(kpi.target_value || 0) === 0;
+
+    // เช็คทิศทางเทียบกับปีล่าสุดกับปีก่อนหน้าโดยตรงด้วย เพื่อกันกรณีปีล่าสุดดิ่งลง
+    let trendLabel = "";
+    let colorClass = "";
+
+    const diffLatest = latest - prev; // เทียบปีล่าสุดกับปีก่อนหน้า
+    const diffOverall = latest - oldest; // เทียบภาพรวม 3 ปี
+
+    // ถ้าตัวชี้วัดควรเพิ่มขึ้น (เช่น ร้อยละความพึงพอใจ)
+    if (!isLowerIsBetter) {
+      if (diffOverall > 0 && diffLatest >= 0) {
+        trendLabel = "▲ ดีขึ้น";
+        colorClass = "text-emerald-600";
+      } else if (diffLatest < 0) {
+        trendLabel = "▼ เฝ้าระวัง"; // ปีล่าสุดตกลงจากปีก่อนหน้า
+        colorClass = "text-red-500";
+      } else if (diffOverall === 0 && diffLatest === 0) {
+        trendLabel = "▬ คงที่";
+        colorClass = "text-gray-500";
+      } else {
+        trendLabel = "▼ เฝ้าระวัง";
+        colorClass = "text-red-500";
+      }
+    } else {
+      // ถ้าตัวชี้วัดควรลดลง (ยิ่งน้อยยิ่งดี เช่น อัตราความผิดพลาด)
+      if (diffOverall < 0 && diffLatest <= 0) {
+        trendLabel = "▲ ดีขึ้น";
+        colorClass = "text-emerald-600";
+      } else if (diffLatest > 0) {
+        trendLabel = "▼ เฝ้าระวัง"; // ปีล่าสุดสูงขึ้น (แย่ลง)
+        colorClass = "text-red-500";
+      } else {
+        trendLabel = "▼ เฝ้าระวัง";
+        colorClass = "text-red-500";
+      }
+    }
+
+    return <span className={`font-bold text-xs ${colorClass}`}>{trendLabel}</span>;
+  };
 
   const fetchRmKpis = async () => {
     setLoading(true);
@@ -35,7 +117,6 @@ export default function RkpRmPage() {
           withoutChildren.push(parent);
         }
       });
-
       setParentKpis(withChildren);
       setSingleKpis(withoutChildren);
     }
@@ -46,14 +127,11 @@ export default function RkpRmPage() {
     fetchRmKpis();
   }, []);
 
-  if (loading) {
-    return <div className="p-8 text-center text-emerald-900 font-medium">กำลังโหลดข้อมูลตัวชี้วัด RM...</div>;
-  }
+  if (loading) return <div className="p-8 text-center text-emerald-900 font-medium">กำลังโหลดข้อมูลตัวชี้วัด RM...</div>;
 
   if (selectedKpi) {
     return (
       <div className="space-y-6">
-        {/* ปุ่มย้อนกลับ */}
         <button
           onClick={() => setSelectedKpi(null)}
           className="text-emerald-800 hover:text-emerald-950 font-bold text-sm flex items-center gap-1 cursor-pointer bg-white px-3 py-1.5 rounded-lg shadow-xs border border-emerald-100 w-fit"
@@ -61,10 +139,8 @@ export default function RkpRmPage() {
           ← ย้อนกลับหน้าตาราง
         </button>
 
-        {/* จัดโครงสร้างให้เป็น ซ้าย-ขวา (grid-cols-2) */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-          
-          {/* ฝั่งซ้าย: กราฟแท่งแสดงผลย้อนหลัง 5 ปี */}
+        <div className="grid grid-cols-1 lg:grid-cols-[2fr_1fr] gap-6 items-start">
+          {/* ฝั่งซ้าย: กราฟแท่ง */}
           <div className="bg-white p-6 rounded-2xl shadow-sm border border-emerald-100 relative">
             <div className="absolute top-4 right-4 bg-red-50 text-red-600 border border-red-200 px-3 py-1 rounded-lg text-xs font-bold shadow-xs">
               GOAL = {selectedKpi.target_value ?? 0}
@@ -75,7 +151,6 @@ export default function RkpRmPage() {
             </h2>
 
             <div className="relative pt-6 pb-2">
-              {/* เส้นประ Target (เอาป้าย Target ออก เหลือแค่เส้นประสีแดง) */}
               <div 
                 className="absolute w-full left-0 flex items-center z-10 pointer-events-none"
                 style={{ bottom: `${Math.min(Math.max(Number(selectedKpi.target_value || 0), 0), 100)}%` }}
@@ -85,19 +160,16 @@ export default function RkpRmPage() {
 
               <div className="h-56 flex items-end justify-between gap-3 px-2 border-b border-gray-300 relative z-20">
                 {years.map((year) => {
-                  const entry = selectedKpi.kpi_entries?.find(
-                    (e: any) => Number(e.year || e.fiscal_year) === year
-                  );
-                  const val = entry?.value !== undefined && entry?.value !== null ? Number(entry.value) : 0;
-                  const heightPercent = val > 0 ? Math.min(Math.max(val, 0), 100) : 0;
+                  const val = calculateYearValue(selectedKpi, year);
+                  const heightPercent = val !== null && val > 0 ? Math.min(Math.max(val, 0), 100) : 0;
 
                   return (
                     <div key={year} className="flex-1 flex flex-col items-center h-full justify-end group">
                       <span className="text-[11px] font-extrabold text-emerald-800 mb-1.5">
-                        {val > 0 ? val : '-'}
+                        {val !== null ? val : '-'}
                       </span>
                       <div className="w-full max-w-[36px] bg-emerald-500 hover:bg-emerald-600 rounded-t-lg transition-all duration-500 shadow-sm relative flex items-start justify-center"
-                           style={{ height: `${heightPercent}%`, minHeight: val > 0 ? '8px' : '4px', opacity: val > 0 ? 1 : 0.15 }}>
+                           style={{ height: `${heightPercent}%`, minHeight: val !== null && val > 0 ? '8px' : '4px', opacity: val !== null && val > 0 ? 1 : 0.15 }}>
                       </div>
                       <span className="text-xs font-semibold text-gray-600 mt-2">{year}</span>
                     </div>
@@ -107,7 +179,7 @@ export default function RkpRmPage() {
             </div>
           </div>
 
-          {/* ฝั่งขวา: ฟอร์มเพิ่มข้อมูล (ปรับระยะห่าง space-y-4 เป็น space-y-2 และลด padding ด้านใน) */}
+          {/* ฝั่งขวา: ฟอร์มเพิ่มข้อมูล */}
           <div className="bg-white p-5 rounded-2xl shadow-sm border border-emerald-100 space-y-2">
             <h3 className="text-base font-bold text-gray-900 border-b border-gray-100 pb-2">
               บันทึกผลการดำเนินงาน
@@ -123,15 +195,11 @@ export default function RkpRmPage() {
               />
             </div>
           </div>
-
         </div>
       </div>
     );
   }
 
-  // ==========================================
-  // หน้าจอหลัก (แสดงตารางสรุปรายการตัวชี้วัดทั้งหมด)
-  // ==========================================
   return (
     <div className="space-y-8">
       <div className="bg-gradient-to-r from-emerald-900 to-emerald-800 text-white p-5 rounded-2xl shadow-md">
@@ -152,7 +220,7 @@ export default function RkpRmPage() {
                   {years.map((year) => (
                     <th key={year} className="p-4 text-center">{year}</th>
                   ))}
-                  <th className="p-4 text-center">TREND</th>
+                  <th className="p-4 text-center">TREND (3 ปี)</th>
                   <th className="p-4 text-center">ACTION</th>
                 </tr>
               </thead>
@@ -167,21 +235,23 @@ export default function RkpRmPage() {
                       <td className="p-4 font-semibold text-gray-900">{kpi.name}</td>
                       <td className="p-4 text-center font-bold text-emerald-800">{kpi.target_value ?? '-'}</td>
                       {years.map((year) => {
-                        const entry = kpi.kpi_entries?.find((e: any) => e.year === year);
+                        const yearVal = calculateYearValue(kpi, year);
                         return (
                           <td key={year} className="p-4 text-center text-gray-500">
-                            {entry?.value !== undefined && entry?.value !== null ? (
-                              <span className="font-bold text-emerald-700">{entry.value}</span>
+                            {yearVal !== null ? (
+                              <span className="font-bold text-emerald-700">{yearVal}</span>
                             ) : (
                               <span className="text-xs text-gray-400 italic">ไม่มีข้อมูล</span>
                             )}
                           </td>
                         );
                       })}
-                      <td className="p-4 text-center text-gray-400 font-medium">-</td>
+                      <td className="p-4 text-center">
+                        {calculateTrend(kpi)}
+                      </td>
                       <td className="p-4 text-center">
                         <button
-                          onClick={() => setSelectedKpi(kpi)} // กดแล้วสลับไปหน้ากราฟ+เพิ่มข้อมูล
+                          onClick={() => setSelectedKpi(kpi)}
                           className="bg-red-600 hover:bg-red-700 text-white px-4 py-1.5 rounded-lg text-xs font-bold transition-all shadow-sm uppercase tracking-wider cursor-pointer"
                         >
                           เพิ่ม
@@ -222,7 +292,7 @@ export default function RkpRmPage() {
                       {years.map((year) => (
                         <th key={year} className="p-3 text-center">{year}</th>
                       ))}
-                      <th className="p-3 text-center">TREND</th>
+                      <th className="p-3 text-center">TREND (3 ปี)</th>
                       <th className="p-3 text-center">ACTION</th>
                     </tr>
                   </thead>
@@ -232,21 +302,23 @@ export default function RkpRmPage() {
                         <td className="p-3 text-gray-800 font-medium">{sub.name}</td>
                         <td className="p-3 text-center font-bold text-emerald-800">{sub.target_value ?? '-'}</td>
                         {years.map((year) => {
-                          const entry = sub.kpi_entries?.find((e: any) => e.year === year);
+                          const yearVal = calculateYearValue(sub, year);
                           return (
                             <td key={year} className="p-3 text-center text-gray-500">
-                              {entry?.value !== undefined && entry?.value !== null ? (
-                                <span className="font-bold text-emerald-700">{entry.value}</span>
+                              {yearVal !== null ? (
+                                <span className="font-bold text-emerald-700">{yearVal}</span>
                               ) : (
                                 <span className="text-xs text-gray-400 italic">ไม่มีข้อมูล</span>
                               )}
                             </td>
                           );
                         })}
-                        <td className="p-3 text-center text-gray-400 font-medium">-</td>
+                        <td className="p-3 text-center">
+                          {calculateTrend(sub)}
+                        </td>
                         <td className="p-3 text-center">
                           <button
-                            onClick={() => setSelectedKpi(sub)} // กดตัวลูกแล้วสลับไปหน้ากราฟ+เพิ่มข้อมูลของตัวลูกนั้นๆ
+                            onClick={() => setSelectedKpi(sub)}
                             className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded-lg text-xs font-bold transition-all shadow-sm uppercase tracking-wider cursor-pointer"
                           >
                             เพิ่ม

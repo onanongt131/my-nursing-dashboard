@@ -26,24 +26,43 @@ export default function AddEntryForm({ kpiId, type, deptId, onSuccess }: {
     if (!kpiId) return;
 
     try {
-      const { data: data3P } = await supabase
+      const targetKpiId = Number(kpiId);
+      const targetDeptId = deptId ? Number(deptId) : null;
+
+      // 1. ดึงข้อมูล 3P ตาม KPI และ Department (รองรับกรณีเป็นองค์กรคือ NULL)
+      let query3P = supabase
         .from('kpi_3p_analysis')
         .select('*')
-        .eq('kpi_id', kpiId)
-        .maybeSingle();
+        .eq('kpi_id', targetKpiId);
+
+      if (targetDeptId) {
+        query3P = query3P.eq('department_id', targetDeptId);
+      } else {
+        query3P = query3P.is('department_id', null);
+      }
+
+      const { data: data3P } = await query3P.maybeSingle();
 
       let currentNumerator = '';
       let currentDenominator = '';
       let currentValue = '';
 
+      // 2. ดึงข้อมูลตัวเลขรายเดือนตามเงื่อนไข
       if (formData.year && formData.month) {
-        const { data: entryData } = await supabase
+        let queryEntry = supabase
           .from('kpi_entries')
           .select('*')
-          .eq('kpi_id', kpiId)
+          .eq('kpi_id', targetKpiId)
           .eq('year', Number(formData.year))
-          .eq('month', formData.month)
-          .maybeSingle();
+          .eq('month', formData.month);
+
+        if (targetDeptId) {
+          queryEntry = queryEntry.eq('department_id', targetDeptId);
+        } else {
+          queryEntry = queryEntry.is('department_id', null);
+        }
+
+        const { data: entryData } = await queryEntry.maybeSingle();
 
         if (entryData) {
           currentNumerator = entryData.numerator !== null ? String(entryData.numerator) : '';
@@ -65,7 +84,7 @@ export default function AddEntryForm({ kpiId, type, deptId, onSuccess }: {
     } catch (err) {
       console.error("Error fetching existing entry:", err);
     }
-  }, [kpiId, formData.year, formData.month, supabase]);
+  }, [kpiId, deptId, formData.year, formData.month, supabase]);
 
   useEffect(() => {
     if (isOpen) {
@@ -92,9 +111,11 @@ export default function AddEntryForm({ kpiId, type, deptId, onSuccess }: {
         finalValue = Number(Number(rawFinalValue).toFixed(2));
       }
       
+      const targetDeptId = deptId ? Number(deptId) : null;
+
       const payload = {
         kpi_id: Number(kpiId),
-        department_id: deptId ? Number(deptId) : null, // <--- เพิ่มตรงนี้เพื่อผูกข้อมูลกับหน่วยงาน
+        department_id: targetDeptId,
         year: Number(formData.year),
         month: formData.month,
         value: finalValue,
@@ -104,7 +125,7 @@ export default function AddEntryForm({ kpiId, type, deptId, onSuccess }: {
 
       const { error } = await supabase
         .from('kpi_entries')
-        .upsert(payload, { onConflict: 'kpi_id, year, month' });
+        .upsert(payload, { onConflict: 'kpi_id, department_id, year, month' });
 
       if (error) throw error;
       
@@ -122,16 +143,23 @@ export default function AddEntryForm({ kpiId, type, deptId, onSuccess }: {
   const handleSave3P = async () => {
     setIsSaving3P(true);
     const targetKpiId = Number(kpiId);
+    const targetDeptId = deptId ? Number(deptId) : null;
+    const analysisLevel = targetDeptId ? 'department' : 'organization';
 
+    const payload = {
+      kpi_id: targetKpiId,
+      department_id: targetDeptId,
+      analysis_level: analysisLevel,
+      purpose: formData.purpose,
+      process: formData.process,
+      performance: formData.performance,
+      updated_at: new Date().toISOString()
+    };
+
+    // ใช้ onConflict ให้ตรงกับ Unique Index ที่ผูกคู่กัน (kpi_id, department_id)
     const { error } = await supabase.from('kpi_3p_analysis').upsert(
-      {
-        kpi_id: targetKpiId,
-        purpose: formData.purpose,
-        process: formData.process,
-        performance: formData.performance,
-        updated_at: new Date().toISOString()
-      },
-      { onConflict: 'kpi_id' }
+      payload,
+      { onConflict: 'kpi_id, department_id' }
     );
 
     setIsSaving3P(false);
@@ -153,7 +181,9 @@ export default function AddEntryForm({ kpiId, type, deptId, onSuccess }: {
       {isOpen && (
         <div className="mt-4 p-4 border rounded-xl bg-white shadow-sm space-y-6">
           <div className="space-y-3">
-            <h4 className="font-bold text-gray-700 text-sm">บันทึก / แก้ไขผลงานรายเดือน</h4>
+            <h4 className="font-bold text-gray-700 text-sm">
+              บันทึก / แก้ไขผลงานรายเดือน {deptId ? '(ระดับหน่วยงาน)' : '(ระดับองค์กร)'}
+            </h4>
             <div className="grid grid-cols-2 gap-2">
               <input 
                 type="number" 

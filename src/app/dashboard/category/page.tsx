@@ -200,7 +200,7 @@ export default function CategoryPage() {
       </head>
       <body>
         <h2>สรุปผลการดำเนินงานตัวชี้วัด กลุ่มภารกิจด้านการพยาบาล</h2>
-        <p>ประจำปีงบประมาณ</p>
+        <p>ประจำปีงบประมาณ 2569</p>
         <table>
           <thead>
             <tr>
@@ -265,7 +265,7 @@ export default function CategoryPage() {
               <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
                 {selectedCategory ? "สรุปผลหมวดนี้" : "สรุปภาพรวมทั้งหมด"}
               </span>
-              <span className="text-xs px-2 py-0.5 bg-purple-50 text-purple-700 font-bold rounded-full">
+              <span className="text-2xl px-2 py-0.5 bg-purple-50 text-purple-700 font-bold rounded-full">
                 {stats.total} ตัวชี้วัด
               </span>
             </div>
@@ -273,9 +273,9 @@ export default function CategoryPage() {
             <div className="grid grid-cols-2 gap-3">
               <div className="bg-emerald-50/60 p-3 rounded-xl border border-emerald-100 flex flex-col">
                 <span className="text-emerald-700 font-semibold text-[11px] flex items-center gap-1">
-                  <span className="w-4 h-4 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[9px]">✓</span> ผ่าน
+                  <span className="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[9px]">✓</span> ผ่าน
                 </span>
-                <span className="text-2xl font-black text-emerald-700 mt-1">{stats.passed}</span>
+                <span className="text-4xl font-black text-emerald-700 mt-1">{stats.passed}</span>
               </div>
 
               <div className="bg-rose-50/60 p-3 rounded-xl border border-rose-100 flex flex-col">
@@ -420,7 +420,7 @@ export default function CategoryPage() {
             <div className="p-6 sm:p-10 overflow-y-auto space-y-6 flex-1 bg-white text-xs">
               <div className="text-center mb-6">
                 <h2 className="text-xl font-bold text-slate-800">สรุปผลการดำเนินงานตัวชี้วัด กลุ่มภารกิจด้านการพยาบาล</h2>
-                <p className="text-sm text-slate-500 mt-1">ประจำปีงบประมาณ</p>
+                <p className="text-sm text-slate-500 mt-1">ประจำปีงบประมาณ 2569</p>
               </div>
 
               <div className="overflow-x-auto">

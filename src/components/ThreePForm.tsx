@@ -2,7 +2,12 @@
 import { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client'; 
 
-export default function ThreePForm({ kpiId }: { kpiId: string }) {
+interface ThreePFormProps {
+  kpiId: string | number;
+  departmentId?: string | number | null; // เพิ่ม prop สำหรับรหัสหน่วยงาน (ถ้ามี)
+}
+
+export default function ThreePForm({ kpiId, departmentId = null }: ThreePFormProps) {
   const supabase = createClient();
   
   const [loading, setLoading] = useState(true);
@@ -17,14 +22,23 @@ export default function ThreePForm({ kpiId }: { kpiId: string }) {
       }
       
       setLoading(true);
-      const targetKpiId = Number(kpiId); // แปลงเป็น Number ให้แน่ใจ
+      const targetKpiId = Number(kpiId);
+      const targetDeptId = departmentId ? Number(departmentId) : null;
 
       try {
-        const { data: existingData, error } = await supabase
+        let query = supabase
           .from('kpi_3p_analysis')
           .select('*')
-          .eq('kpi_id', targetKpiId)
-          .maybeSingle();
+          .eq('kpi_id', targetKpiId);
+
+        // แยกเงื่อนไขการดึงข้อมูลระหว่าง "หน่วยงาน" กับ "องค์กร (รวม)"
+        if (targetDeptId) {
+          query = query.eq('department_id', targetDeptId);
+        } else {
+          query = query.is('department_id', null);
+        }
+
+        const { data: existingData, error } = await query.maybeSingle();
 
         if (error) {
           console.error("Error fetching 3P:", error.message);
@@ -47,25 +61,31 @@ export default function ThreePForm({ kpiId }: { kpiId: string }) {
     };
 
     fetchData();
-  }, [kpiId, supabase]);
+  }, [kpiId, departmentId, supabase]);
 
   const handleSave = async () => {
     if (!kpiId) return;
     setSaving(true);
     const targetKpiId = Number(kpiId);
+    const targetDeptId = departmentId ? Number(departmentId) : null;
+    
+    // กำหนด analysis_level อัตโนมัติ: ถ้ามี departmentId ให้เป็น 'department' ถ้าไม่มีให้เป็น 'organization'
+    const analysisLevel = targetDeptId ? 'department' : 'organization';
 
+    const payload = {
+      kpi_id: targetKpiId,
+      department_id: targetDeptId,
+      analysis_level: analysisLevel,
+      purpose: data.purpose,
+      process: data.process,
+      performance: data.performance,
+      updated_at: new Date().toISOString()
+    };
+
+    // ใช้ onConflict ให้ตรงกับ Index ที่เราสร้างไว้คู่กัน (kpi_id, department_id)
     const { error } = await supabase
       .from('kpi_3p_analysis')
-      .upsert(
-        { 
-          kpi_id: targetKpiId, 
-          purpose: data.purpose,
-          process: data.process,
-          performance: data.performance,
-          updated_at: new Date().toISOString()
-        },
-        { onConflict: 'kpi_id' } 
-      );
+      .upsert(payload, { onConflict: 'kpi_id, department_id' });
 
     setSaving(false);
 
@@ -83,7 +103,9 @@ export default function ThreePForm({ kpiId }: { kpiId: string }) {
 
   return (
     <div className="bg-white p-6 border rounded-xl shadow-sm space-y-4">
-      <h2 className="text-lg font-bold text-gray-700 mb-4">ผลวิเคราะห์ตัวชี้วัดแบบ 3P</h2>
+      <h2 className="text-lg font-bold text-gray-700 mb-4">
+        ผลวิเคราะห์ตัวชี้วัดแบบ 3P {departmentId ? '(ระดับหน่วยงาน)' : '(ระดับองค์กร)'}
+      </h2>
       
       {/* Purpose */}
       <div className="grid grid-cols-4 gap-4 items-start">

@@ -12,8 +12,12 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
   
   const displayUserName = userName || "ผู้ใช้งานระบบ";
   
+  // States สำหรับ Dropdown ต่างๆ
   const [isNursingDropdownOpen, setIsNursingDropdownOpen] = useState(false);
   const nursingDropdownRef = useRef<HTMLDivElement>(null);
+
+  const [isCommitteeDropdownOpen, setIsCommitteeDropdownOpen] = useState(false);
+  const committeeDropdownRef = useRef<HTMLDivElement>(null);
   
   const [nursingBranches, setNursingBranches] = useState<any[]>([
     { name: 'การพยาบาลวิจัยและพัฒนาการบริการ', path: '/dashboard/nursing/branch-1' },
@@ -33,6 +37,16 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
     { name: 'การพยาบาลผู้คลอด', path: '/dashboard/nursing/branch-15' },
     { name: 'การพยาบาลผู้ป่วยออร์โธปิดิกส์', path: '/dashboard/nursing/branch-16' },
   ]);
+
+  // รายชื่อคณะกรรมการ
+  const committeeList = [
+    { name: 'คณะกรรมการ QA', path: '/dashboard/committee/qa' },
+    { name: 'คณะกรรมการ RM', path: '/dashboard/committee/rm' },
+    { name: 'คณะกรรมการวิชาการ', path: '/dashboard/committee/academic' },
+    { name: 'คณะกรรมการ EIC', path: '/dashboard/committee/eic' },
+    { name: 'คณะกรรมการ 5S และสิ่งแวดล้อม', path: '/dashboard/committee/5s' },
+    { name: 'คณะกรรมการบ้านพัก', path: '/dashboard/committee/home' },
+  ];
 
   useEffect(() => {
     const fetchNursingBranches = async () => {
@@ -107,6 +121,7 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (nursingDropdownRef.current && !nursingDropdownRef.current.contains(event.target as Node)) setIsNursingDropdownOpen(false);
+      if (committeeDropdownRef.current && !committeeDropdownRef.current.contains(event.target as Node)) setIsCommitteeDropdownOpen(false);
       if (kpiDropdownRef.current && !kpiDropdownRef.current.contains(event.target as Node)) setIsKpiDropdownOpen(false);
       if (monthlyDropdownRef.current && !monthlyDropdownRef.current.contains(event.target as Node)) setIsMonthlyDropdownOpen(false);
       if (unitDropdownRef.current && !unitDropdownRef.current.contains(event.target as Node)) { setIsUnitDropdownOpen(false); }
@@ -115,18 +130,20 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const isHomeActive = (pathname === '/dashboard' || activeTab === 'dashboard') && !pathname.startsWith('/dashboard/nursing');
+  const isHomeActive = (pathname === '/dashboard' || activeTab === 'dashboard') && !pathname.startsWith('/dashboard/nursing') && !pathname.startsWith('/dashboard/committee') && !activeTab?.startsWith('committee');
+  const isCommitteeActive = pathname.startsWith('/dashboard/committee') || activeTab === 'committee';
   const isNursingActive = pathname.startsWith('/dashboard/nursing') || activeTab === 'nursing';
   const isUnitActive = pathname.startsWith('/dashboard/departments') || activeTab === 'unit';
   const isKpiActive = pathname.startsWith('/dashboard/category') || pathname.startsWith('/dashboard/strategy') || activeTab === 'category' || activeTab === 'strategy';
   const isMonthlyActive = (pathname.startsWith('/dashboard/productivity') || pathname.startsWith('/dashboard/wp-qa') || pathname.startsWith('/dashboard/iv-care') || pathname.startsWith('/dashboard/audit-chart') || ['productivity', 'wp-qa', 'iv-care', 'audit-chart', 'Audit chart'].includes(activeTab)) && !isUnitActive;
+  
   const buttonBaseClass = "w-full md:w-52 h-11 flex items-center justify-center gap-2 px-4 font-semibold text-sm md:text-base rounded-xl transition-all cursor-pointer whitespace-nowrap";
   const activeStyle = "bg-emerald-800 text-amber-300 border border-amber-400";
   const inactiveStyle = "bg-emerald-900 text-amber-100 hover:text-amber-300 hover:bg-emerald-800";
 
   return (
     <div className="bg-white shadow-sm w-full rounded-2xl overflow-visible border border-emerald-100">
-      {/* Header ส่วนบน (แสดงโลโก้ ชื่อระบบ และชื่อผู้ใช้ + สิทธิ์) */}
+      {/* Header ส่วนบน */}
       <header className="flex flex-col md:flex-row items-center justify-between px-4 sm:px-6 py-4 bg-white gap-4 border-b border-gray-100">
         <div className="flex items-center justify-between w-full md:w-auto">
           <div className="flex items-center gap-3 sm:gap-4 text-center sm:text-left">
@@ -149,34 +166,64 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
           </button>
         </div>
 
-        {/* ส่วนแสดงชื่อ Login และ Badge สิทธิ์ (Desktop View) */}
+       {/* ส่วนแสดงชื่อ Login และ Badge สิทธิ์ (Desktop View) */}
         <div className="hidden md:flex items-center gap-3">
-          <div className="flex items-center gap-2 bg-gray-50 px-3 py-1.5 rounded-xl border border-gray-200">
-            <span className="text-sm font-semibold text-gray-700 flex items-center gap-1.5">
+          {/* กล่องชื่อผู้ใช้งาน */}
+          <div className="h-11 flex items-center gap-3 px-4 rounded-2xl border border-emerald-300/60 bg-white shadow-2xs">
+            <div className="w-8 h-8 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-800 shrink-0">
               <svg className="w-4 h-4 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
               </svg>
-              <span>{displayUserName}</span>
-            </span>
-
-            {/* แสดงสิทธิ์ต่อท้ายชื่อ */}
-            {userRole && (
-              <span className="text-xs bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-md font-bold uppercase border border-indigo-100">
-                {userRole} {userGroup ? `(${userGroup})` : ''}
+            </div>
+            
+            <div className="flex flex-col justify-center">
+              <span className="text-sm font-bold text-emerald-900 tracking-tight leading-tight">
+                {displayUserName}
               </span>
-            )}
+              {userRole && (
+                <span className="text-[10px] text-emerald-600 font-medium uppercase tracking-wider mt-0.5">
+                  {userRole} {userGroup ? `(${userGroup})` : ''}
+                </span>
+              )}
+            </div>
           </div>
-          <LogoutButton />
+          
+          {/* ปุ่มออกจากระบบ (กรอบโค้ง rounded-2xl ขอบสีแดงอ่อน พื้นหลังแดงอ่อน) */}
+          <div className="h-11 flex items-center px-2 rounded-2xl border border-rose-200 bg-rose-50/50 hover:bg-rose-100/60 transition-colors">
+            <LogoutButton />
+          </div>
         </div>
       </header>
 
-      {/* Navigation เมนูด้านล่าง (ที่เคยหายไป กลับมาแล้ว) */}
+      {/* Navigation เมนูด้านล่าง */}
       <div className={`w-full bg-emerald-900 shadow-md transition-all duration-300 ${isMobileMenuOpen ? 'block' : 'hidden'} md:block`}>
         <nav className="flex flex-col md:flex-row items-start md:items-center justify-start gap-3 px-4 sm:px-6 py-3">
           
+          {/* 1. หน้าหลัก */}
           <button type="button" onClick={() => { onTabChange && onTabChange('dashboard'); setIsMobileMenuOpen(false); }} className={`${buttonBaseClass} ${isHomeActive ? activeStyle : inactiveStyle}`}>หน้าหลัก</button>
 
-          {/* Dropdown: การพยาบาล 16 กลุ่มงาน */}
+          {/* 2. คณะกรรมการ */}
+          <div className="relative w-full md:w-auto" ref={committeeDropdownRef}>
+            <button 
+              type="button" 
+              onClick={() => setIsCommitteeDropdownOpen(!isCommitteeDropdownOpen)} 
+              className={`${buttonBaseClass} ${isCommitteeActive || isCommitteeDropdownOpen ? activeStyle : inactiveStyle}`}
+            >
+              <span>คณะกรรมการ</span>
+              <svg className={`w-4 h-4 ml-1 transition-transform ${isCommitteeDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+            </button>
+            {isCommitteeDropdownOpen && (
+              <div className="absolute left-0 mt-2 w-full md:w-64 bg-white rounded-xl shadow-2xl border border-amber-200 py-2 z-50 max-h-96 overflow-y-auto">
+                {committeeList.map((item: any, i: number) => (
+                  <a key={i} href={item.path} onClick={() => setIsMobileMenuOpen(false)} className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-emerald-50 border-b last:border-b-0">
+                    {item.name}
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* 3. การพยาบาล 16 กลุ่มงาน */}
           <div className="relative w-full md:w-auto" ref={nursingDropdownRef}>
             <button 
               type="button" 
@@ -197,7 +244,7 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
             )}
           </div>
 
-          {/* Dropdown: ตัวชี้วัดตามแผน */}
+          {/* 4. ตัวชี้วัดตามแผน */}
           <div className="relative w-full md:w-auto" ref={kpiDropdownRef}>
             <button type="button" onClick={() => setIsKpiDropdownOpen(!isKpiDropdownOpen)} className={`${buttonBaseClass} ${isKpiActive ? activeStyle : inactiveStyle}`}>
               <span>ตัวชี้วัดตามแผน</span>
@@ -218,7 +265,7 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
           )}
           </div>
 
-          {/* Dropdown: ตัวชี้วัดรายเดือน */}
+          {/* 5. ตัวชี้วัดรายเดือน */}
           <div className="relative w-full md:w-auto" ref={monthlyDropdownRef}>
             <button type="button" onClick={() => setIsMonthlyDropdownOpen(!isMonthlyDropdownOpen)} className={`${buttonBaseClass} ${isMonthlyActive ? activeStyle : inactiveStyle}`}>
               <span>ตัวชี้วัดรายเดือน</span>
@@ -231,7 +278,7 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
             )}
           </div>
 
-          {/* Dropdown: หน่วยงาน */}
+          {/* 6. หน่วยงาน */}
           <div className="relative w-full md:w-auto" ref={unitDropdownRef}>
             <button type="button" onClick={() => setIsUnitDropdownOpen(!isUnitDropdownOpen)} className={`${buttonBaseClass} ${isUnitActive || isUnitDropdownOpen ? activeStyle : inactiveStyle}`}>
               <span>หน่วยงาน</span>

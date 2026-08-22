@@ -60,7 +60,7 @@ export default function CategoryPage() {
               .select('id')
               .eq('group', userGroup);
 
-            const deptIds = deptsInGroup ? deptsInGroup.map(d => d.id) : [];
+            const deptIds = deptsInGroup ? deptsInGroup.map((d: any) => d.id) : [];
             filtered = allKpis.filter((k: any) => deptIds.includes(k.departments_id));
           }
           else if (role === 'admin' || role === 'head_nurse') {

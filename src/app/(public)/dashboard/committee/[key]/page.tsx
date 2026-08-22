@@ -13,23 +13,37 @@ export default function CommitteeDetailPage() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [canEdit, setCanEdit] = useState(false); // 1. เพิ่ม State สำหรับตรวจสอบสิทธิ์การแก้ไข
 
   useEffect(() => {
-    const fetchDetail = async () => {
+    const fetchDetailAndAuth = async () => {
       setLoading(true);
-      const { data: detail, error } = await supabase
-        .from('committee_content')
-        .select('*')
-        .eq('committee_key', committeeKey)
-        .single();
+      try {
+        // ดึงข้อมูลคณะกรรมการ
+        const { data: detail, error } = await supabase
+          .from('committee_content')
+          .select('*')
+          .eq('committee_key', committeeKey)
+          .single();
 
-      if (!error && detail) {
-        setData(detail);
+        if (!error && detail) {
+          setData(detail);
+        }
+
+        // 2. ตรวจสอบสิทธิ์การเข้าสู่ระบบ (Login Session)
+        const { data: { session } } = await supabase.auth.getSession();
+        setCanEdit(!!session); // ถ้าเข้าสู่ระบบแล้วจะเป็น true
+
+      } catch (err) {
+        console.error('Unexpected error:', err);
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
 
-    if (committeeKey) fetchDetail();
+    if (committeeKey) {
+      fetchDetailAndAuth();
+    }
   }, [committeeKey, supabase]);
 
   if (loading) return <div className="p-8 text-center text-emerald-800">กำลังโหลดข้อมูล...</div>;
@@ -37,27 +51,30 @@ export default function CommitteeDetailPage() {
 
   return (
     <div className="w-full space-y-6 pb-12">
-      {/* ส่วนหัวชื่อคณะกรรมการ และปุ่มแก้ไข */}
+      {/* ส่วนหัวชื่อคณะกรรมการ และปุ่มแก้ไข (แสดงเฉพาะผู้ที่ Login แล้ว) */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between border-b-2 border-amber-400 pb-4 gap-4">
         <h1 className="text-xl sm:text-2xl font-bold text-emerald-900">
           {data?.committee_name || "คณะกรรมการ"}
         </h1>
         
-        <Link
-          href={`/dashboard/committee/${committeeKey}/edit`}
-          className="bg-emerald-800 hover:bg-emerald-900 text-amber-300 font-semibold px-5 py-2.5 rounded-xl shadow-md transition-all flex items-center gap-2 border border-amber-400/50 cursor-pointer text-sm md:text-base"
-        >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-          </svg>
-          แก้ไขข้อมูลคณะกรรมการ
-        </Link>
+        {/* 3. ครอบปุ่มด้วยเงื่อนไข canEdit */}
+        {canEdit && (
+          <Link
+            href={`/dashboard/committee/${committeeKey}/edit`}
+            className="bg-emerald-800 hover:bg-emerald-900 text-amber-300 font-semibold px-5 py-2.5 rounded-xl shadow-md transition-all flex items-center gap-2 border border-amber-400/50 cursor-pointer text-sm md:text-base"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+            แก้ไขข้อมูลคณะกรรมการ
+          </Link>
+        )}
       </div>
 
-      {/* Grid 12 คอลัมน์ (ปรับลดขนาดคอลัมน์แรกเหลือ col-span-3 และขยายคอลัมน์อื่น) */}
+      {/* Grid 12 คอลัมน์ (โครงสร้างเดิมของคุณ) */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         
-        {/* คอลัมน์ที่ 1: ภาพประธาน และเอกสารดาวน์โหลด (ปรับให้แคบลงเหลือ 3 ส่วน) */}
+        {/* คอลัมน์ที่ 1: ภาพประธาน และเอกสารดาวน์โหลด */}
         <div className="lg:col-span-3 space-y-6">
           <div className="bg-white rounded-2xl border border-emerald-200 shadow-sm overflow-hidden">
             <div className="bg-emerald-800 text-amber-300 px-4 py-3 text-center font-semibold text-sm">
@@ -113,7 +130,7 @@ export default function CommitteeDetailPage() {
           </div>
         </div>
 
-        {/* คอลัมน์ที่ 2: บทบาทหน้าที่ และรายชื่อ (5 ส่วน) */}
+        {/* คอลัมน์ที่ 2: บทบาทหน้าที่ และรายชื่อ */}
         <div className="lg:col-span-5 space-y-6">
           <div className="bg-white rounded-2xl border border-emerald-200 shadow-sm overflow-hidden">
             <div className="bg-emerald-800 text-amber-300 px-4 py-3 text-center font-semibold text-base">
@@ -165,7 +182,7 @@ export default function CommitteeDetailPage() {
           </div>
         </div>
 
-        {/* คอลัมน์ที่ 3: ภาพกิจกรรม (4 ส่วน) */}
+        {/* คอลัมน์ที่ 3: ภาพกิจกรรม */}
         <div className="lg:col-span-4 space-y-6">
           <div className="bg-white rounded-2xl border border-emerald-200 shadow-sm overflow-hidden">
             <div className="bg-emerald-800 text-amber-300 px-4 py-3 text-center font-semibold text-base">

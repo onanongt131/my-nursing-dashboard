@@ -90,7 +90,10 @@ export default function NursingBranchPage() {
           }
         }
 
-        setCanEdit(true);
+        // --- ตรวจสอบสิทธิ์การเข้าสู่ระบบผ่าน Supabase Auth ---
+        const { data: { session } } = await supabase.auth.getSession();
+        setCanEdit(!!session);
+
       } catch (err) {
         console.error('Error:', err);
       } finally {
@@ -103,7 +106,7 @@ export default function NursingBranchPage() {
 
   if (loading) return <div className="p-8 text-center text-emerald-800">กำลังโหลดข้อมูล...</div>;
 
- return (
+  return (
     <div className="p-6 md:p-8 space-y-6 bg-stone-50 min-h-screen">
       
       {/* ส่วนหัว: ชื่อกลุ่มงาน (ธีมเขียว-ทอง) */}
@@ -209,14 +212,12 @@ export default function NursingBranchPage() {
                     rel="noopener noreferrer"
                     className="flex items-center justify-between p-3.5 bg-white rounded-xl border border-amber-200 hover:bg-emerald-50/80 transition-colors group shadow-sm"
                   >
-                    {/* ฝั่งซ้าย: ไอคอน PDF + ชื่อเอกสาร */}
                     <div className="flex items-center gap-3 overflow-hidden">
                       <span className="text-xs font-bold text-stone-700 group-hover:text-emerald-900 truncate">
                         {doc.title || "เอกสารดาวน์โหลด"}
                       </span>
                     </div>
 
-                    {/* ฝั่งขวา: ปุ่ม Download */}
                     <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200 group-hover:bg-emerald-700 group-hover:text-white transition-colors flex-shrink-0 ml-2">
                       Download
                     </span>
@@ -268,83 +269,80 @@ export default function NursingBranchPage() {
         </div>
 
         {/* คอลัมน์ 4: ผลงานเด่น */}
-<div className="bg-white border border-amber-200 rounded-xl p-5 shadow-sm h-full flex flex-col">
-  <div className="bg-emerald-800 text-amber-200 font-bold py-2.5 px-4 rounded-xl w-full mb-4 text-center text-sm border border-amber-500/30">
-    ผลงานเด่น
-  </div>
-  
-  <div className="space-y-4 flex-1">
-    {Array.isArray(content?.highlight_works) && content.highlight_works.length > 0 ? (
-      content.highlight_works.map((work: any, index: number) => {
-        const fileUrl = work.fileUrl || work.url || work.image || "";
-        const isPdf = fileUrl.toLowerCase().endsWith('.pdf') || fileUrl.toLowerCase().includes('.pdf');
-        
-        return (
-          <div key={index} className="p-3.5 bg-emerald-50/40 rounded-xl border border-amber-100 space-y-2.5">
-            {/* ชื่อผลงาน */}
-            <h5 className="text-xs font-bold text-emerald-900">
-              {work.title || work.name || `ผลงานที่ ${index + 1}`}
-            </h5>
-            
-            {/* รายละเอียดผลงาน */}
-            {(work.description || work.detail) && (
-              <p className="text-xs text-stone-600 leading-relaxed">
-                {work.description || work.detail}
-              </p>
-            )}
-
-            {/* ส่วนแสดงผลรูปภาพ หรือ เอกสาร PDF */}
-            {fileUrl && (
-              <div className="pt-1">
-                {isPdf ? (
-                  <a
-                    href={fileUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center justify-between p-3.5 bg-white rounded-xl border border-amber-200 hover:bg-emerald-50/80 transition-colors group shadow-sm"
-                  >
-                    <div className="flex items-center gap-3 overflow-hidden">
-                      <div className="w-9 h-9 rounded-lg bg-red-100 text-red-700 flex items-center justify-center font-bold text-xs flex-shrink-0 shadow-inner">
-                        PDF
-                      </div>
-                      <span className="text-xs font-bold text-stone-700 group-hover:text-emerald-900 truncate">
-                        {work.title || "เอกสารผลงาน PDF"}
-                      </span>
-                    </div>
+        <div className="bg-white border border-amber-200 rounded-xl p-5 shadow-sm h-full flex flex-col">
+          <div className="bg-emerald-800 text-amber-200 font-bold py-2.5 px-4 rounded-xl w-full mb-4 text-center text-sm border border-amber-500/30">
+            ผลงานเด่น
+          </div>
+          
+          <div className="space-y-4 flex-1">
+            {Array.isArray(content?.highlight_works) && content.highlight_works.length > 0 ? (
+              content.highlight_works.map((work: any, index: number) => {
+                const fileUrl = work.fileUrl || work.url || work.image || "";
+                const isPdf = fileUrl.toLowerCase().endsWith('.pdf') || fileUrl.toLowerCase().includes('.pdf');
+                
+                return (
+                  <div key={index} className="p-3.5 bg-emerald-50/40 rounded-xl border border-amber-100 space-y-2.5">
+                    <h5 className="text-xs font-bold text-emerald-900">
+                      {work.title || work.name || `ผลงานที่ ${index + 1}`}
+                    </h5>
                     
-                    <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200 group-hover:bg-emerald-700 group-hover:text-white transition-colors flex-shrink-0 ml-2">
-                      Download
-                    </span>
-                  </a>
-                ) : (
-                  <a
-                    href={fileUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="block w-full rounded-lg overflow-hidden border border-amber-200 shadow-sm bg-stone-100 group relative"
-                  >
-                    <img
-                      src={fileUrl}
-                      alt={work.title || "ผลงานเด่น"}
-                      className="w-full h-auto object-contain group-hover:opacity-95 transition-opacity"
-                    />
-                    <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                      <span className="text-[10px] font-bold text-white bg-black/60 px-2 py-1 rounded">คลิกเพื่อดูรูปใหญ่</span>
-                    </div>
-                  </a>
-                )}
+                    {(work.description || work.detail) && (
+                      <p className="text-xs text-stone-600 leading-relaxed">
+                        {work.description || work.detail}
+                      </p>
+                    )}
+
+                    {fileUrl && (
+                      <div className="pt-1">
+                        {isPdf ? (
+                          <a
+                            href={fileUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center justify-between p-3.5 bg-white rounded-xl border border-amber-200 hover:bg-emerald-50/80 transition-colors group shadow-sm"
+                          >
+                            <div className="flex items-center gap-3 overflow-hidden">
+                              <div className="w-9 h-9 rounded-lg bg-red-100 text-red-700 flex items-center justify-center font-bold text-xs flex-shrink-0 shadow-inner">
+                                PDF
+                              </div>
+                              <span className="text-xs font-bold text-stone-700 group-hover:text-emerald-900 truncate">
+                                {work.title || "เอกสารผลงาน PDF"}
+                              </span>
+                            </div>
+                            
+                            <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-3 py-1.5 rounded-lg border border-emerald-200 group-hover:bg-emerald-700 group-hover:text-white transition-colors flex-shrink-0 ml-2">
+                              Download
+                            </span>
+                          </a>
+                        ) : (
+                          <a
+                            href={fileUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="block w-full rounded-lg overflow-hidden border border-amber-200 shadow-sm bg-stone-100 group relative"
+                          >
+                            <img
+                              src={fileUrl}
+                              alt={work.title || "ผลงานเด่น"}
+                              className="w-full h-auto object-contain group-hover:opacity-95 transition-opacity"
+                            />
+                            <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                              <span className="text-[10px] font-bold text-white bg-black/60 px-2 py-1 rounded">คลิกเพื่อดูรูปใหญ่</span>
+                            </div>
+                          </a>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            ) : (
+              <div className="flex-1 flex items-center justify-center border border-dashed border-emerald-200 rounded-lg bg-emerald-50/30 min-h-[120px]">
+                <p className="text-stone-400 text-xs">ไม่มีข้อมูลผลงานเด่น</p>
               </div>
             )}
           </div>
-        );
-      })
-    ) : (
-      <div className="flex-1 flex items-center justify-center border border-dashed border-emerald-200 rounded-lg bg-emerald-50/30 min-h-[120px]">
-        <p className="text-stone-400 text-xs">ไม่มีข้อมูลผลงานเด่น</p>
-      </div>
-    )}
-  </div>
-</div>
+        </div>
 
       </div>
     </div>

@@ -9,11 +9,13 @@ export default function CommitteeListPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [committees, setCommittees] = useState<any[]>([]);
+  const [canEdit, setCanEdit] = useState(false); // ตัวแปรควบคุมการแสดงปุ่มเพิ่ม
 
   useEffect(() => {
-    const fetchCommittees = async () => {
+    const fetchCommitteesAndAuth = async () => {
       setLoading(true);
       try {
+        // 1. ดึงข้อมูลคณะกรรมการ
         const { data, error } = await supabase
           .from('committee_content')
           .select('committee_key, committee_name, president_name, president_image, updated_at');
@@ -23,6 +25,11 @@ export default function CommitteeListPage() {
         } else {
           setCommittees(data || []);
         }
+
+        // 2. ตรวจสอบสิทธิ์การเข้าสู่ระบบ (Login Session)
+        const { data: { session } } = await supabase.auth.getSession();
+        setCanEdit(!!session); // ถ้า Login แล้วจะเป็น true
+
       } catch (err) {
         console.error('Unexpected error:', err);
       } finally {
@@ -30,7 +37,7 @@ export default function CommitteeListPage() {
       }
     };
 
-    fetchCommittees();
+    fetchCommitteesAndAuth();
   }, [supabase]);
 
   if (loading) {
@@ -53,6 +60,17 @@ export default function CommitteeListPage() {
             ทำเนียบและรายนามคณะกรรมการชุดต่างๆ ประจำปีงบประมาณ
           </p>
         </div>
+
+        {/* ปุ่มเพิ่มคณะกรรมการ (แสดงเฉพาะผู้ที่ Login แล้วเท่านั้น) */}
+        {canEdit && (
+          <button
+            type="button"
+            onClick={() => router.push('/dashboard/committee/add')} // ปรับ Path หน้าเพิ่มข้อมูลตามโปรเจกต์ของคุณ
+            className="bg-emerald-700 hover:bg-emerald-800 text-amber-100 font-semibold px-5 py-2.5 rounded-xl shadow-md transition-colors border border-amber-400 cursor-pointer flex-shrink-0"
+          >
+            + เพิ่มคณะกรรมการ
+          </button>
+        )}
       </div>
 
       {/* Grid แสดงรายการคณะกรรมการ */}

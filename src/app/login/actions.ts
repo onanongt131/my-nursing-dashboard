@@ -35,11 +35,21 @@ export async function authenticate(prevState: any, formData: FormData) {
       redirectTo: "/dashboard",
     });
   } catch (error) {
+    // 🔥 เพิ่มการดักจับ Error ที่ส่งมาจาก auth.ts ตรงนี้ก่อนครับ
+    if (error instanceof Error) {
+      if (error.message === "UNAPPROVED_USER") {
+        return "บัญชีของคุณยังไม่ได้รับการอนุมัติจากผู้ดูแลระบบ กรุณารอการอนุมัติ";
+      }
+      if (error.message === "ไม่พบอีเมลนี้ในระบบ" || error.message === "รหัสผ่านไม่ถูกต้อง") {
+        return error.message;
+      }
+    }
+
     if (error instanceof AuthError) {
       return "ชื่อผู้ใช้งานหรือรหัสผ่านไม่ถูกต้อง";
     }
     
-    // 🔥 จุดสำคัญ: เช็คว่าถ้าเป็นคำสั่งดีดหน้า (Redirect) ให้ปล่อยผ่านไปเลย ห้าม throw error
+    // เช็คเรื่องการ Redirect ของ Next.js
     if (error instanceof Error && error.message === 'NEXT_REDIRECT') {
       throw error;
     }
@@ -51,6 +61,7 @@ export async function authenticate(prevState: any, formData: FormData) {
     return "เกิดข้อผิดพลาดในการเชื่อมต่อระบบ";
   }
 }
+
 export async function handleSignOut() {
   await serverSignOut({ redirectTo: "/login" });
 }

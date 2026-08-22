@@ -5,7 +5,6 @@ import { LayoutDashboard, CheckCircle2, XCircle } from 'lucide-react';
 import AddEntryForm from '@/components/AddEntryForm';
 import KpiCard from "@/components/KpiCard";
 import { getButtonStyle } from "@/utils/kpiCalculations";
-import CategoryClient from './category/CategoryClient';
 import { CheckCircleIcon as IconCheck, XCircleIcon as XIcon } from '@heroicons/react/24/solid';
 
 export const categories = [

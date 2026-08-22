@@ -137,7 +137,7 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
   const isKpiActive = pathname.startsWith('/dashboard/category') || pathname.startsWith('/dashboard/strategy') || activeTab === 'category' || activeTab === 'strategy';
   const isMonthlyActive = (pathname.startsWith('/dashboard/productivity') || pathname.startsWith('/dashboard/wp-qa') || pathname.startsWith('/dashboard/iv-care') || pathname.startsWith('/dashboard/audit-chart') || ['productivity', 'wp-qa', 'iv-care', 'audit-chart', 'Audit chart'].includes(activeTab)) && !isUnitActive;
   
-  const buttonBaseClass = "w-full md:w-52 h-11 flex items-center justify-center gap-2 px-4 font-semibold text-sm md:text-base rounded-xl transition-all cursor-pointer whitespace-nowrap";
+  const buttonBaseClass = "w-full md:w-auto flex-1 h-11 flex items-center justify-center gap-1 px-3 font-semibold text-xs md:text-sm rounded-xl transition-all cursor-pointer whitespace-nowrap";
   const activeStyle = "bg-emerald-800 text-amber-300 border border-amber-400";
   const inactiveStyle = "bg-emerald-900 text-amber-100 hover:text-amber-300 hover:bg-emerald-800";
 
@@ -168,6 +168,20 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
 
        {/* ส่วนแสดงชื่อ Login และ Badge สิทธิ์ (Desktop View) */}
         <div className="hidden md:flex items-center gap-3">
+          
+          {/* 👉 ปุ่มอนุมัติสมาชิก (แสดงเฉพาะ Admin มุมขวาบน) */}
+          {userRole && userRole.toLowerCase() === 'admin' && (
+            <a 
+              href="/dashboard/admin/approve-members" 
+              className="h-11 flex items-center gap-2 px-4 rounded-2xl border border-emerald-300/60 bg-white text-emerald-900 font-bold text-sm hover:bg-emerald-50 transition-colors shadow-2xs"
+            >
+              <svg className="w-4 h-4 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              อนุมัติสมาชิก
+            </a>
+          )}
+
           {/* กล่องชื่อผู้ใช้งาน */}
           <div className="h-11 flex items-center gap-3 px-4 rounded-2xl border border-emerald-300/60 bg-white shadow-2xs">
             <div className="w-8 h-8 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-800 shrink-0">
@@ -188,7 +202,7 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
             </div>
           </div>
           
-          {/* ปุ่มออกจากระบบ (กรอบโค้ง rounded-2xl ขอบสีแดงอ่อน พื้นหลังแดงอ่อน) */}
+          {/* ปุ่มออกจากระบบ */}
           <div className="h-11 flex items-center px-2 rounded-2xl border border-rose-200 bg-rose-50/50 hover:bg-rose-100/60 transition-colors">
             <LogoutButton />
           </div>
@@ -199,7 +213,7 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
       <div className={`w-full bg-emerald-900 shadow-md transition-all duration-300 ${isMobileMenuOpen ? 'block' : 'hidden'} md:block`}>
         <nav className="flex flex-col md:flex-row items-start md:items-center justify-start gap-3 px-4 sm:px-6 py-3">
           
-          {/* 1. หน้าหลัก */}
+         {/* 1. หน้าหลัก */}
           <button type="button" onClick={() => { onTabChange && onTabChange('dashboard'); setIsMobileMenuOpen(false); }} className={`${buttonBaseClass} ${isHomeActive ? activeStyle : inactiveStyle}`}>หน้าหลัก</button>
 
           {/* 2. คณะกรรมการ */}

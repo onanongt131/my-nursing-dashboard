@@ -65,6 +65,7 @@ export default function DashboardLayoutContent({ profile, departments = [], chil
           onTabChange={handleTabChange}
           departments={departments}
           userName={profile?.full_name}
+          userRole={profile?.role}
         />
       </div>
       

@@ -1,17 +1,29 @@
-// ในไฟล์ src/middleware.ts
 import { auth } from "@/auth";
 import { NextResponse } from "next/server";
 
-// 1. เขียนฟังก์ชัน middleware แบบมาตรฐานที่ Next.js บังคับตรวจเช็ค
 export default auth((req) => {
-  // ระบบจะใช้เงื่อนไขตรวจสอบจาก callbacks.authorized ใน auth.ts อัตโนมัติ
+  const { pathname } = req.nextUrl;
+  const isLoggedIn = !!req.auth;
+
+  // 1. กำหนดหน้า Public ที่ไม่ต้อง Login (รวมหน้าหลักและหน้าย่อยของมัน)
+  const isPublicPage = 
+    pathname === "/dashboard" || 
+    pathname.startsWith("/dashboard/committee") || 
+    pathname.startsWith("/dashboard/nursing");
+
+  // ถ้าเป็นหน้า Public ให้ปล่อยผ่านทันที ไม่ต้องเช็ค Login
+  if (isPublicPage) {
+    return NextResponse.next();
+  }
+
+  // 2. ถ้าเข้าหน้าอื่นใน /dashboard ที่ไม่ใช่ Public และยังไม่ได้ Login ให้ดีดไป /login
+  if (!isLoggedIn) {
+    return NextResponse.redirect(new URL("/login", req.url));
+  }
+
   return NextResponse.next();
 });
 
-// 2. ล็อกเป้าหมายตรวจเช็คเฉพาะหน้า Login และหน้าระบบหลังบ้าน
 export const config = {
-  matcher: [
-    // ยกเว้น route ของ api auth
-    '/((?!api|_next/static|_next/image|favicon.ico|login).*)',
-  ],
-}
+  matcher: ["/dashboard/:path*"],
+};

@@ -1,13 +1,23 @@
 import { createBrowserClient } from '@supabase/ssr'
 
-export const createClient = () =>
-  createBrowserClient(
+// สร้างตัวแปรเก็บอินสแตนซ์ไว้ภายนอกฟังก์ชัน
+let cachedClient: ReturnType<typeof createBrowserClient> | null = null;
+
+export const createClient = () => {
+  if (cachedClient) {
+    return cachedClient;
+  }
+
+  cachedClient = createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       auth: {
-        persistSession: false, // ปิดการจำ Session ข้ามการปิดเบราว์เซอร์
+        persistSession: false, 
         autoRefreshToken: true,
       },
     }
   );
+
+  return cachedClient;
+};

@@ -19,6 +19,10 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
   const [isCommitteeDropdownOpen, setIsCommitteeDropdownOpen] = useState(false);
   const committeeDropdownRef = useRef<HTMLDivElement>(null);
   
+  // State สำหรับ Dropdown เมนู "อัตรากำลัง"
+  const [isStaffingDropdownOpen, setIsStaffingDropdownOpen] = useState(false);
+  const staffingDropdownRef = useRef<HTMLDivElement>(null);
+  
   const [nursingBranches, setNursingBranches] = useState<any[]>([
     { name: 'การพยาบาลวิจัยและพัฒนาการบริการ', path: '/dashboard/nursing/branch-1' },
     { name: 'การพยาบาลผู้ป่วยหนัก', path: '/dashboard/nursing/branch-2' },
@@ -46,6 +50,13 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
     { name: 'คณะกรรมการ EIC', path: '/dashboard/committee/eic' },
     { name: 'คณะกรรมการ 5S และสิ่งแวดล้อม', path: '/dashboard/committee/5s' },
     { name: 'คณะกรรมการบ้านพัก', path: '/dashboard/committee/home' },
+  ];
+
+  // รายการเมนูย่อยของ "อัตรากำลัง"
+  const staffingSubMenus = [
+    { name: 'staffing-overview', label: 'บุคลากรและสมรรถนะ', path: '/dashboard/staffing' },
+    { name: 'command-center', label: 'Ward Command Center', path: '/dashboard/staffing/command-center' },
+    { name: 'shift-schedule', label: 'ตารางเวรและกำลังคนจริง', path: '/dashboard/staffing/schedule' },
   ];
 
   useEffect(() => {
@@ -122,6 +133,7 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
     const handleClickOutside = (event: MouseEvent) => {
       if (nursingDropdownRef.current && !nursingDropdownRef.current.contains(event.target as Node)) setIsNursingDropdownOpen(false);
       if (committeeDropdownRef.current && !committeeDropdownRef.current.contains(event.target as Node)) setIsCommitteeDropdownOpen(false);
+      if (staffingDropdownRef.current && !staffingDropdownRef.current.contains(event.target as Node)) setIsStaffingDropdownOpen(false);
       if (kpiDropdownRef.current && !kpiDropdownRef.current.contains(event.target as Node)) setIsKpiDropdownOpen(false);
       if (monthlyDropdownRef.current && !monthlyDropdownRef.current.contains(event.target as Node)) setIsMonthlyDropdownOpen(false);
       if (unitDropdownRef.current && !unitDropdownRef.current.contains(event.target as Node)) { setIsUnitDropdownOpen(false); }
@@ -130,9 +142,10 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const isHomeActive = (pathname === '/dashboard' || activeTab === 'dashboard') && !pathname.startsWith('/dashboard/nursing') && !pathname.startsWith('/dashboard/committee') && !activeTab?.startsWith('committee');
+  const isHomeActive = (pathname === '/dashboard' || activeTab === 'dashboard') && !pathname.startsWith('/dashboard/nursing') && !pathname.startsWith('/dashboard/committee') && !pathname.startsWith('/dashboard/staffing') && !activeTab?.startsWith('committee') && !activeTab?.startsWith('staffing');
   const isCommitteeActive = pathname.startsWith('/dashboard/committee') || activeTab === 'committee';
   const isNursingActive = pathname.startsWith('/dashboard/nursing') || activeTab === 'nursing';
+  const isStaffingActive = pathname.startsWith('/dashboard/staffing') || activeTab === 'staffing' || activeTab === 'staffing-overview';
   const isUnitActive = pathname.startsWith('/dashboard/departments') || activeTab === 'unit';
   const isKpiActive = pathname.startsWith('/dashboard/category') || pathname.startsWith('/dashboard/strategy') || activeTab === 'category' || activeTab === 'strategy';
   const isMonthlyActive = (pathname.startsWith('/dashboard/productivity') || pathname.startsWith('/dashboard/wp-qa') || pathname.startsWith('/dashboard/iv-care') || pathname.startsWith('/dashboard/audit-chart') || ['productivity', 'wp-qa', 'iv-care', 'audit-chart', 'Audit chart'].includes(activeTab)) && !isUnitActive;
@@ -169,7 +182,7 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
        {/* ส่วนแสดงชื่อ Login และ Badge สิทธิ์ (Desktop View) */}
         <div className="hidden md:flex items-center gap-3">
           
-          {/* 👉 ปุ่มอนุมัติสมาชิก (แสดงเฉพาะ Admin มุมขวาบน) */}
+          {/* ปุ่มอนุมัติสมาชิก */}
           {userRole && userRole.toLowerCase() === 'admin' && (
             <a 
               href="/dashboard/admin/approve-members" 
@@ -258,7 +271,39 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
             )}
           </div>
 
-          {/* 4. ตัวชี้วัดตามแผน */}
+          {/* 4. อัตรากำลัง (ย้ายมาอยู่หลังการพยาบาล 16 กลุ่มงาน) */}
+          <div className="relative w-full md:w-auto" ref={staffingDropdownRef}>
+            <button 
+              type="button" 
+              onClick={() => setIsStaffingDropdownOpen(!isStaffingDropdownOpen)} 
+              className={`${buttonBaseClass} ${isStaffingActive || isStaffingDropdownOpen ? activeStyle : inactiveStyle}`}
+            >
+              <span>อัตรากำลัง</span>
+              <svg className={`w-4 h-4 ml-1 transition-transform ${isStaffingDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            {isStaffingDropdownOpen && (
+              <div className="absolute left-0 mt-2 w-full md:w-60 bg-white rounded-xl shadow-2xl border border-amber-200 py-2 z-50 flex flex-col">
+                {staffingSubMenus.map((m: any, index: number) => (
+                  <a 
+                    key={`${m.name}-${index}`} 
+                    href={m.path}
+                    onClick={() => {
+                      if (onTabChange) onTabChange(m.name);
+                      setIsMobileMenuOpen(false);
+                      setIsStaffingDropdownOpen(false);
+                    }} 
+                    className="block px-4 py-2.5 text-sm text-gray-700 hover:bg-emerald-50 transition-colors border-b last:border-b-0"
+                  >
+                    {m.label}
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* 5. ตัวชี้วัดตามแผน */}
           <div className="relative w-full md:w-auto" ref={kpiDropdownRef}>
             <button type="button" onClick={() => setIsKpiDropdownOpen(!isKpiDropdownOpen)} className={`${buttonBaseClass} ${isKpiActive ? activeStyle : inactiveStyle}`}>
               <span>ตัวชี้วัดตามแผน</span>
@@ -279,7 +324,7 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
           )}
           </div>
 
-          {/* 5. ตัวชี้วัดรายเดือน */}
+          {/* 6. ตัวชี้วัดรายเดือน */}
           <div className="relative w-full md:w-auto" ref={monthlyDropdownRef}>
             <button type="button" onClick={() => setIsMonthlyDropdownOpen(!isMonthlyDropdownOpen)} className={`${buttonBaseClass} ${isMonthlyActive ? activeStyle : inactiveStyle}`}>
               <span>ตัวชี้วัดรายเดือน</span>
@@ -292,7 +337,7 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
             )}
           </div>
 
-          {/* 6. หน่วยงาน */}
+          {/* 7. หน่วยงาน */}
           <div className="relative w-full md:w-auto" ref={unitDropdownRef}>
             <button type="button" onClick={() => setIsUnitDropdownOpen(!isUnitDropdownOpen)} className={`${buttonBaseClass} ${isUnitActive || isUnitDropdownOpen ? activeStyle : inactiveStyle}`}>
               <span>หน่วยงาน</span>

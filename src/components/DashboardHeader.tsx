@@ -44,6 +44,7 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
 
   // รายชื่อคณะกรรมการ
   const committeeList = [
+    { name: 'คณะกรรมการบริหาร', path: '/dashboard/committee/executive' },
     { name: 'คณะกรรมการ QA', path: '/dashboard/committee/qa' },
     { name: 'คณะกรรมการ RM', path: '/dashboard/committee/rm' },
     { name: 'คณะกรรมการวิชาการ', path: '/dashboard/committee/academic' },
@@ -56,7 +57,9 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
   const staffingSubMenus = [
     { name: 'staffing-overview', label: 'บุคลากรและสมรรถนะ', path: '/dashboard/staffing' },
     { name: 'command-center', label: 'Ward Command Center', path: '/dashboard/staffing/command-center' },
-    { name: 'shift-schedule', label: 'ตารางเวรและกำลังคนจริง', path: '/dashboard/staffing/schedule' },
+    { name: 'shift-schedule', label: 'ตารางเวร', path: '/dashboard/staffing/schedule' },
+    { name: 'staffing-dashboard', label: 'ภาพรวมอัตรากำลัง', path: '/dashboard/staffing/overview' },
+    { name: 'inspection-report',label: 'รายงานเวรตรวจการ', path: '/dashboard/staffing/inspection-report'},
   ];
 
   useEffect(() => {
@@ -340,7 +343,7 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
           {/* 7. หน่วยงาน */}
           <div className="relative w-full md:w-auto" ref={unitDropdownRef}>
             <button type="button" onClick={() => setIsUnitDropdownOpen(!isUnitDropdownOpen)} className={`${buttonBaseClass} ${isUnitActive || isUnitDropdownOpen ? activeStyle : inactiveStyle}`}>
-              <span>หน่วยงาน</span>
+              <span>หน่วยงานภายใน</span>
               <svg className={`w-4 h-4 ml-1 transition-transform ${isUnitDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
             </button>
             {isUnitDropdownOpen && (

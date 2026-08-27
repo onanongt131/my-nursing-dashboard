@@ -1,9 +1,12 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter, usePathname } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 
 export default function StaffingDashboardPage() {
+  const router = useRouter();
+  const pathname = usePathname();
   const [loading, setLoading] = useState(true);
 
   // กำหนดค่าเริ่มต้นเป็นวันปัจจุบันในรูปแบบ YYYY-MM-DD
@@ -19,6 +22,15 @@ export default function StaffingDashboardPage() {
   });
 
   const [departmentStaffing, setDepartmentStaffing] = useState<any[]>([]);
+
+  // รายการ Tabs สำหรับสลับหน้า
+  const tabs = [
+    { label: 'บุคลากรและสมรรถนะ', path: '/dashboard/staffing' },
+    { label: 'Ward Command Center', path: '/dashboard/staffing/command-center' },
+    { label: 'ตารางเวร', path: '/dashboard/staffing/schedule' },
+    { label: 'ภาพรวมอัตรากำลัง', path: '/dashboard/staffing/overview' },
+    { label: 'รายงานเวรตรวจการ', path: '/dashboard/staffing/inspection-report' }, // หน้าใหม่ที่เพิ่มเข้ามา
+  ];
 
   useEffect(() => {
     async function fetchDailyStaffing() {
@@ -133,26 +145,36 @@ export default function StaffingDashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* หัวข้อหน้าเว็บ และปุ่ม Ward Command Center */}
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-white p-6 rounded-2xl shadow-xs border border-emerald-100">
-        <div>
-          <h1 className="text-xl md:text-2xl font-bold text-emerald-900">บุคลากรและสมรรถนะ (Staffing Overview)</h1>
-          <p className="text-sm text-gray-500 mt-1">ติดตามข้อมูลอัตรากำลัง กำลังคนจริง และสถานการณ์การปฏิบัติงานภาพรวม</p>
-        </div>
-        <div className="flex items-center gap-3">
-          {/* ปุ่ม Ward Command Center ตามดีไซน์ที่ต้องการ */}
-          <a
-            href="/dashboard/staffing/command-center"
-            className="px-5 py-2.5 bg-[#0A5C36] text-[#FFD700] font-bold text-sm rounded-xl hover:bg-[#08482A] transition-all shadow-md flex items-center gap-2"
-          >
-            Ward Command Center
-          </a>
-          <a
-            href="/dashboard/staffing/schedule"
-            className="px-4 py-2.5 bg-white border border-emerald-300 text-emerald-900 font-semibold text-sm rounded-xl hover:bg-emerald-50 transition-colors shadow-xs"
-          >
-            ตารางเวรและกำลังคนจริง
-          </a>
+      {/* ส่วนหัวข้อหน้าเว็บ พร้อมแถบ Tabs สลับหน้า */}
+      <div className="bg-white p-6 rounded-2xl shadow-sm border border-emerald-100">
+        <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
+          
+          {/* หัวข้อและคำอธิบาย */}
+          <div>
+            <h1 className="text-xl md:text-2xl font-bold text-emerald-900">บุคลากรและสมรรถนะ (Staffing Overview)</h1>
+            <p className="text-sm text-gray-500 mt-1">ติดตามข้อมูลอัตรากำลัง กำลังคนจริง และสถานการณ์การปฏิบัติงานภาพรวม</p>
+          </div>
+
+         {/* แถบ Tabs สลับหน้า */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
+            {tabs.map((tab) => {
+              const isActive = pathname === tab.path;
+              return (
+                <button
+                  key={tab.path}
+                  onClick={() => router.push(tab.path)}
+                  className={`px-3 py-2 rounded-xl text-xs font-medium transition-all shadow-xs whitespace-nowrap ${
+                    isActive
+                      ? 'bg-emerald-800 text-white shadow-emerald-900/20'
+                      : 'bg-white text-emerald-800 border border-emerald-200 hover:bg-emerald-50'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              );
+            })}
+          </div>
+
         </div>
       </div>
 

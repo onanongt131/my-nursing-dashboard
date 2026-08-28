@@ -19,10 +19,13 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
   const [isCommitteeDropdownOpen, setIsCommitteeDropdownOpen] = useState(false);
   const committeeDropdownRef = useRef<HTMLDivElement>(null);
   
-  // State สำหรับ Dropdown เมนู "อัตรากำลัง"
   const [isStaffingDropdownOpen, setIsStaffingDropdownOpen] = useState(false);
   const staffingDropdownRef = useRef<HTMLDivElement>(null);
   
+  // State สำหรับ Nursing Dashboard แบบดรอปดาวน์ 6 แดชบอร์ด
+  const [isDashboardDropdownOpen, setIsDashboardDropdownOpen] = useState(false);
+  const dashboardDropdownRef = useRef<HTMLDivElement>(null);
+
   const [nursingBranches, setNursingBranches] = useState<any[]>([
     { name: 'การพยาบาลวิจัยและพัฒนาการบริการ', path: '/dashboard/nursing/branch-1' },
     { name: 'การพยาบาลผู้ป่วยหนัก', path: '/dashboard/nursing/branch-2' },
@@ -42,6 +45,16 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
     { name: 'การพยาบาลผู้ป่วยออร์โธปิดิกส์', path: '/dashboard/nursing/branch-16' },
   ]);
 
+  // 6 แดชบอร์ดดีย่อยตามโครงสร้างใหม่
+  const nursingDashboardSubMenus = [
+    { name: 'executive', label: '1. Executive Dashboard', desc: 'ภาพรวมองค์กรตอนนี้เป็นอย่างไร', path: '/dashboard/nursing-dashboard/executive' },
+    { name: 'strategic', label: '2. Strategic Dashboard', desc: '5 ยุทธศาสตร์บรรลุเป้าหมายหรือไม่', path: '/dashboard/nursing-dashboard/strategic' },
+    { name: 'quality-safety', label: '3. Quality & Safety Dashboard', desc: 'จุดเสี่ยงทางการพยาบาลอยู่ที่ไหน', path: '/dashboard/nursing-dashboard/quality-safety' },
+    { name: 'workforce', label: '4. Workforce Dashboard', desc: 'คนพอไหม Productivity/PCS/Skill Mix เป็นอย่างไร', path: '/dashboard/nursing-dashboard/workforce' },
+    { name: 'people-excellence', label: '5. People Excellence Dashboard', desc: 'Competency, IDP, Engagement, Supervision เป็นอย่างไร', path: '/dashboard/nursing-dashboard/people-excellence' },
+    { name: 'action-risk', label: '6. Action & Risk Dashboard', desc: 'เรื่องใดต้องแก้ ใครรับผิดชอบ และครบกำหนดเมื่อใด', path: '/dashboard/nursing-dashboard/action-risk' },
+  ];
+
   // รายชื่อคณะกรรมการ
   const committeeList = [
     { name: 'คณะกรรมการบริหาร', path: '/dashboard/committee/executive' },
@@ -59,7 +72,7 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
     { name: 'command-center', label: 'Ward Command Center', path: '/dashboard/staffing/command-center' },
     { name: 'shift-schedule', label: 'ตารางเวร', path: '/dashboard/staffing/schedule' },
     { name: 'staffing-dashboard', label: 'ภาพรวมอัตรากำลัง', path: '/dashboard/staffing/overview' },
-    { name: 'inspection-report',label: 'รายงานเวรตรวจการ', path: '/dashboard/staffing/inspection-report'},
+    { name: 'inspection-report', label: 'รายงานเวรตรวจการ', path: '/dashboard/staffing/inspection-report' },
   ];
 
   useEffect(() => {
@@ -140,14 +153,16 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
       if (kpiDropdownRef.current && !kpiDropdownRef.current.contains(event.target as Node)) setIsKpiDropdownOpen(false);
       if (monthlyDropdownRef.current && !monthlyDropdownRef.current.contains(event.target as Node)) setIsMonthlyDropdownOpen(false);
       if (unitDropdownRef.current && !unitDropdownRef.current.contains(event.target as Node)) { setIsUnitDropdownOpen(false); }
+      if (dashboardDropdownRef.current && !dashboardDropdownRef.current.contains(event.target as Node)) setIsDashboardDropdownOpen(false);
     };
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const isHomeActive = (pathname === '/dashboard' || activeTab === 'dashboard') && !pathname.startsWith('/dashboard/nursing') && !pathname.startsWith('/dashboard/committee') && !pathname.startsWith('/dashboard/staffing') && !activeTab?.startsWith('committee') && !activeTab?.startsWith('staffing');
+  const isHomeActive = pathname === '/dashboard' || activeTab === 'home' || activeTab === 'overview';
+  const isDashboardActive = pathname.startsWith('/dashboard/nursing-dashboard') || activeTab === 'nursing-dashboard';
   const isCommitteeActive = pathname.startsWith('/dashboard/committee') || activeTab === 'committee';
-  const isNursingActive = pathname.startsWith('/dashboard/nursing') || activeTab === 'nursing';
+  const isNursingActive = (pathname.startsWith('/dashboard/nursing') && !pathname.startsWith('/dashboard/nursing-dashboard')) || activeTab === 'nursing';
   const isStaffingActive = pathname.startsWith('/dashboard/staffing') || activeTab === 'staffing' || activeTab === 'staffing-overview';
   const isUnitActive = pathname.startsWith('/dashboard/departments') || activeTab === 'unit';
   const isKpiActive = pathname.startsWith('/dashboard/category') || pathname.startsWith('/dashboard/strategy') || activeTab === 'category' || activeTab === 'strategy';
@@ -229,10 +244,49 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
       <div className={`w-full bg-emerald-900 shadow-md transition-all duration-300 ${isMobileMenuOpen ? 'block' : 'hidden'} md:block`}>
         <nav className="flex flex-col md:flex-row items-start md:items-center justify-start gap-3 px-4 sm:px-6 py-3">
           
-         {/* 1. หน้าหลัก */}
-          <button type="button" onClick={() => { onTabChange && onTabChange('dashboard'); setIsMobileMenuOpen(false); }} className={`${buttonBaseClass} ${isHomeActive ? activeStyle : inactiveStyle}`}>หน้าหลัก</button>
+          {/* 1. หน้าหลัก (Home / วิสัยทัศน์) */}
+          <a 
+            href="/dashboard"
+            onClick={() => { if (onTabChange) onTabChange('home'); setIsMobileMenuOpen(false); }}
+            className={`${buttonBaseClass} ${isHomeActive ? activeStyle : inactiveStyle}`}
+          >
+            <span>หน้าหลัก</span>
+          </a>
 
-          {/* 2. คณะกรรมการ */}
+          {/* 2. Nursing Dashboard (6 แดชบอร์ดดีย่อย) */}
+          <div className="relative w-full md:w-auto" ref={dashboardDropdownRef}>
+            <button 
+              type="button" 
+              onClick={() => setIsDashboardDropdownOpen(!isDashboardDropdownOpen)} 
+              className={`${buttonBaseClass} ${isDashboardActive || isDashboardDropdownOpen ? activeStyle : inactiveStyle}`}
+            >
+              <span>Nursing Dashboard</span>
+              <svg className={`w-4 h-4 ml-1 transition-transform ${isDashboardDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+            {isDashboardDropdownOpen && (
+              <div className="absolute left-0 mt-2 w-full md:w-80 bg-white rounded-xl shadow-2xl border border-amber-200 py-2 z-50 max-h-[450px] overflow-y-auto">
+                {nursingDashboardSubMenus.map((m: any, index: number) => (
+                  <a 
+                    key={`${m.name}-${index}`} 
+                    href={m.path}
+                    onClick={() => {
+                      if (onTabChange) onTabChange(m.name);
+                      setIsMobileMenuOpen(false);
+                      setIsDashboardDropdownOpen(false);
+                    }} 
+                    className="block px-4 py-3 text-sm text-gray-700 hover:bg-emerald-50 transition-colors border-b last:border-b-0"
+                  >
+                    <div className="font-bold text-emerald-900">{m.label}</div>
+                    <div className="text-xs text-gray-500 mt-0.5">{m.desc}</div>
+                  </a>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* 3. คณะกรรมการ */}
           <div className="relative w-full md:w-auto" ref={committeeDropdownRef}>
             <button 
               type="button" 
@@ -253,7 +307,7 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
             )}
           </div>
 
-          {/* 3. การพยาบาล 16 กลุ่มงาน */}
+          {/* 4. การพยาบาล 16 กลุ่มงาน */}
           <div className="relative w-full md:w-auto" ref={nursingDropdownRef}>
             <button 
               type="button" 
@@ -274,7 +328,7 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
             )}
           </div>
 
-          {/* 4. อัตรากำลัง (ย้ายมาอยู่หลังการพยาบาล 16 กลุ่มงาน) */}
+          {/* 5. อัตรากำลัง */}
           <div className="relative w-full md:w-auto" ref={staffingDropdownRef}>
             <button 
               type="button" 
@@ -306,7 +360,7 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
             )}
           </div>
 
-          {/* 5. ตัวชี้วัดตามแผน */}
+          {/* 6. ตัวชี้วัดตามแผน */}
           <div className="relative w-full md:w-auto" ref={kpiDropdownRef}>
             <button type="button" onClick={() => setIsKpiDropdownOpen(!isKpiDropdownOpen)} className={`${buttonBaseClass} ${isKpiActive ? activeStyle : inactiveStyle}`}>
               <span>ตัวชี้วัดตามแผน</span>
@@ -327,7 +381,7 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
           )}
           </div>
 
-          {/* 6. ตัวชี้วัดรายเดือน */}
+          {/* 7. ตัวชี้วัดรายเดือน */}
           <div className="relative w-full md:w-auto" ref={monthlyDropdownRef}>
             <button type="button" onClick={() => setIsMonthlyDropdownOpen(!isMonthlyDropdownOpen)} className={`${buttonBaseClass} ${isMonthlyActive ? activeStyle : inactiveStyle}`}>
               <span>ตัวชี้วัดรายเดือน</span>
@@ -340,7 +394,7 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
             )}
           </div>
 
-          {/* 7. หน่วยงาน */}
+          {/* 8. หน่วยงาน */}
           <div className="relative w-full md:w-auto" ref={unitDropdownRef}>
             <button type="button" onClick={() => setIsUnitDropdownOpen(!isUnitDropdownOpen)} className={`${buttonBaseClass} ${isUnitActive || isUnitDropdownOpen ? activeStyle : inactiveStyle}`}>
               <span>หน่วยงานภายใน</span>

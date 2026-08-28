@@ -12,11 +12,6 @@ export default function NursingExecutiveDashboard() {
 
   return (
     <div className="min-h-screen bg-gray-100/60 pb-12">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 pt-6 space-y-6">
-        
-        {/* หัวข้อหน้าแดชบอร์ด */}
-        <DashboardHeader title="NURSING EXECUTIVE DASHBOARD" activeTab="nursing-dashboard" />
-
         {/* 1. FILTER BAR SECTION */}
         <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-200 flex flex-wrap items-center justify-between gap-4">
           <div className="flex flex-wrap items-center gap-3">
@@ -189,6 +184,5 @@ export default function NursingExecutiveDashboard() {
         </div>
 
       </div>
-    </div>
   );
 }

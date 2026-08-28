@@ -106,26 +106,58 @@ export default function AddEntryForm({ kpiId, type, deptId, onSuccess }: {
         finalValue = Number(Number(val).toFixed(2));
       } else {
         const rawFinalValue = type === 'percent' ? (den !== 0 ? (num / den) * 100 : 0) : 
-                            type === 'rate' ? (den !== 0 ? (num / den) * 1000 : 0) : val;
+                              type === 'rate' ? (den !== 0 ? (num / den) * 1000 : 0) : val;
         
         finalValue = Number(Number(rawFinalValue).toFixed(2));
       }
       
       const targetDeptId = deptId ? Number(deptId) : null;
+      const targetKpiId = Number(kpiId);
+      const targetYear = Number(formData.year);
+      const targetMonth = formData.month;
+
+      // 1. ตรวจสอบว่ามีข้อมูลเดิมอยู่แล้วหรือไม่
+      let checkQuery = supabase
+        .from('kpi_entries')
+        .select('id')
+        .eq('kpi_id', targetKpiId)
+        .eq('year', targetYear)
+        .eq('month', targetMonth);
+
+      if (targetDeptId) {
+        checkQuery = checkQuery.eq('department_id', targetDeptId);
+      } else {
+        checkQuery = checkQuery.is('department_id', null);
+      }
+
+      const { data: existingData, error: checkError } = await checkQuery.maybeSingle();
+      if (checkError) throw checkError;
 
       const payload = {
-        kpi_id: Number(kpiId),
+        kpi_id: targetKpiId,
         department_id: targetDeptId,
-        year: Number(formData.year),
-        month: formData.month,
+        year: targetYear,
+        month: targetMonth,
         value: finalValue,
         numerator: type === 'count' ? null : num,      
         denominator: type === 'count' ? null : den
       };
 
-      const { error } = await supabase
-        .from('kpi_entries')
-        .upsert(payload, { onConflict: 'kpi_id, department_id, year, month' });
+      let error;
+      if (existingData) {
+        // 2. ถ้ามีข้อมูลเดิมแล้ว ให้ทำการ Update ตาม id
+        const { error: updateError } = await supabase
+          .from('kpi_entries')
+          .update(payload)
+          .eq('id', existingData.id);
+        error = updateError;
+      } else {
+        // 3. ถ้ายังไม่มี ให้ทำการ Insert ใหม่
+        const { error: insertError } = await supabase
+          .from('kpi_entries')
+          .insert([payload]);
+        error = insertError;
+      }
 
       if (error) throw error;
       

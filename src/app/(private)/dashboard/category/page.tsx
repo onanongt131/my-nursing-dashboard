@@ -21,6 +21,14 @@ export default function CategoryPage() {
 
   const supabase = createClient();
 
+  // ย้ายฟังก์ชันมาไว้ตรงนี้ (ให้อยู่ภายใน CategoryPage)
+  const formatGoal = (kpi: any) => {
+    const op = kpi.operator && kpi.operator.trim() !== '' ? `${kpi.operator} ` : '';
+    const val = kpi.target_value ?? '';
+    const unit = kpi.unit ? ` ${kpi.unit}` : '';
+    return `${op}${val}${unit}`;
+  };
+
   const loadKpis = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -167,7 +175,7 @@ export default function CategoryPage() {
         rowsHTML += `
           <tr>
             <td style="border: 1px solid #cbd5e1; padding: 8px; text-align: left;">${idx + 1}. ${kpi.name}</td>
-            <td style="border: 1px solid #cbd5e1; padding: 8px; text-align: center; font-weight: bold;">${kpi.target_value} ${kpi.unit || ''}</td>
+            <td style="border: 1px solid #cbd5e1; padding: 8px; text-align: center; font-weight: bold;">${formatGoal(kpi)}</td>
             <td style="border: 1px solid #cbd5e1; padding: 8px; text-align: center;">${entry2565}</td>
             <td style="border: 1px solid #cbd5e1; padding: 8px; text-align: center;">${entry2566}</td>
             <td style="border: 1px solid #cbd5e1; padding: 8px; text-align: center;">${entry2567}</td>
@@ -469,7 +477,7 @@ export default function CategoryPage() {
                             return (
                               <tr key={kpi.id || idx} className="hover:bg-slate-50/50">
                                 <td className="border border-slate-300 p-2 text-left font-medium text-slate-800">{idx + 1}. {kpi.name}</td>
-                                <td className="border border-slate-300 p-2 text-center font-semibold text-slate-700">{kpi.target_value} {kpi.unit || ''}</td>
+                                <td className="border border-slate-300 p-2 text-center font-semibold text-slate-700">{formatGoal(kpi)}</td>
                                 <td className="border border-slate-300 p-2 text-center text-slate-600">{entry2565}</td>
                                 <td className="border border-slate-300 p-2 text-center text-slate-600">{entry2566}</td>
                                 <td className="border border-slate-300 p-2 text-center text-slate-600">{entry2567}</td>

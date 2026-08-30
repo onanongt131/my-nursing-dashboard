@@ -2,62 +2,73 @@
 
 import React, { useEffect, useState } from 'react';
 import { createClient } from '@/utils/supabase/client';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
 
 export default function CommitteeDetailPage() {
   const supabase = createClient();
   const params = useParams();
-  const committeeKey = params.key as string;
+  const committeeKey = params?.key as string;
 
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [canEdit, setCanEdit] = useState(true); // ตั้งเป็น true ไว้ก่อนเพื่อให้ปุ่มแสดง
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
-  const [canEdit, setCanEdit] = useState(false); // 1. เพิ่ม State สำหรับตรวจสอบสิทธิ์การแก้ไข
 
   useEffect(() => {
-    const fetchDetailAndAuth = async () => {
+    const fetchData = async () => {
       setLoading(true);
       try {
-        // ดึงข้อมูลคณะกรรมการ
-        const { data: detail, error } = await supabase
-          .from('committee_content')
-          .select('*')
-          .eq('committee_key', committeeKey)
-          .single();
+        // 1. เช็คสิทธิ์จากตาราง profiles
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user?.email) {
+          const { data: profile } = await supabase
+            .from('profiles') // เปลี่ยนจาก users เป็น profiles ตามที่คุณแจ้ง
+            .select('role')
+            .eq('email', user.email)
+            .single();
 
-        if (!error && detail) {
-          setData(detail);
+          if (profile?.role?.toLowerCase().trim() === 'staff') {
+            setCanEdit(false);
+          } else {
+            setCanEdit(true);
+          }
         }
 
-        // 2. ตรวจสอบสิทธิ์การเข้าสู่ระบบ (Login Session)
-        const { data: { session } } = await supabase.auth.getSession();
-        setCanEdit(!!session); // ถ้าเข้าสู่ระบบแล้วจะเป็น true
+        // 2. ดึงข้อมูลคณะกรรมการ
+        if (committeeKey) {
+          const { data: detail, error } = await supabase
+            .from('committee_content')
+            .select('*')
+            .eq('committee_key', committeeKey)
+            .single();
 
+          if (!error && detail) {
+            setData(detail);
+          }
+        }
       } catch (err) {
-        console.error('Unexpected error:', err);
+        console.error('Error:', err);
       } finally {
         setLoading(false);
       }
     };
 
-    if (committeeKey) {
-      fetchDetailAndAuth();
-    }
+    fetchData();
   }, [committeeKey, supabase]);
 
   if (loading) return <div className="p-8 text-center text-emerald-800">กำลังโหลดข้อมูล...</div>;
-  if (!data) return <div className="p-8 text-center text-red-600">ไม่พบข้อมูลคณะกรรมการ</div>;
+  if (!data) return <div className="p-8 text-center text-red-600">ไม่พบข้อมูลคณะกรรมการ (Key: {committeeKey})</div>;
 
   return (
     <div className="w-full space-y-6 pb-12">
-      {/* ส่วนหัวชื่อคณะกรรมการ และปุ่มแก้ไข (แสดงเฉพาะผู้ที่ Login แล้ว) */}
+      {/* ส่วนหัวชื่อคณะกรรมการ และปุ่มแก้ไข */}
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between border-b-2 border-amber-400 pb-4 gap-4">
         <h1 className="text-xl sm:text-2xl font-bold text-emerald-900">
           {data?.committee_name || "คณะกรรมการ"}
         </h1>
         
-        {/* 3. ครอบปุ่มด้วยเงื่อนไข canEdit */}
+        {/* ปุ่มแก้ไข */}
         {canEdit && (
           <Link
             href={`/dashboard/committee/${committeeKey}/edit`}
@@ -71,10 +82,9 @@ export default function CommitteeDetailPage() {
         )}
       </div>
 
-      {/* Grid 12 คอลัมน์ (โครงสร้างเดิมของคุณ) */}
+      {/* โครงสร้างเนื้อหาปกติ */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        
-        {/* คอลัมน์ที่ 1: ภาพประธาน และเอกสารดาวน์โหลด */}
+        {/* คอลัมน์ที่ 1: ภาพประธาน และเอกสาร */}
         <div className="lg:col-span-3 space-y-6">
           <div className="bg-white rounded-2xl border border-emerald-200 shadow-sm overflow-hidden">
             <div className="bg-emerald-800 text-amber-300 px-4 py-3 text-center font-semibold text-sm">
@@ -83,11 +93,7 @@ export default function CommitteeDetailPage() {
             <div className="p-4 flex flex-col items-center">
               <div className="w-full h-56 bg-gray-100 rounded-xl overflow-hidden border-2 border-amber-300 shadow-inner mb-3 flex items-center justify-center">
                 {data?.president_image ? (
-                  <img 
-                    src={data.president_image} 
-                    alt="ประธาน" 
-                    className="w-full h-full object-cover" 
-                  />
+                  <img src={data.president_image} alt="ประธาน" className="w-full h-full object-cover" />
                 ) : (
                   <span className="text-gray-400 text-xs">ไม่มีรูปภาพ</span>
                 )}
@@ -122,9 +128,7 @@ export default function CommitteeDetailPage() {
                   </a>
                 ))
               ) : (
-                <div className="text-center py-4 text-gray-400 text-xs">
-                  ไม่มีเอกสารดาวน์โหลด
-                </div>
+                <div className="text-center py-4 text-gray-400 text-xs">ไม่มีเอกสารดาวน์โหลด</div>
               )}
             </div>
           </div>
@@ -174,9 +178,7 @@ export default function CommitteeDetailPage() {
                   ))}
                 </ul>
               ) : (
-                <div className="text-center py-6 text-gray-400 text-sm">
-                  ไม่มีข้อมูลรายชื่อคณะกรรมการ
-                </div>
+                <div className="text-center py-6 text-gray-400 text-sm">ไม่มีข้อมูลรายชื่อคณะกรรมการ</div>
               )}
             </div>
           </div>
@@ -194,18 +196,13 @@ export default function CommitteeDetailPage() {
                   {data.activity_images.map((imgItem: any, index: number) => {
                     const imgUrl = typeof imgItem === 'string' ? imgItem : imgItem?.url;
                     if (!imgUrl) return null;
-
                     return (
                       <div 
                         key={index} 
                         onClick={() => setSelectedImage(imgUrl)}
                         className="rounded-xl overflow-hidden border border-gray-200 shadow-xs bg-gray-50 cursor-pointer group relative flex items-center justify-center p-1"
                       >
-                        <img 
-                          src={imgUrl} 
-                          alt={`ภาพกิจกรรม ${index + 1}`} 
-                          className="w-full h-auto object-contain group-hover:scale-102 transition-transform duration-300 rounded-lg"
-                        />
+                        <img src={imgUrl} alt={`ภาพกิจกรรม ${index + 1}`} className="w-full h-auto object-contain group-hover:scale-102 transition-transform duration-300 rounded-lg" />
                         <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center rounded-xl">
                           <svg className="w-6 h-6 text-white drop-shadow-md" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" />
@@ -226,30 +223,18 @@ export default function CommitteeDetailPage() {
             </div>
           </div>
         </div>
-
       </div>
 
       {/* Modal สำหรับแสดงภาพขนาดใหญ่ */}
       {selectedImage && (
-        <div 
-          onClick={() => setSelectedImage(null)}
-          className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4"
-        >
+        <div onClick={() => setSelectedImage(null)} className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4">
           <div className="relative max-w-4xl w-full max-h-[90vh] flex items-center justify-center">
-            <button 
-              onClick={() => setSelectedImage(null)}
-              className="absolute -top-10 right-0 text-white hover:text-amber-300 transition-colors p-2 cursor-pointer"
-            >
+            <button onClick={() => setSelectedImage(null)} className="absolute -top-10 right-0 text-white hover:text-amber-300 transition-colors p-2 cursor-pointer">
               <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </button>
-            <img 
-              src={selectedImage} 
-              alt="ภาพกิจกรรมขนาดใหญ่" 
-              className="max-w-full max-h-[85vh] object-contain rounded-xl shadow-2xl border border-white/10"
-              onClick={(e) => e.stopPropagation()}
-            />
+            <img src={selectedImage} alt="ภาพกิจกรรมขนาดใหญ่" className="max-w-full max-h-[85vh] object-contain rounded-xl shadow-2xl border border-white/10" onClick={(e) => e.stopPropagation()} />
           </div>
         </div>
       )}

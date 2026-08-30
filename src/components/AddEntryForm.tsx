@@ -116,23 +116,6 @@ export default function AddEntryForm({ kpiId, type, deptId, onSuccess }: {
       const targetYear = Number(formData.year);
       const targetMonth = formData.month;
 
-      // 1. ตรวจสอบว่ามีข้อมูลเดิมอยู่แล้วหรือไม่
-      let checkQuery = supabase
-        .from('kpi_entries')
-        .select('id')
-        .eq('kpi_id', targetKpiId)
-        .eq('year', targetYear)
-        .eq('month', targetMonth);
-
-      if (targetDeptId) {
-        checkQuery = checkQuery.eq('department_id', targetDeptId);
-      } else {
-        checkQuery = checkQuery.is('department_id', null);
-      }
-
-      const { data: existingData, error: checkError } = await checkQuery.maybeSingle();
-      if (checkError) throw checkError;
-
       const payload = {
         kpi_id: targetKpiId,
         department_id: targetDeptId,
@@ -143,21 +126,12 @@ export default function AddEntryForm({ kpiId, type, deptId, onSuccess }: {
         denominator: type === 'count' ? null : den
       };
 
-      let error;
-      if (existingData) {
-        // 2. ถ้ามีข้อมูลเดิมแล้ว ให้ทำการ Update ตาม id
-        const { error: updateError } = await supabase
-          .from('kpi_entries')
-          .update(payload)
-          .eq('id', existingData.id);
-        error = updateError;
-      } else {
-        // 3. ถ้ายังไม่มี ให้ทำการ Insert ใหม่
-        const { error: insertError } = await supabase
-          .from('kpi_entries')
-          .insert([payload]);
-        error = insertError;
-      }
+      // ใช้ .upsert() ร่วมกับ onConflict เพื่อจัดการข้อมูลซ้ำซ้อนตามโครงสร้าง Constraint ใหม่
+      const { error } = await supabase
+        .from('kpi_entries')
+        .upsert([payload], {
+          onConflict: 'kpi_id,department_id,year,month'
+        });
 
       if (error) throw error;
       

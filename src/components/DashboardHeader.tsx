@@ -47,11 +47,11 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
 
   // 6 แดชบอร์ดดีย่อยตามโครงสร้างใหม่
   const nursingDashboardSubMenus = [
-    { name: 'executive', label: '1. Executive Dashboard', desc: 'ภาพรวมองค์กรตอนนี้เป็นอย่างไร', path: '/dashboard/nursing-dashboard/executive' },
-    { name: 'strategic', label: '2. Strategic Dashboard', desc: '5 ยุทธศาสตร์บรรลุเป้าหมายหรือไม่', path: '/dashboard/nursing-dashboard/strategic' },
-    { name: 'quality-safety', label: '3. Quality & Safety Dashboard', desc: 'จุดเสี่ยงทางการพยาบาลอยู่ที่ไหน', path: '/dashboard/nursing-dashboard/quality-safety' },
-    { name: 'workforce', label: '4. Workforce Dashboard', desc: 'คนพอไหม Productivity/PCS/Skill Mix เป็นอย่างไร', path: '/dashboard/nursing-dashboard/workforce' },
-    { name: 'people-excellence', label: '5. People Excellence Dashboard', desc: 'Competency, IDP, Engagement, Supervision เป็นอย่างไร', path: '/dashboard/nursing-dashboard/people-excellence' },
+    { name: 'executive', label: '1. Executive Dashboard', desc: 'ภาพรวมองค์กร', path: '/dashboard/nursing-dashboard/executive' },
+    { name: 'strategic', label: '2. Strategic Dashboard', desc: 'เป้าหมาย 5 ยุทธศาสตร์', path: '/dashboard/nursing-dashboard/strategic' },
+    { name: 'quality-safety', label: '3. Quality & Safety Dashboard', desc: 'จุดเสี่ยงทางการพยาบาล', path: '/dashboard/nursing-dashboard/quality-safety' },
+    { name: 'workforce', label: '4. Workforce Dashboard', desc: 'Productivity/PCS/Skill Mix', path: '/dashboard/nursing-dashboard/workforce' },
+    { name: 'people-excellence', label: '5. People Excellence Dashboard', desc: 'Competency, IDP, Engagement, Supervision', path: '/dashboard/nursing-dashboard/people-excellence' },
     { name: 'action-risk', label: '6. Action & Risk Dashboard', desc: 'เรื่องใดต้องแก้ ใครรับผิดชอบ และครบกำหนดเมื่อใด', path: '/dashboard/nursing-dashboard/action-risk' },
   ];
 
@@ -314,7 +314,7 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
               onClick={() => setIsNursingDropdownOpen(!isNursingDropdownOpen)} 
               className={`${buttonBaseClass} ${isNursingActive || isNursingDropdownOpen ? activeStyle : inactiveStyle}`}
             >
-              <span>การพยาบาล 16 กลุ่มงาน</span>
+              <span>16 กลุ่มงาน</span>
               <svg className={`w-4 h-4 ml-1 transition-transform ${isNursingDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
             </button>
             {isNursingDropdownOpen && (

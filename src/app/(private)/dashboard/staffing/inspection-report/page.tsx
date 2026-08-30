@@ -204,7 +204,6 @@ export default function NursingInspectionReportPage() {
       <div className="w-full bg-white p-3 rounded-xl border border-gray-200 mb-4 shadow-xs flex flex-wrap items-center justify-between print:hidden">
         <div>
           <h1 className="text-sm font-bold text-emerald-900">รายงานพยาบาลเวรตรวจการ</h1>
-          <p className="text-[11px] text-gray-500">บันทึกและตรวจสอบสถิติผู้ป่วยและอัตรากำลังรายเวรจากฐานข้อมูล</p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5 mt-2 md:mt-0">
@@ -329,7 +328,7 @@ export default function NursingInspectionReportPage() {
                 <th className="border border-black p-1.5 text-left w-[290px]" rowSpan={2}>รายชื่อพยาบาลเวร</th>
               </tr>
               <tr className="bg-gray-50 text-[11px] text-black font-semibold">
-                <th className="border border-black p-1 w-7">ยอดผู้ป่วย</th>
+                <th className="border border-black p-1 w-7">ยอดยกมา</th>
                 <th className="border border-black p-1 w-6">รับใหม่</th>
                 <th className="border border-black p-1 w-6">รับย้าย</th>
                 <th className="border border-black p-1 w-6">จำหน่าย</th>

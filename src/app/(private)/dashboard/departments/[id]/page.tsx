@@ -123,15 +123,15 @@ export default function SingleDepartmentPage() {
       const formattedDept = {
         ...dept,
         kpis: maps
-          .map(m => {
-            const kpiData = kpis.find(k => k.id === m.kpi_id);
-            return kpiData ? {
-              ...kpiData,
-              entries: entries.filter(e => e.kpi_id === kpiData.id)
-            } : null;
-          })
-          .filter(Boolean)
-      };
+          .map((m: any) => {
+      const kpiData = kpis.find((k: any) => k.id === m.kpi_id);
+          return kpiData ? {
+            ...kpiData,
+            entries: entries.filter((e: any) => e.kpi_id === kpiData.id)
+          } : null;
+        })
+        .filter(Boolean)
+    };
       
       setDepartmentData(formattedDept);
     } catch (err) {
@@ -710,12 +710,17 @@ export default function SingleDepartmentPage() {
                           <button 
                             onClick={async () => {
                               if (confirm('คุณต้องการลบข้อมูลรายการนี้ใช่หรือไม่?')) {
-                                const { error } = await supabase.from('kpi_entries').delete().eq('id', entry.id);
+                                const { error } = await supabase
+                                  .from('kpi_entries')
+                                  .delete()
+                                  .eq('id', entry.id)
+                                  .eq('department_id', deptId); // เพิ่มความปลอดภัยให้ตรงกับหน่วยงานปัจจุบัน
+
                                 if (!error) {
                                   fetchDepartmentData();
                                   setDetailModalData(null);
                                 } else {
-                                  alert('เกิดข้อผิดพลาดในการลบข้อมูล');
+                                  alert('เกิดข้อผิดพลาดในการลบข้อมูล: ' + error.message);
                                 }
                               }
                             }}

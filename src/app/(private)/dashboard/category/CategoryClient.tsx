@@ -175,8 +175,14 @@ export default function CategoryClient({ category }: { category: string }) {
                 {kpis.map((kpi: any) => (
                   <tr key={kpi.id} className="hover:bg-purple-50/30 transition-all">
                     <td className="p-3.5 text-gray-700 font-medium">{kpi.name}</td>
-                    <td className="p-3.5 text-center font-bold text-gray-500">
-                      {kpi.operator} {kpi.target_value}
+                    <td className="p-3.5 text-center font-medium text-gray-700">
+                      <span className="inline-flex items-center gap-1 justify-center">
+                        {/* แสดง operator ก็ต่อเมื่อมีค่าและไม่ใช่ค่าว่าง */}
+                        {kpi.operator && kpi.operator.trim() !== "" && (
+                          <span>{kpi.operator}</span>
+                        )}
+                        <span>{kpi.target_value}</span>
+                      </span>
                     </td>
                     {[2565, 2566, 2567, 2568, 2569].map((year) => {
                       const avg = calculateYearlySummary(kpi.kpi_entries || [], year, kpi.Type);
@@ -202,8 +208,36 @@ export default function CategoryClient({ category }: { category: string }) {
                       );
                     })}
                     
-                    <td className="p-3.5 text-center font-semibold text-green-600">Pass</td>
-                    <td className="p-3.5 text-center text-base">{getYearlyTrend(kpi.kpi_entries || [], kpi.Type)}</td>
+                    <td className="p-3.5 text-center">
+                      {(() => {
+                        const latestYear = 2569;
+                        const avg = calculateYearlySummary(kpi.kpi_entries || [], latestYear, kpi.Type);
+                        const hasData = avg !== null && avg !== "-" && avg !== ""; 
+                        const pass = hasData ? checkStatus(Number(avg), kpi.target_value, kpi.operator) : false;
+
+                        if (!hasData) {
+                          return <span className="text-[11px] text-gray-300 italic">ไม่มีข้อมูล</span>;
+                        }
+
+                        return (
+                          <span className={`inline-block px-2.5 py-0.5 rounded-md font-bold text-xs border ${
+                            pass 
+                              ? "bg-green-50 text-green-700 border-green-200" 
+                              : "bg-red-50 text-red-700 border-red-200"
+                          }`}>
+                            {pass ? "Pass" : "Fail"}
+                          </span>
+                        );
+                      })()}
+                    </td>
+                    <td className="p-3.5 text-center text-base">
+                      {getYearlyTrend(
+                        kpi.kpi_entries || [], 
+                        kpi.Type, 
+                        kpi.operator, // ส่ง operator เข้าไปให้ฟังก์ชันเช็คว่าเป็นแบบ "ยิ่งน้อยยิ่งดี" หรือไม่
+                        2569          // ปีปัจจุบัน
+                      )}
+                    </td>
                     <td className="p-3.5 text-center">
                       {editingComparisonId === kpi.id ? (
                         <div className="flex items-center gap-1 justify-center">

@@ -2,22 +2,18 @@
 
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { createClient } from '@supabase/supabase-js';
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+import { createClient } from '@/utils/supabase/client';
 
 export default function NursingBranchPage() {
+  const supabase = createClient();
   const params = useParams();
   const router = useRouter();
-  const idParam = params.id;
+  const idParam = params?.id as string;
 
   const [departmentName, setDepartmentName] = useState('กลุ่มงานการพยาบาล');
   const [content, setContent] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [canEdit, setCanEdit] = useState(false);
+  const [canEdit, setCanEdit] = useState(true); // ตั้งเป็น true ไว้ก่อนเพื่อให้ปุ่มแสดง
   const [isExpanded, setIsExpanded] = useState(false);
 
   useEffect(() => {
@@ -26,6 +22,23 @@ export default function NursingBranchPage() {
     const fetchData = async () => {
       setLoading(true);
       try {
+        // 1. ตรวจสอบสิทธิ์จากตาราง profiles (เหมือนหน้าอื่น)
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user?.email) {
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('email', user.email)
+            .single();
+
+          if (profile?.role?.toLowerCase().trim() === 'staff') {
+            setCanEdit(false);
+          } else {
+            setCanEdit(true);
+          }
+        }
+
+        // 2. ดึงข้อมูลรายชื่อกลุ่มงานทั้งหมดเพื่อเทียบชื่อ
         const { data: allDepts, error: deptError } = await supabase
           .from('nursing_departments')
           .select('*');
@@ -73,6 +86,7 @@ export default function NursingBranchPage() {
           targetDeptId = numericId;
         }
 
+        // 3. ดึงข้อมูลเนื้อหาของกลุ่มงานจากตาราง department_content
         if (targetDeptId) {
           const { data: contentData } = await supabase
             .from('department_content')
@@ -90,10 +104,6 @@ export default function NursingBranchPage() {
           }
         }
 
-        // --- ตรวจสอบสิทธิ์การเข้าสู่ระบบผ่าน Supabase Auth ---
-        const { data: { session } } = await supabase.auth.getSession();
-        setCanEdit(!!session);
-
       } catch (err) {
         console.error('Error:', err);
       } finally {
@@ -102,7 +112,7 @@ export default function NursingBranchPage() {
     };
 
     fetchData();
-  }, [idParam]);
+  }, [idParam, supabase]);
 
   if (loading) return <div className="p-8 text-center text-emerald-800">กำลังโหลดข้อมูล...</div>;
 
@@ -118,8 +128,11 @@ export default function NursingBranchPage() {
           <button
             type="button"
             onClick={() => router.push(`/dashboard/nursing/${String(idParam)}/edit`)}
-            className="bg-emerald-700 hover:bg-emerald-800 text-amber-100 font-semibold px-5 py-2.5 rounded-xl shadow-md transition-colors border border-amber-400 cursor-pointer"
+            className="bg-emerald-800 hover:bg-emerald-900 text-amber-300 font-semibold px-5 py-2.5 rounded-xl shadow-md transition-all flex items-center gap-2 border border-amber-400/50 cursor-pointer text-sm md:text-base"
           >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
             {content ? 'แก้ไขข้อมูลกลุ่มงาน' : 'เพิ่มข้อมูลกลุ่มงาน'}
           </button>
         )}

@@ -13,7 +13,7 @@ export default function Strategic() {
   const [groupKpis, setGroupKpis] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // 📌 เพิ่ม State สำหรับจัดการ Modal รายละเอียดรายเดือน
+  // 📌 State สำหรับจัดการ Modal รายละเอียดรายเดือน
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [modalData, setModalData] = useState<{ kpi: any; year: number; entries: any[] } | null>(null);
 
@@ -88,7 +88,6 @@ export default function Strategic() {
     fetchData();
   }, [fetchData]);
 
-  // 📌 ฟังก์ชันเปิด Modal และกรองข้อมูลรายเดือนตามปีที่คลิก
   const handleOpenDetail = (kpi: any, year: number) => {
     const entries = kpi.kpi_entries || [];
     const filteredEntries = entries.filter((entry: any) => Number(entry.year) === Number(year));
@@ -98,31 +97,33 @@ export default function Strategic() {
 
   const currentStrategic = strategicGoals.find((g) => g.id === selectedStrategic);
   const isDiseaseStrategy = currentStrategic?.name === "Service Excellence";
+  // แสดงคอลัมน์โรคในตารางเฉพาะเมื่อเลือกดู "ทั้งหมด"
   const showDiseaseColumn = isDiseaseStrategy && selectedDisease === "ทั้งหมด";
 
   if (loading) return <div className="p-8 text-center">กำลังโหลดข้อมูล...</div>;
 
   return (
     <div className="space-y-6 mt-6 animate-in fade-in duration-500">
-      {/* 1. แถบเลือกยุทธศาสตร์ */}
-      <div className="flex gap-2">
-        {strategicGoals.map((goal) => (
-          <button
-            key={goal.id}
-            onClick={() => { 
-              setSelectedStrategic(goal.id);
-              setSelectedKpi(null); 
-            }}
-            className={`flex-1 px-2 py-3 rounded-xl border font-bold text-center transition-all ${
-              selectedStrategic === goal.id 
-                ? "bg-purple-400 text-white border-purple-600" 
-                : "bg-white text-gray-700 hover:bg-purple-50"
-            }`}
-          >
-            {goal.name}
-          </button>
-        ))}
-      </div>
+      {/* แถบเลือกยุทธศาสตร์: จัดกลุ่มอยู่ตรงกลาง */}
+<div className="flex flex-wrap items-center justify-center gap-3 w-full">
+  {strategicGoals.map((goal) => (
+    <button
+      key={goal.id}
+      onClick={() => { 
+        setSelectedStrategic(goal.id);
+        setSelectedDisease("ทั้งหมด"); 
+        setSelectedKpi(null); 
+      }}
+      className={`px-5 py-3 rounded-xl border font-bold text-center transition-all shrink-0 ${
+        selectedStrategic === goal.id 
+          ? "bg-purple-400 text-white border-purple-600 shadow-md" 
+          : "bg-white text-gray-700 hover:bg-purple-50 border-gray-200"
+      }`}
+    >
+      {goal.name}
+    </button>
+  ))}
+</div>
 
       {/* 2. เนื้อหาหลัก (แสดงเมื่อไม่ได้เลือก KPI) */}
       {!selectedKpi && (
@@ -133,85 +134,108 @@ export default function Strategic() {
             </p>
           </div>
 
-          {isDiseaseStrategy && (
-            <div className="flex flex-wrap gap-2">
-              {diseaseList.map((disease) => (
-                <button 
-                  key={disease} 
-                  onClick={() => {
-                    setSelectedDisease(disease);
-                    setSelectedKpi(null); 
-                  }} 
-                  className={`px-4 py-1.5 text-xs rounded-full border transition-all font-medium ${
-                    selectedDisease === disease 
-                      ? "bg-blue-500 text-white border-blue-600 shadow-md" 
-                      : "bg-white border-gray-200 text-gray-600 hover:border-blue-300"
-                  }`}
-                >
-                  {disease}
-                </button>
-              ))}
-            </div>
-          )}
+          {/* โครงสร้างแบบ 2 ฝั่ง ( ปรับฝั่งซ้ายให้แคบลงเหลือ lg:w-56 ) */}
+          <div className="flex flex-col lg:flex-row gap-6 items-start">
+            
+            {/* ฝั่งซ้าย: เมนูรายชื่อโรค */}
+            {isDiseaseStrategy && (
+              <div className="w-full lg:w-56 bg-white rounded-3xl border border-gray-100 shadow-sm p-4 shrink-0">
+                <h2 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3 px-3">กลุ่มโรคสำคัญ</h2>
+                <div className="flex flex-col space-y-1">
+                  {diseaseList.map((disease) => {
+                    const isActive = selectedDisease === disease;
+                    return (
+                      <button 
+                        key={disease} 
+                        onClick={() => {
+                          setSelectedDisease(disease);
+                          setSelectedKpi(null); 
+                        }} 
+                        className={`w-full px-3.5 py-2 rounded-xl text-sm font-medium transition-all text-left flex items-center justify-between ${
+                          isActive 
+                            ? "bg-purple-600 text-white shadow-md shadow-purple-200" 
+                            : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
+                        }`}
+                      >
+                        <span className="truncate">{disease}</span>
+                        {isActive && <span className="text-xs shrink-0 ml-1">▶</span>}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
 
-          <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="border-b bg-gray-50 text-xs text-gray-500 uppercase tracking-wider">
-                    {showDiseaseColumn && <th className="p-4">โรค</th>}
-                    <th className="p-4">ตัวชี้วัด (KPI)</th>
-                    <th className="p-4 text-center">Goal</th>
-                    {[2565, 2566, 2567, 2568, 2569].map(y => <th key={y} className="p-4 text-center">{y}</th>)}
-                    <th className="p-4 text-center">Trend</th>
-                    <th className="p-4 text-center">Action</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-100">
-                  {groupKpis
-                    .filter((k: any) => {
-                      const matchStrategic = String(k.strategic_id) === String(selectedStrategic);
-                      const matchDisease = !isDiseaseStrategy || selectedDisease === "ทั้งหมด" || k.disease_name === selectedDisease;
-                      return matchStrategic && matchDisease;
-                    })
-                    .map((kpi: any) => (
-                      <tr key={kpi.id} className="hover:bg-gray-50 transition-colors text-sm">
-                        {showDiseaseColumn && <td className="p-4 text-gray-600">{kpi.disease_name || "-"}</td>}
-                        <td className="p-4 font-medium text-gray-900">{kpi.name}</td>
-                        <td className="p-4 text-center font-bold text-gray-700">{kpi.operator} {kpi.target_value}</td>
-                        {[2565, 2566, 2567, 2568, 2569].map((year) => {
-                          const avg = calculateYearlySummary(kpi.kpi_entries || [], year, kpi.Type);
-                          const hasData = avg !== null && avg !== "-" && avg !== ""; 
-                          const pass = hasData ? checkStatus(Number(avg), kpi.target_value, kpi.operator) : false;
+            {/* ฝั่งขวา: ตารางแสดงตัวชี้วัด (KPI) */}
+            <div className="flex-1 w-full bg-white p-6 rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
+              <div className="flex justify-between items-center mb-4 pb-3 border-b border-gray-100">
+                <h2 className="font-bold text-gray-800 text-base">
+                  {isDiseaseStrategy ? (
+                    <>รายการตัวชี้วัด: <span className="text-purple-600">{selectedDisease}</span></>
+                  ) : (
+                    <>รายการตัวชี้วัดตามยุทธศาสตร์</>
+                  )}
+                </h2>
+              </div>
 
-                          return (
-                            <td key={year} className="p-4 text-center">
-                              {hasData ? (
-                                /* 📌 เพิ่ม onClick และเปลี่ยนสไตล์ให้รู้ว่ากดได้ */
-                                <span 
-                                  onClick={() => handleOpenDetail(kpi, year)}
-                                  className={`px-2 py-1 rounded-md font-bold text-xs cursor-pointer hover:opacity-80 transition-all inline-block ${
-                                    pass ? "bg-green-50 text-green-700 border border-green-200" : "bg-red-50 text-red-700 border border-red-200"
-                                  }`}
-                                  title="คลิกเพื่อดูรายละเอียดรายเดือน"
-                                >
-                                  {avg}
-                                </span>
-                              ) : (
-                                <span className="text-xs text-gray-400 italic">ไม่มีข้อมูล</span>
-                              )}
-                            </td>
-                          );
-                        })}
-                        <td className="p-4 text-center text-sm text-gray-600">{getYearlyTrend(kpi.kpi_entries || [], kpi.Type)}</td>
-                        <td className="p-4 text-center">
-                          <button onClick={() => setSelectedKpi(kpi)} className={getButtonStyle(kpi.kpi_entries || [], 'monthly')}>เพิ่ม</button>
-                        </td>
-                      </tr>
-                    ))}
-                </tbody>
-              </table>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b bg-gray-50 text-xs text-gray-500 uppercase tracking-wider">
+                      {showDiseaseColumn && <th className="p-4">โรค</th>}
+                      <th className="p-4">ตัวชี้วัด (KPI)</th>
+                      <th className="p-4 text-center">Goal</th>
+                      {[2565, 2566, 2567, 2568, 2569].map(y => <th key={y} className="p-4 text-center">{y}</th>)}
+                      <th className="p-4 text-center">Trend</th>
+                      <th className="p-4 text-center">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {groupKpis
+                      .filter((k: any) => {
+                        const matchStrategic = String(k.strategic_id) === String(selectedStrategic);
+                        const matchDisease = !isDiseaseStrategy || selectedDisease === "ทั้งหมด" || k.disease_name === selectedDisease;
+                        return matchStrategic && matchDisease;
+                      })
+                      .map((kpi: any) => (
+                        <tr key={kpi.id} className="hover:bg-gray-50 transition-colors text-sm">
+                          {showDiseaseColumn && <td className="p-4 text-gray-600 font-medium">{kpi.disease_name || "-"}</td>}
+                          <td className="p-4 font-medium text-gray-900">{kpi.name}</td>
+                          <td className="p-4 text-center font-bold text-gray-700">{kpi.operator} {kpi.target_value}</td>
+                          {[2565, 2566, 2567, 2568, 2569].map((year) => {
+                            const avg = calculateYearlySummary(kpi.kpi_entries || [], year, kpi.Type);
+                            const hasData = avg !== null && avg !== "-" && avg !== ""; 
+                            const pass = hasData ? checkStatus(Number(avg), kpi.target_value, kpi.operator) : false;
+
+                            return (
+                              <td key={year} className="p-4 text-center">
+                                {hasData ? (
+                                  <span 
+                                    onClick={() => handleOpenDetail(kpi, year)}
+                                    className={`px-2.5 py-1 rounded-md font-bold text-xs cursor-pointer hover:opacity-80 transition-all inline-block ${
+                                      pass ? "bg-green-50 text-green-700 border border-green-200" : "bg-red-50 text-red-700 border border-red-200"
+                                    }`}
+                                    title="คลิกเพื่อดูรายละเอียดรายเดือน"
+                                  >
+                                    {avg}
+                                  </span>
+                                ) : (
+                                  <span className="text-xs text-gray-400 italic">ไม่มีข้อมูล</span>
+                                )}
+                              </td>
+                            );
+                          })}
+                          <td className="p-4 text-center text-sm text-gray-600">{getYearlyTrend(kpi.kpi_entries || [], kpi.Type, kpi.operator || '<')}</td>
+                          <td className="p-4 text-center">
+                            <button onClick={() => setSelectedKpi(kpi)} className={getButtonStyle(kpi.kpi_entries || [], 'monthly')}>เพิ่ม</button>
+                          </td>
+                        </tr>
+                      ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
+
           </div>
         </div>
       )}
@@ -250,7 +274,7 @@ export default function Strategic() {
         </div>
       )}
 
-      {/* 📌 ส่วน Modal สำหรับแสดงรายละเอียดรายเดือน (ปี, เดือน, ตัวตั้ง, ตัวหาร, ผลลัพธ์) */}
+      {/* 📌 ส่วน Modal สำหรับแสดงรายละเอียดรายเดือน */}
       {isDetailModalOpen && modalData && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-3xl shadow-xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">

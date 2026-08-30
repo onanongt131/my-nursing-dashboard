@@ -25,6 +25,8 @@ export default function NursingExecutiveDashboard() {
               >
                 <option value="2570">2570</option>
                 <option value="2569">2569</option>
+                <option value="2569">2568</option>
+                <option value="2569">2567</option>
               </select>
             </div>
 
@@ -40,6 +42,15 @@ export default function NursingExecutiveDashboard() {
                 <option value="1">ตุลาคม</option>
                 <option value="2">พฤศจิกายน</option>
                 <option value="3">ธันวาคม</option>
+                <option value="4">มกราคม</option>
+                <option value="5">กุมภาพันธ์</option>
+                <option value="6">มีนาคม</option>
+                <option value="7">เมษายน</option>
+                <option value="8">พฤษภาคม</option>
+                <option value="9">มิถุนายน</option>
+                <option value="10">กรกฎาคม</option>
+                <option value="11">สิงหาคม</option>
+                <option value="12">กันยายน</option>
               </select>
             </div>
 
@@ -182,7 +193,6 @@ export default function NursingExecutiveDashboard() {
             ))}
           </div>
         </div>
-
       </div>
   );
 }

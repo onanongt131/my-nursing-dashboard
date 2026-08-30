@@ -9,7 +9,7 @@ export default function NursingDashboardHubPage() {
     {
       id: 'executive',
       title: '1. Executive Dashboard',
-      subtitle: 'ภาพรวมองค์กรตอนนี้เป็นอย่างไร',
+      subtitle: 'ภาพรวมองค์กร',
       description: 'สรุปสถานการณ์ตัวชี้วัดสำคัญระดับองค์กร อัตราครองเตียง และสถานะภาพรวมแบบเรียลไทม์เพื่อการตัดสินใจของผู้บริหาร',
       path: '/dashboard/nursing-dashboard/executive',
       borderColor: 'border-emerald-500',
@@ -20,7 +20,7 @@ export default function NursingDashboardHubPage() {
     {
       id: 'strategic',
       title: '2. Strategic Dashboard',
-      subtitle: '5 ยุทธศาสตร์บรรลุเป้าหมายหรือไม่',
+      subtitle: 'เป้าหมาย 5 ยุทธศาสตร์',
       description: 'ติดตามความก้าวหน้าของแผนยุทธศาสตร์ 5 ด้าน เป้าหมายประจำปี และโครงการ Quick Win ของกลุ่มภารกิจด้านการพยาบาล',
       path: '/dashboard/nursing-dashboard/strategic',
       borderColor: 'border-blue-500',
@@ -31,7 +31,7 @@ export default function NursingDashboardHubPage() {
     {
       id: 'quality-safety',
       title: '3. Quality & Safety Dashboard',
-      subtitle: 'จุดเสี่ยงทางการพยาบาลอยู่ที่ไหน',
+      subtitle: 'จุดเสี่ยงทางการพยาบาล',
       description: 'วิเคราะห์อุบัติการณ์ความเสี่ยง (Clinical Incident) ตัวชี้วัดคุณภาพการพยาบาลตามมาตรฐาน HA และความปลอดภัยของผู้ป่วย',
       path: '/dashboard/nursing-dashboard/quality-safety',
       borderColor: 'border-amber-500',
@@ -42,7 +42,7 @@ export default function NursingDashboardHubPage() {
     {
       id: 'workforce',
       title: '4. Workforce Dashboard',
-      subtitle: 'คนพอไหม Productivity / PCS / Skill Mix เป็นอย่างไร',
+      subtitle: 'Productivity / PCS / Skill Mix',
       description: 'วิเคราะห์ภาระงานของผู้ป่วย (Patient Classification System), สัดส่วนบุคลากร (Skill Mix) และอัตรากำลังในแต่ละหอผู้ป่วย',
       path: '/dashboard/nursing-dashboard/workforce',
       borderColor: 'border-purple-500',
@@ -53,7 +53,7 @@ export default function NursingDashboardHubPage() {
     {
       id: 'people-excellence',
       title: '5. People Excellence Dashboard',
-      subtitle: 'Competency, IDP, Engagement, Supervision เป็นอย่างไร',
+      subtitle: 'Competency, IDP, Engagement, Supervision',
       description: 'ติดตามสมรรถนะพยาบาล การพัฒนาตามแผนรายบุคคล (IDP), ความผูกพันต่อองค์กร และผลการนิเทศทางการพยาบาล',
       path: '/dashboard/nursing-dashboard/people-excellence',
       borderColor: 'border-rose-500',

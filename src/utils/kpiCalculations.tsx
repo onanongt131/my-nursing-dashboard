@@ -53,6 +53,7 @@ export const calculateYearlySummary = (entries: any[], year: number, type: KpiTy
   
 
 // --- 2. กลุ่มจัดการสถานะและการแสดงผล ---
+// --- 2. กลุ่มจัดการสถานะและการแสดงผล ---
 export const checkStatus = (value: number, target: number, operator: string, isHigherBetter: boolean = true): boolean => {
   // หากเป็นตัวชี้วัดที่ค่าต่ำคือดี (เช่น อุบัติการณ์) ให้กลับผลลัพธ์
   const passed = (() => {
@@ -68,21 +69,33 @@ export const checkStatus = (value: number, target: number, operator: string, isH
   return isHigherBetter ? passed : !passed;
 };
 
-// ฟังก์ชัน Trend ที่ปรับปรุงตามความต้องการของคุณ
-export const getYearlyTrend = (entries: any[], kpiType: KpiType, currentYear: number = 2569): React.ReactNode => {
+// ฟังก์ชัน Trend ที่ปรับปรุงใหม่ รองรับเงื่อนไข Less is Better (isHigherBetter = false)
+export const getYearlyTrend = (entries: any[], kpiType: KpiType, operator: string, currentYear: number = 2569): React.ReactNode => {
   const prevYear = currentYear - 1;
   const avgCurrent = calculateYearlySummary(entries, currentYear, kpiType);
   const avgPrev = calculateYearlySummary(entries, prevYear, kpiType);
 
   if (avgCurrent === "-" || avgPrev === "-") return "-";
 
-  // ใช้ Number() แทน parseFloat เพื่อรองรับทั้ง string และ number ได้อย่างถูกต้อง
   const valCurrent = Number(avgCurrent);
   const valPrev = Number(avgPrev);
 
-  if (valCurrent > valPrev) return <span className="text-green-500 font-bold text-sm">▲</span>;
-  if (valCurrent < valPrev) return <span className="text-red-500 font-bold text-sm">▼</span>;
-  return <span className="text-blue-500 font-bold text-xl">o</span>;
+  if (valCurrent === valPrev) return <span className="text-blue-500 font-bold text-xl">o</span>;
+
+  // ตรวจสอบว่าเป็นตัวชี้วัดแบบ "ยิ่งน้อยยิ่งดี" หรือไม่ (จากเครื่องหมาย < หรือ <=)
+  const safeOperator = operator || '';
+  const isLessIsBetter = safeOperator.includes('<');
+
+  const isImproved = isLessIsBetter ? valCurrent < valPrev : valCurrent > valPrev;
+
+  if (isImproved) {
+    // ดีขึ้น: แสดงลูกศรสีเขียว (ไม่ว่าจะพุ่งขึ้นหรือลดลง ขอแค่ทิศทางส่งผลดีต่อตัวชี้วัด)
+    // ถ้าอยากให้แสดงลูกศรชี้ขึ้นเสมอเมื่อผลลัพธ์ดีขึ้น ใช้ ▲ สีเขียว
+    return <span className="text-green-500 font-bold text-sm">▲</span>;
+  } else {
+    // แย่ลง: แสดงลูกศรสีแดง
+    return <span className="text-red-500 font-bold text-sm">▼</span>;
+  }
 };
 
 // --- 3. กลุ่มจัดการสถานะปุ่ม (Alert/Status) ---

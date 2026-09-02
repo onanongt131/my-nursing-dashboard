@@ -1,352 +1,391 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { 
-  Users, 
-  Clock, 
-  TrendingUp, 
-  AlertTriangle, 
-  Activity, 
-  Calendar 
-} from 'lucide-react';
+import { useState, useEffect } from 'react';
 import { createClient } from '@/utils/supabase/client';
 
-export default function StaffingOverviewPage() {
-  const [selectedWard, setSelectedWard] = useState('all');
-  const [selectedShift, setSelectedShift] = useState('เวรเช้า');
-
-  const [selectedDate, setSelectedDate] = useState(() => {
-    const today = new Date();
-    const year = today.getFullYear();
-    const month = String(today.getMonth() + 1).padStart(2, '0');
-    const day = String(today.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  });
-
+export default function WardCommandCenterPage() {
   const [loading, setLoading] = useState(true);
-  const [dashboardData, setDashboardData] = useState({
-    totalPatients: 0,
-    wardCount: 0,
-    totalRequiredHours: 0,
-    totalActualHours: 0,
-    avgProductivity: 0,
-    totalFteGap: 0,
-    activeAlerts: 0,
-    criticalAlerts: 0,
-  });
+  const todayStr = new Date().toISOString().split('T')[0];
+  
+  const [selectedDate, setSelectedDate] = useState(todayStr);
+  const [selectedShift, setSelectedShift] = useState('เวรเช้า');
+  const [departments, setDepartments] = useState<any[]>([]);
+  const [selectedDeptId, setSelectedDeptId] = useState<string>('');
 
-  const [departmentList, setDepartmentList] = useState<any[]>([]);
-  const [wardsFilterOptions, setWardsFilterOptions] = useState<any[]>([]);
+  const [staffNames, setStaffNames] = useState<string>('-');
+
+  const [wardData, setWardData] = useState({
+    name: '-',
+    patientCount: 0,
+    occupancyRate: '0.0%',
+    occupancyVal: 0,
+    score4_5: 0,
+    highFlow: 0,
+    ventilator: 0,
+    np: 0,
+    admissionTotal: 0,
+    dischargeTotal: 0,
+    transferTotal: 0,
+    shifts: [] as any[],
+    acuityLevels: [
+      { level: 1, name: 'ดูแลตนเองได้', count: 0, standardHours: 1.5, totalHours: 0, color: 'bg-emerald-500' },
+      { level: 2, name: 'ต้องช่วยเหลือเล็กน้อย', count: 0, standardHours: 3.5, totalHours: 0, color: 'bg-cyan-500' },
+      { level: 3, name: 'ต้องช่วยเหลือปานกลาง', count: 0, standardHours: 5.5, totalHours: 0, color: 'bg-amber-500' },
+      { level: 4, name: 'ต้องช่วยเหลือมาก', count: 0, standardHours: 7.5, totalHours: 0, color: 'bg-orange-500' },
+      { level: 5, name: 'วิกฤต', count: 0, standardHours: 12.0, totalHours: 0, color: 'bg-rose-500' },
+    ],
+  });
 
   useEffect(() => {
-    async function fetchDashboardData() {
+    async function initDepts() {
+      const supabase = createClient();
+      const { data: deptData } = await supabase.from('departments').select('*');
+
+      if (deptData) {
+        const validDepts = deptData.filter((d: any) => {
+          const name = (d.Department || d.department_name || d.name || '').trim();
+          
+          const isOPD = name.toUpperCase().startsWith('OPD');
+          const excludedNames = [
+            'อายุรกรรมชาย 1',
+            'พิเศษอายุรกรรมชั้น 4',
+            'พิเศษอายุรกรรมชั้น 5',
+            'ศูนย์ใจรักษ์',
+            'ศูนย์ดูแลบาดแผล',
+            'อายุรกรรมหญิง'
+          ];
+
+          const isExcluded = excludedNames.some(exc => name.includes(exc));
+
+          return !isOPD && !isExcluded;
+        });
+
+        setDepartments(validDepts);
+        if (validDepts.length > 0 && !selectedDeptId) {
+          setSelectedDeptId(String(validDepts[0].id));
+        }
+      }
+    }
+    initDepts();
+  }, []);
+
+  useEffect(() => {
+    async function fetchWardDetails() {
+      if (!selectedDeptId) return;
       try {
         setLoading(true);
         const supabase = createClient();
 
-        const { data: deptData, error: deptError } = await supabase.from('departments').select('*');
-        if (deptError) {
-          console.error('Error fetching departments:', deptError);
+        const currentDept = departments.find((d: any) => String(d.id) === selectedDeptId);
+        const deptName = currentDept ? (currentDept.Department || currentDept.department_name || currentDept.name) : 'หอผู้ป่วย';
+        const totalBeds = Number(currentDept?.total_beds || currentDept?.beds || currentDept?.bed_count || 0);
+
+        const { data: staffingRows } = await supabase
+          .from('daily_staffing')
+          .select('*')
+          .eq('department_id', selectedDeptId);
+
+        let matchedRow = staffingRows?.find((r: any) => r.date === selectedDate && r.shift === selectedShift);
+        if (!matchedRow && staffingRows && staffingRows.length > 0) {
+          matchedRow = staffingRows[0];
         }
 
-        const deptMap = new Map();
-        if (deptData) {
-          const sortedDeptData = deptData.sort((a: any, b: any) => {
-            return (a.Department || '').localeCompare(b.Department || '', 'th');
+        if (matchedRow && (matchedRow.staff_names || matchedRow.staff || matchedRow.names)) {
+          setStaffNames(matchedRow.staff_names || matchedRow.staff || matchedRow.names);
+        } else {
+          setStaffNames('ยังไม่มีรายชื่อผู้ปฏิบัติงานในเวรนี้');
+        }
+
+        const pCount = matchedRow?.nursing_count ?? 0;
+
+        let calculatedOccupancy = 0;
+        if (totalBeds > 0) {
+          calculatedOccupancy = (pCount / totalBeds) * 100;
+        }
+
+        if (!matchedRow) {
+          setWardData({
+            name: deptName,
+            patientCount: 0,
+            occupancyRate: '0.0%',
+            occupancyVal: 0,
+            score4_5: 0,
+            highFlow: 0,
+            ventilator: 0,
+            np: 0,
+            admissionTotal: 0,
+            dischargeTotal: 0,
+            transferTotal: 0,
+            shifts: [
+              {
+                shiftName: selectedShift,
+                required: 0,
+                rn: 0,
+                pnNa: '-',
+                staffMix: '0.0%',
+                status: 'ไม่มีข้อมูล',
+                statusBg: 'bg-slate-100 text-slate-500 border border-slate-200'
+              }
+            ],
+            acuityLevels: [
+              { level: 1, name: 'ดูแลตนเองได้', count: 0, standardHours: 1.5, totalHours: 0, color: 'bg-emerald-500' },
+              { level: 2, name: 'ต้องช่วยเหลือเล็กน้อย', count: 0, standardHours: 3.5, totalHours: 0, color: 'bg-cyan-500' },
+              { level: 3, name: 'ต้องช่วยเหลือปานกลาง', count: 0, standardHours: 5.5, totalHours: 0, color: 'bg-amber-500' },
+              { level: 4, name: 'ต้องช่วยเหลือมาก', count: 0, standardHours: 7.5, totalHours: 0, color: 'bg-orange-500' },
+              { level: 5, name: 'วิกฤต', count: 0, standardHours: 12.0, totalHours: 0, color: 'bg-rose-500' },
+            ]
           });
-
-          sortedDeptData.forEach((d: any) => {
-            const deptName = d.Department || `หน่วยงาน ID: ${d.id}`;
-            deptMap.set(Number(d.id), deptName);
-          });
-          setWardsFilterOptions(sortedDeptData);
-        }
-
-        let query = supabase.from('daily_staffing').select('*');
-
-        if (selectedDate) {
-          query = query.eq('date', selectedDate);
-        }
-        if (selectedShift && selectedShift !== 'all') {
-          query = query.eq('shift', selectedShift);
-        }
-
-        const { data, error } = await query;
-
-        if (error) {
-          console.error('Error fetching daily_staffing:', error);
-          setLoading(false);
           return;
         }
 
-        if (data && data.length > 0) {
-          let patientsSum = 0;
-          let reqHoursSum = 0;
-          let actHoursSum = 0;
-          let fteGapSum = 0;
-          let productivitySum = 0;
-          const formattedDepts: any[] = [];
+        const s1 = Number(matchedRow?.score_1) || 0;
+        const s2 = Number(matchedRow?.score_2) || 0;
+        const s3 = Number(matchedRow?.score_3) || 0;
+        const s4 = Number(matchedRow?.score_4) || 0;
+        const s5 = Number(matchedRow?.score_5) || 0;
+        const sGt5 = Number(matchedRow?.score_gt_5) || 0;
+        const total4_5 = s4 + s5 + sGt5;
 
-          data.forEach((item: any) => {
-            const deptIdNum = Number(item.department_id);
-            const deptName = deptMap.get(deptIdNum) || `หน่วยงาน ID: ${item.department_id}`;
+        const hf = matchedRow?.high_flow ?? matchedRow?.HIGH_FLOW ?? 0;
+        const vent = matchedRow?.ventilator ?? matchedRow?.VENTILATOR ?? 0;
+        const npVal = matchedRow?.np ?? matchedRow?.NP ?? 0;
 
-            const patientCount = Number(item.nursing_count || 0);
-            const npValue = Number(item.np || 0);
+        const newAdm = Number(matchedRow?.new_admission) || Number(matchedRow?.ew_admission) || 0;
+        const tIn = Number(matchedRow?.transfer_in) || 0;
+        const dis = Number(matchedRow?.discharge) || 0;
+        const tOut = Number(matchedRow?.transfer_out) || 0;
+        const ref = Number(matchedRow?.refer) || 0;
 
-            const requiredStaff = Number(item.required_staff || 0);
-            const rnCount = Number(item.rn_count || 0);
-            const tnCount = Number(item.tn_count || 0);
-            const actualStaffCount = rnCount + tnCount;
+        const admissionTotal = newAdm + tIn;
+        const dischargeTotal = dis + tOut; 
+        const transferTotal = ref;         
 
-            const requiredHours = requiredStaff * 8;
-            const actualHours = actualStaffCount * 8;
-            const gap = requiredStaff - actualStaffCount;
+        const req = matchedRow?.required_staff || 4;
+        const act = (matchedRow?.rn_count || 0) + (matchedRow?.tn_count || 0);
+        const isNormal = act >= req;
 
-            patientsSum += patientCount;
-            reqHoursSum += requiredHours;
-            actHoursSum += actualHours;
-            fteGapSum += gap;
-            productivitySum += npValue;
+        const currentStaffMixVal = act > 0 ? ((matchedRow?.rn_count || 0) / act) * 100 : 0;
 
-            const wisnVal = requiredStaff > 0 ? (actualStaffCount / requiredStaff).toFixed(2) : '0.00';
+        let shiftList = [
+          {
+            shiftName: selectedShift,
+            required: req,
+            rn: matchedRow?.rn_count || 0,
+            pnNa: '-',
+            staffMix: `${currentStaffMixVal.toFixed(1)}%`,
+            status: isNormal ? 'ผ่าน' : 'ต้องแก้ไข',
+            statusBg: isNormal ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-rose-100 text-rose-700 border border-rose-200'
+          }
+        ];
 
-            if (selectedWard === 'all' || String(item.department_id) === selectedWard) {
-              formattedDepts.push({
-                name: deptName,
-                patients: patientCount,
-                requiredHours: requiredHours,
-                actualHours: actualHours,
-                productivity: npValue.toFixed(1),
-                requiredFte: requiredStaff.toFixed(2),
-                actualFte: actualStaffCount.toFixed(2),
-                gap: gap.toFixed(2),
-                wisn: wisnVal,
-                status: gap > 0 ? 'กำลังคนต่ำกว่าความต้องการตามภาระงาน' : 'สมดุล',
-              });
-            }
-          });
-
-          formattedDepts.sort((a, b) => a.name.localeCompare(b.name, 'th'));
-
-          const avgProd = formattedDepts.length > 0 ? (productivitySum / formattedDepts.length).toFixed(1) : '0';
-
-          setDashboardData({
-            totalPatients: patientsSum,
-            wardCount: formattedDepts.length,
-            totalRequiredHours: reqHoursSum,
-            totalActualHours: actHoursSum,
-            avgProductivity: Number(avgProd),
-            totalFteGap: Number(fteGapSum.toFixed(2)),
-            activeAlerts: formattedDepts.filter(i => Number(i.gap) > 0).length,
-            criticalAlerts: formattedDepts.filter(i => Number(i.gap) > 2).length,
-          });
-
-          setDepartmentList(formattedDepts);
-        } else {
-          setDashboardData({
-            totalPatients: 0,
-            wardCount: 0,
-            totalRequiredHours: 0,
-            totalActualHours: 0,
-            avgProductivity: 0,
-            totalFteGap: 0,
-            activeAlerts: 0,
-            criticalAlerts: 0,
-          });
-          setDepartmentList([]);
-        }
+        setWardData({
+          name: deptName,
+          patientCount: pCount,
+          occupancyRate: `${calculatedOccupancy.toFixed(1)}%`,
+          occupancyVal: calculatedOccupancy,
+          score4_5: total4_5,
+          highFlow: hf,
+          ventilator: vent,
+          np: npVal,
+          admissionTotal,
+          dischargeTotal,
+          transferTotal,
+          shifts: shiftList,
+          acuityLevels: [
+            { level: 1, name: 'ดูแลตนเองได้', count: s1, standardHours: 1.5, totalHours: s1 * 1.5, color: 'bg-emerald-500' },
+            { level: 2, name: 'ต้องช่วยเหลือเล็กน้อย', count: s2, standardHours: 3.5, totalHours: s2 * 3.5, color: 'bg-cyan-500' },
+            { level: 3, name: 'ต้องช่วยเหลือปานกลาง', count: s3, standardHours: 5.5, totalHours: s3 * 5.5, color: 'bg-amber-500' },
+            { level: 4, name: 'ต้องช่วยเหลือมาก', count: s4, standardHours: 7.5, totalHours: s4 * 7.5, color: 'bg-orange-500' },
+            { level: 5, name: 'วิกฤต', count: s5 + sGt5, standardHours: 12.0, totalHours: (s5 + sGt5) * 12.0, color: 'bg-rose-500' },
+          ]
+        });
 
       } catch (err) {
-        console.error('Error loading staffing overview:', err);
+        console.error(err);
       } finally {
         setLoading(false);
       }
     }
 
-    fetchDashboardData();
-  }, [selectedDate, selectedShift, selectedWard]);
+    fetchWardDetails();
+  }, [selectedDeptId, selectedDate, selectedShift, departments]);
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-800 p-6 font-sans">
+    <div className="min-h-screen bg-slate-50 text-slate-800 p-2 space-y-4 font-sans">
       
-      {/* ส่วนหัวแถบเลือก Ward, Shift, Date */}
-      <div className="flex flex-wrap items-center justify-between bg-white p-4 rounded-2xl border border-emerald-100 mb-6 shadow-xs">
-        <div className="flex items-center space-x-3">
-          <span className="bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-xl text-sm shadow-xs">N</span>
-          <div>
-            <h1 className="text-sm font-bold text-emerald-900">โรงพยาบาลวชิระภูเก็ต</h1>
-            <p className="text-xs text-gray-500">ระบบบริหารอัตรากำลังพยาบาล</p>
+      {/* ปรับลดระยะห่างด้านบนด้วย max-w-7xl mx-auto และจำกัดความกว้างกล่องสีขาว */}
+      <div className="max-w-7xl mx-auto">
+        <div className="flex flex-wrap items-center justify-between bg-white p-4 rounded-2xl border border-emerald-100 shadow-xs">
+          <div className="flex items-center space-x-3">
+            <span className="bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-xl text-sm shadow-xs">N</span>
+            <div>
+              <h1 className="text-sm font-bold text-emerald-900">โรงพยาบาลวชิระภูเก็ต</h1>
+              <p className="text-xs text-gray-500">ระบบบริหารอัตรากำลังพยาบาล</p>
+            </div>
           </div>
-        </div>
 
-        <div className="flex items-center space-x-3 mt-3 md:mt-0">
-          <select 
-            value={selectedWard} 
-            onChange={(e) => setSelectedWard(e.target.value)}
-            className="bg-gray-50 text-gray-700 text-xs px-3 py-2 rounded-xl border border-emerald-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
-          >
-            <option value="all">ทุกหอผู้ป่วย / หน่วยงาน</option>
-            {wardsFilterOptions.map((ward) => (
-              <option key={ward.id} value={String(ward.id)}>
-                {ward.Department}
-              </option>
-            ))}
-          </select>
+          <div className="flex flex-wrap items-center gap-3 mt-3 sm:mt-0">
+            <select
+              value={selectedDeptId}
+              onChange={(e) => setSelectedDeptId(e.target.value)}
+              className="bg-white border border-slate-300 text-slate-700 text-xs rounded-xl px-3 py-2 w-48 sm:w-56 focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-xs truncate"
+            >
+              {departments.map((d: any) => (
+                <option key={d.id} value={d.id}>
+                  {d.Department || d.department_name || d.name}
+                </option>
+              ))}
+            </select>
 
-          <select 
-            value={selectedShift} 
-            onChange={(e) => setSelectedShift(e.target.value)}
-            className="bg-gray-50 text-gray-700 text-xs px-3 py-2 rounded-xl border border-emerald-200 focus:outline-none focus:ring-2 focus:ring-emerald-500 cursor-pointer"
-          >
-            <option value="เวรดึก">เวรดึก</option>
-            <option value="เวรเช้า">เวรเช้า</option>
-            <option value="เวรบ่าย">เวรบ่าย</option>
-          </select>
+            <select
+              value={selectedShift}
+              onChange={(e) => setSelectedShift(e.target.value)}
+              className="bg-white border border-slate-300 text-slate-700 text-xs rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-xs"
+            >
+              <option value="เวรเช้า">เวรเช้า</option>
+              <option value="เวรบ่าย">เวรบ่าย</option>
+              <option value="เวรดึก">เวรดึก</option>
+            </select>
 
-          <div className="flex items-center bg-gray-50 px-3 py-1.5 rounded-xl border border-emerald-200 text-xs text-gray-700">
-            <Calendar className="w-4 h-4 mr-2 text-emerald-700" />
-            <input 
-              type="date" 
+            <input
+              type="date"
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
-              className="bg-transparent text-gray-700 focus:outline-none cursor-pointer"
+              className="bg-white border border-slate-300 text-slate-700 text-xs rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-xs"
             />
           </div>
         </div>
       </div>
 
-      {/* แถบแจ้งสถานะการเชื่อมต่อ */}
-      <div className="bg-emerald-50/60 border border-emerald-200 px-4 py-2.5 rounded-xl mb-6 text-xs flex flex-wrap items-center justify-between text-emerald-900">
-        <div>
-          แสดงข้อมูลอัตรากำลังประจำวันที่ <span className="font-semibold">{selectedDate}</span>
-        </div>
-        <div className="text-emerald-700 flex items-center mt-1 sm:mt-0 font-medium">
-          <Activity className="w-3.5 h-3.5 mr-1" /> พร้อมใช้งาน
-        </div>
-      </div>
-
-      {/* KPI Cards โทนสว่าง */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-        <div className="bg-white border border-emerald-100 p-4 rounded-2xl shadow-xs">
-          <p className="text-xs text-gray-500 mb-1">ยอดผู้ป่วย</p>
-          <div className="flex items-baseline space-x-2">
-            <span className="text-2xl font-extrabold text-emerald-900">{dashboardData.totalPatients}</span>
-            <span className="text-xs text-gray-500">ราย</span>
-          </div>
-          <p className="text-[11px] text-gray-400 mt-2">{dashboardData.wardCount} หน่วยงาน</p>
-        </div>
-
-        <div className="bg-white border border-emerald-100 p-4 rounded-2xl shadow-xs">
-          <p className="text-xs text-gray-500 mb-1">Required Nursing Hours</p>
-          <div className="flex items-baseline space-x-2">
-            <span className="text-2xl font-extrabold text-emerald-900">{dashboardData.totalRequiredHours}</span>
-            <span className="text-xs text-gray-500">ชม.</span>
-          </div>
-          <p className="text-[11px] text-emerald-600 mt-2">Actual: {dashboardData.totalActualHours} ชม.</p>
-        </div>
-
-        <div className="bg-white border border-emerald-100 p-4 rounded-2xl shadow-xs">
-          <p className="text-xs text-gray-500 mb-1">Productivity</p>
-          <div className="flex items-baseline space-x-2">
-            <span className="text-2xl font-extrabold text-emerald-700">{dashboardData.avgProductivity}</span>
-            <span className="text-xs text-emerald-700">%</span>
-          </div>
-          <p className="text-[11px] text-gray-400 mt-2">ค่าเฉลี่ยจากฟิลด์ np</p>
-        </div>
-
-        <div className="bg-white border border-emerald-100 p-4 rounded-2xl shadow-xs">
-        <p className="text-xs text-gray-500 mb-1">FTE Gap รวม</p>
-        <div className="flex items-baseline space-x-2">
-            <span className={`text-2xl font-extrabold ${
-            Number(dashboardData.totalFteGap) < 0 ? 'text-blue-600' : 'text-red-600'
-            }`}>
-            {dashboardData.totalFteGap}
-            </span>
-            <span className="text-xs text-gray-500">FTE</span>
-        </div>
-        <p className="text-[11px] text-rose-500 mt-2">ผลต่างกำลังคน</p>
-        </div>
-
-        <div className="bg-white border border-emerald-100 p-4 rounded-2xl shadow-xs">
-          <p className="text-xs text-gray-500 mb-1">แจ้งเตือนที่ยังเปิดอยู่</p>
-          <div className="flex items-baseline space-x-2">
-            <span className="text-2xl font-extrabold text-rose-600">{dashboardData.activeAlerts}</span>
-            <span className="text-xs text-gray-500">รายการ</span>
-          </div>
-          <p className="text-[11px] text-amber-600 mt-2">ระดับ Critical {dashboardData.criticalAlerts} รายการ</p>
-        </div>
-      </div>
-
-      {/* ตารางแสดงข้อมูลรายหน่วยงาน */}
-      <div className="bg-white border border-emerald-100 rounded-2xl p-5 shadow-xs">
-        <h2 className="text-sm font-bold text-emerald-900 mb-1">หน่วยงานที่ต้องให้ความสำคัญ</h2>
+      {/* ส่วนอื่นๆ (จำกัดความกว้าง max-w-7xl mx-auto ให้เท่ากัน) */}
+      <div className="max-w-7xl mx-auto space-y-4">
         
-
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-xs">
-            <thead>
-              <tr className="border-b border-gray-100 text-emerald-900 bg-emerald-50/50 font-semibold">
-                <th className="py-3 px-4 rounded-l-xl">หน่วยงาน</th>
-                <th className="py-3 px-2 text-center">ยอดผู้ป่วย</th>
-                <th className="py-3 px-2 text-center">Required (ชม.)</th>
-                <th className="py-3 px-2 text-center">Actual (ชม.)</th>
-                <th className="py-3 px-2 text-center">Productivity</th>
-                <th className="py-3 px-2 text-center">Required FTE</th>
-                <th className="py-3 px-2 text-center">Actual FTE</th>
-                <th className="py-3 px-2 text-center">Gap</th>
-                <th className="py-3 px-2 text-center">WISN</th>
-                <th className="py-3 px-4 rounded-r-xl">สถานะ</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100 text-gray-700">
-              {loading ? (
-                <tr>
-                  <td colSpan={10} className="py-8 text-center text-gray-400">กำลังโหลดข้อมูล...</td>
-                </tr>
-              ) : departmentList.length === 0 ? (
-                <tr>
-                  <td colSpan={10} className="py-8 text-center text-gray-400">ไม่พบข้อมูลอัตรากำลังในวันที่เลือก</td>
-                </tr>
-              ) : (
-                departmentList.map((item, index) => (
-                  <tr key={index} className="hover:bg-emerald-50/40 transition-colors">
-                    <td className="py-3 px-4 font-semibold text-emerald-900">{item.name}</td>
-                    <td className="py-3 px-2 text-center">{item.patients}</td>
-                    <td className="py-3 px-2 text-center">{item.requiredHours}</td>
-                    <td className="py-3 px-2 text-center">{item.actualHours}</td>
-                    <td className="py-3 px-2 text-center text-emerald-700 font-medium">{item.productivity}%</td>
-                    <td className="py-3 px-2 text-center">{item.requiredFte}</td>
-                    <td className="py-3 px-2 text-center">{item.actualFte}</td>
-                    <td className={`text-right pr-2 tabular-nums ${
-                        Number(item.gap) < 0 
-                            ? 'text-blue-600' 
-                            : Number(item.gap) > 0 
-                            ? 'text-red-600' 
-                            : 'text-gray-800'
-                        }`}>
-                        {Number(item.gap).toFixed(2)}
-                        </td>
-                    <td className="py-3 px-2 text-center">{item.wisn}</td>
-                    <td className="py-3 px-4">
-                      {item.status === 'สมดุล' ? (
-                        <span className="bg-emerald-50 text-emerald-700 border border-emerald-200 px-2.5 py-1 rounded-full text-[10px] font-medium">
-                          {item.status}
-                        </span>
-                      ) : (
-                        <span className="bg-rose-50 text-rose-600 border border-rose-200 px-2.5 py-1 rounded-full text-[10px] font-medium">
-                          {item.status}
-                        </span>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
+        {/* Alert Banner / รายชื่อผู้ปฏิบัติงาน */}
+        <div className="bg-white border-l-4 border-emerald-500 p-4 rounded-xl flex items-center justify-between text-sm shadow-xs border-y border-r border-slate-200">
+          <div>
+            <span className="font-bold text-slate-900">{wardData.name}</span>
+            <span className="text-slate-400 mx-2">|</span>
+            <span className="text-slate-600">{selectedDate} - {selectedShift}</span>
+            <span className="text-slate-400 mx-2">|</span>
+            <span className="text-emerald-700 font-semibold">{staffNames}</span>
+          </div>
+          <span className="text-xs text-slate-400">ปรับปรุงล่าสุด {todayStr} • ข้อมูลจากการบันทึกในระบบ</span>
         </div>
-      </div>
 
+        {/* Cards สรุปตัวเลขหลัก */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+            <span className="text-xs font-semibold text-slate-500">ผู้ป่วยในหน่วยงาน</span>
+            <div className="flex items-baseline gap-2 mt-2">
+              <span className="text-3xl font-extrabold text-slate-900">{wardData.patientCount}</span>
+              <span className="text-xs text-slate-500">ราย</span>
+            </div>
+            <span className="text-xs text-slate-400 mt-2 block">
+              อัตราครองเตียง{' '}
+              <strong className={wardData.occupancyVal > 100 ? 'text-rose-600' : 'text-blue-600'}>
+                {wardData.occupancyRate}
+              </strong>
+            </span>
+          </div>
+
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+            <span className="text-xs font-semibold text-slate-500">ผู้ป่วยระดับ 4-5 / Ventilator / High Flow</span>
+            <div className="flex items-baseline gap-2 mt-2">
+              <span className="text-3xl font-extrabold text-slate-900">{wardData.score4_5}</span>
+              <span className="text-xs text-slate-500">ราย (Vent: <strong className="text-rose-600">{wardData.ventilator}</strong> | HF: <strong className="text-amber-600">{wardData.highFlow}</strong>)</span>
+            </div>
+            <span className="text-xs text-amber-600 mt-2 block">เฝ้าระวัง 1:1 จำนวน 0 ราย</span>
+          </div>
+
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+            <span className="text-xs font-semibold text-slate-500">ค่า NP (Nursing Productivity)</span>
+            <div className="flex items-baseline gap-2 mt-2">
+              <span className="text-3xl font-extrabold text-emerald-600">{Number(wardData.np).toFixed(2)}</span>
+              <span className="text-xs text-slate-500">%</span>
+            </div>
+            <span className="text-xs text-emerald-600 mt-2 block">สมรรถนะตามเกณฑ์กำหนด</span>
+          </div>
+
+          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+            <span className="text-xs font-semibold text-slate-500">Admission / Discharge / Refer</span>
+            <div className="grid grid-cols-3 gap-1 mt-2 text-center">
+              <div className="bg-slate-50 p-1.5 rounded-lg border border-slate-100">
+                <span className="text-[10px] text-slate-400 block">Adm</span>
+                <span className="text-base font-bold text-slate-800">{wardData.admissionTotal}</span>
+              </div>
+              <div className="bg-slate-50 p-1.5 rounded-lg border border-slate-100">
+                <span className="text-[10px] text-slate-400 block">Dis</span>
+                <span className="text-base font-bold text-slate-800">{wardData.dischargeTotal}</span>
+              </div>
+              <div className="bg-slate-50 p-1.5 rounded-lg border border-slate-100">
+                <span className="text-[10px] text-slate-400 block">Trf</span>
+                <span className="text-base font-bold text-slate-800">{wardData.transferTotal}</span>
+              </div>
+            </div>
+            <span className="text-xs text-slate-400 mt-2 block">ข้อมูลรวมในวันนี้</span>
+          </div>
+
+        </div>
+
+        {/* ส่วนล่าง: ตารางเปรียบเทียบเวร และ กราฟส่วนผสม Acuity */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+          
+          <div className="lg:col-span-6 bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+            <h3 className="font-bold text-slate-900 text-sm">Required เทียบ Actual รายเวร</h3>
+            
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="border-b border-slate-200 text-slate-500">
+                    <th className="py-2.5">เวร</th>
+                    <th className="py-2.5 text-center">ต้องการ (คน)</th>
+                    <th className="py-2.5 text-center">RN จริง</th>
+                    <th className="py-2.5 text-center">PN+NA</th>
+                    <th className="py-2.5 text-center">Staff Mix</th>
+                    <th className="py-2.5 text-center">สถานะ</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {wardData.shifts.map((s, idx) => (
+                    <tr key={idx} className="hover:bg-slate-50">
+                      <td className="py-3 font-medium text-slate-700">{s.shiftName}</td>
+                      <td className="py-3 text-center text-slate-600">{s.required}</td>
+                      <td className="py-3 text-center text-slate-600">{s.rn}</td>
+                      <td className="py-3 text-center text-slate-600">{s.pnNa}</td>
+                      <td className="py-3 text-center text-slate-600">{s.staffMix}</td>
+                      <td className="py-3 text-center">
+                        <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${s.statusBg}`}>
+                          {s.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div className="lg:col-span-6 bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-4">
+            <h3 className="font-bold text-slate-900 text-sm">ส่วนผสมผู้ป่วยตามระดับ Acuity</h3>
+            
+            <div className="h-32 flex items-end justify-around gap-2 px-4 pt-4 bg-slate-50 rounded-xl border border-slate-200">
+              {wardData.acuityLevels.map((lvl) => (
+                <div key={lvl.level} className="flex flex-col items-center gap-1 h-full justify-end">
+                  <span className="text-[10px] text-slate-500 font-semibold">{lvl.count}</span>
+                  <div 
+                    style={{ height: lvl.count === 0 ? '0px' : `${Math.max(lvl.count * 14, 8)}px` }} 
+                    className={`w-8 rounded-t-lg ${lvl.color} transition-all`}
+                  ></div>
+                  <span className="text-[10px] text-slate-500 mt-1">ระดับ {lvl.level}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+        </div>
+
+      </div>
     </div>
   );
 }

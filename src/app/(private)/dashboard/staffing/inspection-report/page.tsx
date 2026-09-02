@@ -198,7 +198,7 @@ export default function NursingInspectionReportPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 text-gray-800 p-4 font-sans flex flex-col items-center">
+    <div className="min-h-screen bg-gray-100 text-gray-800 p-2 font-sans flex flex-col items-center">
       
       {/* ส่วนควบคุมด้านบน (ซ่อนตอนพิมพ์) */}
       <div className="w-full bg-white p-3 rounded-xl border border-gray-200 mb-4 shadow-xs flex flex-wrap items-center justify-between print:hidden">

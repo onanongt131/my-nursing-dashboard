@@ -18,6 +18,7 @@ export default function WardCommandCenterPage() {
     name: '-',
     patientCount: 0,
     occupancyRate: '0.0%',
+    occupancyVal: 0, // เก็บค่าตัวเลขดิบสำหรับเช็คเงื่อนไขสี
     score4_5: 0,
     highFlow: 0,
     ventilator: 0,
@@ -77,16 +78,22 @@ export default function WardCommandCenterPage() {
 
         const currentDept = departments.find((d: any) => String(d.id) === selectedDeptId);
         const deptName = currentDept ? (currentDept.Department || currentDept.department_name || currentDept.name) : 'หอผู้ป่วย';
+        const totalBeds = Number(currentDept?.total_beds || currentDept?.beds || currentDept?.bed_count || 0);
 
-        const { data: staffingRows } = await supabase
+        // ดึงข้อมูลโดยกรองตาม department_id, date และ shift จาก Supabase โดยตรง
+        const { data: staffingRows, error } = await supabase
           .from('daily_staffing')
           .select('*')
-          .eq('department_id', selectedDeptId);
-
-        let matchedRow = staffingRows?.find((r: any) => r.date === selectedDate && r.shift === selectedShift);
-        if (!matchedRow && staffingRows && staffingRows.length > 0) {
-          matchedRow = staffingRows[0];
+          .eq('department_id', Number(selectedDeptId)) // แปลงเป็นตัวเลข
+          .eq('date', selectedDate)
+          .eq('shift', selectedShift);
+        
+        if (error) {
+          console.error('Error fetching staffing:', error);
         }
+
+        // เชิงตรวจสอบว่ามีข้อมูลแถวที่ตรงกันหรือไม่
+        const matchedRow = staffingRows && staffingRows.length > 0 ? staffingRows[0] : null;
 
         if (matchedRow && (matchedRow.staff_names || matchedRow.staff || matchedRow.names)) {
           setStaffNames(matchedRow.staff_names || matchedRow.staff || matchedRow.names);
@@ -94,11 +101,19 @@ export default function WardCommandCenterPage() {
           setStaffNames('ยังไม่มีรายชื่อผู้ปฏิบัติงานในเวรนี้');
         }
 
+        const pCount = matchedRow?.nursing_count ?? 0;
+
+        let calculatedOccupancy = 0;
+        if (totalBeds > 0) {
+          calculatedOccupancy = (pCount / totalBeds) * 100;
+        }
+
         if (!matchedRow) {
           setWardData({
             name: deptName,
             patientCount: 0,
             occupancyRate: '0.0%',
+            occupancyVal: 0,
             score4_5: 0,
             highFlow: 0,
             ventilator: 0,
@@ -128,7 +143,6 @@ export default function WardCommandCenterPage() {
           return;
         }
 
-        const pCount = matchedRow?.nursing_count ?? 0;
         const s1 = Number(matchedRow?.score_1) || 0;
         const s2 = Number(matchedRow?.score_2) || 0;
         const s3 = Number(matchedRow?.score_3) || 0;
@@ -141,7 +155,7 @@ export default function WardCommandCenterPage() {
         const vent = matchedRow?.ventilator ?? matchedRow?.VENTILATOR ?? 0;
         const npVal = matchedRow?.np ?? matchedRow?.NP ?? 0;
 
-        const ewAdm = Number(matchedRow?.ew_admission) || 0;
+        const ewAdm = Number(matchedRow?.new_admission) || 0;
         const tIn = Number(matchedRow?.transfer_in) || 0;
         const dis = Number(matchedRow?.discharge) || 0;
         const tOut = Number(matchedRow?.transfer_out) || 0;
@@ -155,8 +169,6 @@ export default function WardCommandCenterPage() {
         const act = (matchedRow?.rn_count || 0) + (matchedRow?.tn_count || 0);
         const isNormal = act >= req;
 
-        const isICU = deptName.toUpperCase().includes('ICU');
-        const targetStaffMix = isICU ? 90 : 70;
         const currentStaffMixVal = act > 0 ? ((matchedRow?.rn_count || 0) / act) * 100 : 0;
 
         let shiftList = [
@@ -174,7 +186,8 @@ export default function WardCommandCenterPage() {
         setWardData({
           name: deptName,
           patientCount: pCount,
-          occupancyRate: '78.1%',
+          occupancyRate: `${calculatedOccupancy.toFixed(1)}%`,
+          occupancyVal: calculatedOccupancy,
           score4_5: total4_5,
           highFlow: hf,
           ventilator: vent,
@@ -268,7 +281,12 @@ export default function WardCommandCenterPage() {
             <span className="text-3xl font-extrabold text-slate-900">{wardData.patientCount}</span>
             <span className="text-xs text-slate-500">ราย</span>
           </div>
-          <span className="text-xs text-slate-400 mt-2 block">อัตราครองเตียง {wardData.occupancyRate}</span>
+          <span className="text-xs text-slate-400 mt-2 block">
+            อัตราครองเตียง{' '}
+            <strong className={wardData.occupancyVal > 100 ? 'text-rose-600' : 'text-blue-600'}>
+              {wardData.occupancyRate}
+            </strong>
+          </span>
         </div>
 
         <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">

@@ -58,11 +58,11 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
   // รายชื่อคณะกรรมการ
   const committeeList = [
     { name: 'คณะกรรมการบริหาร', path: '/dashboard/committee/executive' },
-    { name: 'คณะกรรมการ QA', path: '/dashboard/committee/qa' },
-    { name: 'คณะกรรมการ RM', path: '/dashboard/committee/rm' },
-    { name: 'คณะกรรมการวิชาการ', path: '/dashboard/committee/academic' },
-    { name: 'คณะกรรมการ EIC', path: '/dashboard/committee/eic' },
-    { name: 'คณะกรรมการ 5S และสิ่งแวดล้อม', path: '/dashboard/committee/5s' },
+    { name: 'คณะกรรมการพัฒนาคุณภาพบริการพยาบาล (QA)', path: '/dashboard/committee/qa' },
+    { name: 'คณะกรรมการบริหารความเสี่ยงและจริยธรรมทางการพยาบาล (RM)', path: '/dashboard/committee/rm' },
+    { name: 'คณะกรรมการพัฒนางานวิชาการ (HRN)', path: '/dashboard/committee/academic' },
+    { name: 'คณะกรรมการบริหารอัตรากำลัง', path: '/dashboard/committee/personnel' },
+    { name: 'คณะกรรมการวิจัยและนวัตกรรมทางการพยาบาล', path: '/dashboard/committee/r2r' },
     { name: 'คณะกรรมการบ้านพัก', path: '/dashboard/committee/home' },
   ];
 
@@ -176,69 +176,97 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
     <div className="bg-white shadow-sm w-full rounded-2xl overflow-visible border border-emerald-100">
       {/* Header ส่วนบน */}
       <header className="flex flex-col md:flex-row items-center justify-between px-4 sm:px-6 py-4 bg-white gap-4 border-b border-gray-100">
-        <div className="flex items-center justify-between w-full md:w-auto">
-          <div className="flex items-center gap-3 sm:gap-4 text-center sm:text-left">
-            <img src="/Logo-NSO.png" alt="Logo" className="h-12 w-12 sm:h-14 sm:w-14 object-contain flex-shrink-0" onError={(e) => { e.currentTarget.style.display = 'none'; }} />
-            <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-800 leading-snug">{title || "กลุ่มภารกิจด้านการพยาบาล"}</h1>
-          </div>
-          
-          <button 
-            type="button" 
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} 
-            className="md:hidden p-2 rounded-lg bg-emerald-900 text-amber-300 hover:bg-emerald-800 focus:outline-none flex-shrink-0 ml-2"
-          >
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              {isMobileMenuOpen ? (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              ) : (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              )}
-            </svg>
-          </button>
-        </div>
+  <div className="flex items-center justify-between w-full md:w-auto">
+    <div className="flex items-center gap-3 sm:gap-4 text-center sm:text-left pl-2 sm:pl-4">
+      
+      {/* โลโก้โรงพยาบาล */}
+      <img 
+        src="/Logo VCR.png" 
+        alt="Hospital Logo" 
+        className="h-10 sm:h-12 w-auto object-contain flex-shrink-0" 
+        onError={(e) => { e.currentTarget.style.display = 'none'; }} 
+      />
 
-       {/* ส่วนแสดงชื่อ Login และ Badge สิทธิ์ (Desktop View) */}
-        <div className="hidden md:flex items-center gap-3">
-          
-          {/* ปุ่มอนุมัติสมาชิก */}
-          {userRole && userRole.toLowerCase() === 'admin' && (
-            <a 
-              href="/dashboard/admin/approve-members" 
-              className="h-11 flex items-center gap-2 px-4 rounded-2xl border border-emerald-300/60 bg-white text-emerald-900 font-bold text-sm hover:bg-emerald-50 transition-colors shadow-2xs"
-            >
-              <svg className="w-4 h-4 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
-              อนุมัติสมาชิก
-            </a>
-          )}
+      {/* เส้นคั่นระหว่างโลโก้ */}
+      <div className="h-8 w-[1px] bg-gray-200 hidden sm:block"></div>
 
-          {/* กล่องชื่อผู้ใช้งาน */}
-          <div className="h-11 flex items-center gap-3 px-4 rounded-2xl border border-emerald-300/60 bg-white shadow-2xs">
-            <div className="w-8 h-8 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-800 shrink-0">
-              <svg className="w-4 h-4 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-              </svg>
-            </div>
-            
-            <div className="flex flex-col justify-center">
-              <span className="text-sm font-bold text-emerald-900 tracking-tight leading-tight">
-                {displayUserName}
-              </span>
-              {userRole && (
-                <span className="text-[10px] text-emerald-600 font-medium uppercase tracking-wider mt-0.5">
-                  {userRole} {userGroup ? `(${userGroup})` : ''}
-                </span>
-              )}
-            </div>
-          </div>
-          
-          {/* ปุ่มออกจากระบบ */}
-          <div className="h-11 flex items-center px-2 rounded-2xl border border-rose-200 bg-rose-50/50 hover:bg-rose-100/60 transition-colors">
-            <LogoutButton />
-          </div>
-        </div>
-      </header>
+      {/* โลโก้กลุ่มภารกิจฯ (Logo-NSO) */}
+      <img 
+        src="/Logo-NSO.png" 
+        alt="Logo" 
+        className="h-12 w-12 sm:h-14 sm:w-14 object-contain flex-shrink-0" 
+        onError={(e) => { e.currentTarget.style.display = 'none'; }} 
+      />
+      
+      {/* ส่วนหัวข้อ: บรรทัดบนชื่อกลุ่มภารกิจฯ / บรรทัดล่างโรงพยาบาลวชิระภูเก็ต */}
+      <div className="flex flex-col justify-center">
+        <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-800 leading-snug">
+          {title || "กลุ่มภารกิจด้านการพยาบาล"}
+        </h1>
+        <span className="text-xs sm:text-sm text-gray-500 font-medium tracking-wide">
+          โรงพยาบาลวชิระภูเก็ต
+        </span>
+      </div>
+
+    </div>
+    
+    <button 
+      type="button" 
+      onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} 
+      className="md:hidden p-2 rounded-lg bg-emerald-900 text-amber-300 hover:bg-emerald-800 focus:outline-none flex-shrink-0 ml-2"
+    >
+      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        {isMobileMenuOpen ? (
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+        ) : (
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+        )}
+      </svg>
+    </button>
+  </div>
+
+  {/* ส่วนแสดงชื่อ Login และ Badge สิทธิ์ (Desktop View) */}
+  <div className="hidden md:flex items-center gap-3">
+    
+    {/* ปุ่มอนุมัติสมาชิก */}
+    {userRole && userRole.toLowerCase() === 'admin' && (
+      <a 
+        href="/dashboard/admin/approve-members" 
+        className="h-11 flex items-center gap-2 px-4 rounded-2xl border border-emerald-300/60 bg-white text-emerald-900 font-bold text-sm hover:bg-emerald-50 transition-colors shadow-2xs"
+      >
+        <svg className="w-4 h-4 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        อนุมัติสมาชิก
+      </a>
+    )}
+
+    {/* กล่องชื่อผู้ใช้งาน */}
+    <div className="h-11 flex items-center gap-3 px-4 rounded-2xl border border-emerald-300/60 bg-white shadow-2xs">
+      <div className="w-8 h-8 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-800 shrink-0">
+        <svg className="w-4 h-4 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+        </svg>
+      </div>
+      
+      <div className="flex flex-col justify-center">
+        <span className="text-sm font-bold text-emerald-900 tracking-tight leading-tight">
+          {displayUserName}
+        </span>
+        {userRole && (
+          <span className="text-[10px] text-emerald-600 font-medium uppercase tracking-wider mt-0.5">
+            {userRole} {userGroup ? `(${userGroup})` : ''}
+          </span>
+        )}
+      </div>
+    </div>
+    
+    {/* ปุ่มออกจากระบบ */}
+    <div className="h-11 flex items-center px-2 rounded-2xl border border-rose-200 bg-rose-50/50 hover:bg-rose-100/60 transition-colors">
+      <LogoutButton />
+    </div>
+  </div>
+</header>
 
       {/* Navigation เมนูด้านล่าง */}
       <div className={`w-full bg-emerald-900 shadow-md transition-all duration-300 ${isMobileMenuOpen ? 'block' : 'hidden'} md:block`}>

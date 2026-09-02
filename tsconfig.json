@@ -29,6 +29,6 @@
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts",
     "**/*.mts"
-, "src/middleware.ts.bak", "next.config.js"  ],
+, "src/middleware.ts.bak", "next.config.js", "src/app/(private)/dashboard/committee/[key]/page", "src/app/(private)/dashboard/committee/page"  ],
   "exclude": ["node_modules"]
 }

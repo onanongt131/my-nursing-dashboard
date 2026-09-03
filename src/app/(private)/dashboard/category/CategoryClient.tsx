@@ -234,8 +234,9 @@ export default function CategoryClient({ category }: { category: string }) {
                       {getYearlyTrend(
                         kpi.kpi_entries || [], 
                         kpi.Type, 
-                        kpi.operator, // ส่ง operator เข้าไปให้ฟังก์ชันเช็คว่าเป็นแบบ "ยิ่งน้อยยิ่งดี" หรือไม่
-                        2569          // ปีปัจจุบัน
+                        kpi.operator, 
+                        kpi.target_value, // ส่งค่า target_value เข้าไปให้ฟังก์ชันช่วยวิเคราะห์
+                        2569  
                       )}
                     </td>
                     <td className="p-3.5 text-center">

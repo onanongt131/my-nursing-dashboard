@@ -53,7 +53,7 @@ export default function RkpRmPage() {
 
     const latest = lastThree[lastThree.length - 1].val!; // ปีล่าสุด (2569)
     const prev = lastThree[lastThree.length - 2].val!;    // ปีก่อนหน้า (2568)
-    const oldest = lastThree[0].val!;                    // ปีแรกใน 3 ปี (2567)
+    const oldest = lastThree[0].val!;                   // ปีแรกใน 3 ปี (2567)
 
     const isLowerIsBetter = Number(kpi.target_value || 0) === 0;
 
@@ -104,12 +104,12 @@ export default function RkpRmPage() {
       .eq('kpi_type', 'RM');
 
     if (data) {
-      const parentItems = data.filter(kpi => !kpi.parent_id);
+      const parentItems = data.filter((kpi: any) => !kpi.parent_id);
       const withChildren: any[] = [];
       const withoutChildren: any[] = [];
 
-      parentItems.forEach(parent => {
-        const children = data.filter(kpi => kpi.parent_id === parent.id);
+      parentItems.forEach((parent: any) => {
+        const children = data.filter((kpi: any) => kpi.parent_id === parent.id);
         if (children.length > 0) {
           parent.sub_items = children;
           withChildren.push(parent);

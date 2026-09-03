@@ -69,8 +69,15 @@ export const checkStatus = (value: number, target: number, operator: string, isH
   return isHigherBetter ? passed : !passed;
 };
 
-// ฟังก์ชัน Trend ที่ปรับปรุงใหม่ รองรับเงื่อนไข Less is Better (isHigherBetter = false)
-export const getYearlyTrend = (entries: any[], kpiType: KpiType, operator: string, currentYear: number = 2569): React.ReactNode => {
+// --- 2. กลุ่มจัดการสถานะและการแสดงผล ---
+// --- 2. กลุ่มจัดการสถานะและการแสดงผล ---
+export const getYearlyTrend = (
+  entries: any[], 
+  kpiType: KpiType, 
+  operator: string, 
+  target?: number | string, 
+  currentYear: number = 2569
+): React.ReactNode => {
   const prevYear = currentYear - 1;
   const avgCurrent = calculateYearlySummary(entries, currentYear, kpiType);
   const avgPrev = calculateYearlySummary(entries, prevYear, kpiType);
@@ -80,21 +87,45 @@ export const getYearlyTrend = (entries: any[], kpiType: KpiType, operator: strin
   const valCurrent = Number(avgCurrent);
   const valPrev = Number(avgPrev);
 
-  if (valCurrent === valPrev) return <span className="text-blue-500 font-bold text-xl">o</span>;
+  // กรณีค่าเท่ากัน (คงที่)
+  if (valCurrent === valPrev) {
+    return (
+      <span className="inline-flex items-center gap-1 font-medium text-xs text-blue-500 whitespace-nowrap">
+        <span>o</span> <span>คงที่</span>
+      </span>
+    );
+  }
 
-  // ตรวจสอบว่าเป็นตัวชี้วัดแบบ "ยิ่งน้อยยิ่งดี" หรือไม่ (จากเครื่องหมาย < หรือ <=)
-  const safeOperator = operator || '';
-  const isLessIsBetter = safeOperator.includes('<');
+  const safeOperator = operator ? operator.trim() : '';
+  let isLessIsBetter = false;
+
+  if (safeOperator) {
+    isLessIsBetter = safeOperator.includes('<');
+  } else if (target !== undefined && target !== null) {
+    const numTarget = Number(target);
+    if (numTarget === 0) {
+      isLessIsBetter = true;  
+    } else if (numTarget === 100) {
+      isLessIsBetter = false; 
+    }
+  }
 
   const isImproved = isLessIsBetter ? valCurrent < valPrev : valCurrent > valPrev;
 
   if (isImproved) {
-    // ดีขึ้น: แสดงลูกศรสีเขียว (ไม่ว่าจะพุ่งขึ้นหรือลดลง ขอแค่ทิศทางส่งผลดีต่อตัวชี้วัด)
-    // ถ้าอยากให้แสดงลูกศรชี้ขึ้นเสมอเมื่อผลลัพธ์ดีขึ้น ใช้ ▲ สีเขียว
-    return <span className="text-green-500 font-bold text-sm">▲</span>;
+    // ดีขึ้น (สีเขียว)
+    return (
+      <span className="inline-flex items-center gap-1 font-medium text-xs text-green-600 whitespace-nowrap">
+        <span>▲</span> <span>ดีขึ้น</span>
+      </span>
+    );
   } else {
-    // แย่ลง: แสดงลูกศรสีแดง
-    return <span className="text-red-500 font-bold text-sm">▼</span>;
+    // เฝ้าระวัง (สีแดง)
+    return (
+      <span className="inline-flex items-center gap-1 font-medium text-xs text-red-500 whitespace-nowrap">
+        <span>▼</span> <span>เฝ้าระวัง</span>
+      </span>
+    );
   }
 };
 

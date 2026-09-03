@@ -21,7 +21,6 @@ export default function CategoryPage() {
 
   const supabase = createClient();
 
-  // ย้ายฟังก์ชันมาไว้ตรงนี้ (ให้อยู่ภายใน CategoryPage)
   const formatGoal = (kpi: any) => {
     const op = kpi.operator && kpi.operator.trim() !== '' ? `${kpi.operator} ` : '';
     const val = kpi.target_value ?? '';
@@ -243,7 +242,6 @@ export default function CategoryPage() {
   
   return (
     <div className="space-y-6">
-      
       {/* แถบหัวข้อและปุ่มพิมพ์ด้านบนสุด */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm">
         <div>
@@ -263,43 +261,42 @@ export default function CategoryPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        
-        {/* ฝั่งซ้าย: แผงควบคุมสรุปภาพรวม */}
+        {/* ฝั่งซ้าย: แผงควบคุมสรุปภาพรวม (ปรับให้กะทัดรัดขึ้นเป็น 3 คอลัมน์) */}
         <div className="lg:col-span-3 flex flex-col space-y-4 sticky top-6">
-          <div className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200/80 space-y-5 relative overflow-hidden">
+          <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200/80 space-y-4 relative overflow-hidden">
             <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 via-amber-500 to-purple-600"></div>
             
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
+              <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">
                 {selectedCategory ? "สรุปผลหมวดนี้" : "สรุปภาพรวมทั้งหมด"}
               </span>
-              <span className="text-2xl px-2 py-0.5 bg-purple-50 text-purple-700 font-bold rounded-full">
+              <span className="text-xs px-2 py-0.5 bg-purple-50 text-purple-700 font-bold rounded-full">
                 {stats.total} ตัวชี้วัด
               </span>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="bg-emerald-50/60 p-3 rounded-xl border border-emerald-100 flex flex-col">
-                <span className="text-emerald-700 font-semibold text-[11px] flex items-center gap-1">
-                  <span className="w-6 h-6 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[9px]">✓</span> ผ่าน
+            <div className="grid grid-cols-2 gap-2.5">
+              <div className="bg-emerald-50/60 p-2.5 rounded-xl border border-emerald-100 flex flex-col">
+                <span className="text-emerald-700 font-semibold text-[10px] flex items-center gap-1">
+                  <span className="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[8px]">✓</span> ผ่าน
                 </span>
-                <span className="text-4xl font-black text-emerald-700 mt-1">{stats.passed}</span>
+                <span className="text-2xl font-black text-emerald-700 mt-0.5">{stats.passed}</span>
               </div>
 
-              <div className="bg-rose-50/60 p-3 rounded-xl border border-rose-100 flex flex-col">
-                <span className="text-rose-700 font-semibold text-[11px] flex items-center gap-1">
-                  <span className="w-4 h-4 rounded-full bg-rose-500 text-white flex items-center justify-center text-[9px]">✕</span> ไม่ผ่าน
+              <div className="bg-rose-50/60 p-2.5 rounded-xl border border-rose-100 flex flex-col">
+                <span className="text-rose-700 font-semibold text-[10px] flex items-center gap-1">
+                  <span className="w-4 h-4 rounded-full bg-rose-500 text-white flex items-center justify-center text-[8px]">✕</span> ไม่ผ่าน
                 </span>
-                <span className="text-2xl font-black text-rose-600 mt-1">{stats.failed}</span>
+                <span className="text-xl font-black text-rose-600 mt-0.5">{stats.failed}</span>
               </div>
             </div>
 
-            <div className="space-y-2 pt-1">
+            <div className="space-y-1.5 pt-1">
               <div className="flex justify-between items-center text-xs">
-                <span className="text-slate-500 font-medium">อัตราความสำเร็จ</span>
+                <span className="text-slate-500 font-medium text-[11px]">อัตราความสำเร็จ</span>
                 <span className="font-extrabold text-slate-800">{stats.percent}%</span>
               </div>
-              <div className="w-full bg-slate-100 h-2.5 rounded-full overflow-hidden">
+              <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
                 <div 
                   className="bg-gradient-to-r from-emerald-500 to-teal-500 h-full rounded-full transition-all duration-500"
                   style={{ width: `${Math.min(stats.percent, 100)}%` }}
@@ -310,18 +307,18 @@ export default function CategoryPage() {
             {selectedCategory && (
               <button 
                 onClick={() => setSelectedCategory(null)} 
-                className="w-full py-2 px-3 bg-purple-50 text-purple-700 hover:bg-purple-100 font-bold text-xs rounded-xl border border-purple-200 transition-all text-center shadow-sm cursor-pointer"
+                className="w-full py-2 px-2 bg-purple-50 text-purple-700 hover:bg-purple-100 font-bold text-[11px] rounded-xl border border-purple-200 transition-all text-center shadow-sm cursor-pointer"
               >
-                ← ดูภาพรวมทุกหมวดหมู่
+                ← ดูภาพรวมทุกหมวด
               </button>
             )}
           </div>
         </div>
 
-        {/* ฝั่งขวา: การ์ดหมวดหมู่ / เนื้อหา */}
+        {/* ฝั่งขวา: การ์ดหมวดหมู่ (ปรับเป็น 3 คอลัมน์) / เนื้อหา */}
         <div className="lg:col-span-9 flex flex-col">
           {!selectedCategory ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
               {categories.map((cat, index) => {
                 const summaryData = totalCategoriesSummary[index];
                 const total = summaryData.total;
@@ -334,10 +331,8 @@ export default function CategoryPage() {
                   <div 
                     key={cat.id} 
                     onClick={() => setSelectedCategory(fullName)} 
-                    // [ปรับปรุง] เพิ่มลูกเล่นขอบสีแบบมีมิติ, เงาจางๆ และเอฟเฟกต์ Transition เมื่อ Hover
                     className={`bg-white p-5 rounded-2xl border-2 border-slate-200/80 ${cat.borderColor} shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 cursor-pointer flex flex-col justify-between group relative overflow-hidden`}
                   >
-                    {/* แถบสีตกแต่งขอบบนของการ์ดเพิ่มความพรีเมียม */}
                     <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500/40 via-indigo-500/40 to-blue-500/40 opacity-0 group-hover:opacity-100 transition-opacity"></div>
 
                     <div>
@@ -345,7 +340,7 @@ export default function CategoryPage() {
                         <span className="text-3xl p-2.5 bg-slate-50 rounded-2xl group-hover:scale-110 group-hover:bg-white group-hover:shadow-sm transition-all shrink-0">{cat.icon}</span>
                         <div>
                           <span className="text-xs font-extrabold text-purple-600 uppercase tracking-wider block mb-0.5">{cat.prefix}</span>
-                          <h3 className="font-bold text-base text-slate-800 leading-snug line-clamp-1 group-hover:text-purple-950 transition-colors">{cat.name}</h3>
+                          <h3 className="font-bold text-sm text-slate-800 leading-snug line-clamp-1 group-hover:text-purple-950 transition-colors">{cat.name}</h3>
                         </div>
                       </div>
                       <div className="border-t border-slate-100 my-3"></div>
@@ -400,7 +395,6 @@ export default function CategoryPage() {
             </div>
           )}
         </div>
-
       </div>
 
       {showReportModal && (
@@ -431,8 +425,8 @@ export default function CategoryPage() {
                 <p className="text-sm text-slate-500 mt-1">ประจำปีงบประมาณ 2569</p>
               </div>
 
-              <div className="overflow-x-auto">
-                <table className="w-full border-collapse border border-slate-300 text-xs text-slate-700">
+              <div className="w-full overflow-x-auto">
+                <table className="w-full min-w-[850px] border-collapse text-left text-xs">
                   <thead>
                     <tr className="bg-slate-100 text-slate-800">
                       <th className="border border-slate-300 p-2 text-center w-[24%]">ตัวชี้วัด (KPI)</th>

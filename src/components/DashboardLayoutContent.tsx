@@ -55,7 +55,7 @@ export default function DashboardLayoutContent({ profile, departments = [], chil
     
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 md:p-6">
+    <div className="min-h-screen bg-gray-50 pt-0 px-4 pb-4 md:px-6 md:pb-6">
       
 
       <div className="w-full bg-white rounded-2xl shadow-sm border border-gray-100">

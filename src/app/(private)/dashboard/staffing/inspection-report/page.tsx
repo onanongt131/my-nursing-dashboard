@@ -198,13 +198,16 @@ export default function NursingInspectionReportPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100 text-gray-800 p-2 font-sans flex flex-col items-center">
+    <div className="min-h-screen bg-gray-100 text-gray-800 pt-0 px-2 pb-2 font-sans flex flex-col items-center">
       
       {/* ส่วนควบคุมด้านบน (ซ่อนตอนพิมพ์) */}
       <div className="w-full bg-white p-3 rounded-xl border border-gray-200 mb-4 shadow-xs flex flex-wrap items-center justify-between print:hidden">
         <div>
+          <div className="flex items-center gap-3">
           <h1 className="text-sm font-bold text-emerald-900">รายงานพยาบาลเวรตรวจการ</h1>
+          <a href="/dashboard/staffing" className="text-xs px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition font-medium">← กลับหน้าภาพรวม</a>
         </div>
+      </div>
 
         <div className="flex flex-wrap items-center gap-2.5 mt-2 md:mt-0">
           <div className="flex items-center bg-gray-50 px-2.5 py-1 rounded-xl border border-gray-200 text-xs">

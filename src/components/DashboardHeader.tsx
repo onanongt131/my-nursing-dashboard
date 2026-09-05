@@ -270,7 +270,7 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
 
       {/* Navigation เมนูด้านล่าง */}
       <div className={`w-full bg-emerald-900 shadow-md transition-all duration-300 ${isMobileMenuOpen ? 'block' : 'hidden'} md:block`}>
-        <nav className="flex flex-col md:flex-row items-start md:items-center justify-start gap-3 px-4 sm:px-6 py-3">
+        <nav className="flex flex-col md:flex-row items-start md:items-center justify-start gap-3 px-4 sm:px-6 py-1.5">
           
           {/* 1. หน้าหลัก (Home / วิสัยทัศน์) */}
           <a 

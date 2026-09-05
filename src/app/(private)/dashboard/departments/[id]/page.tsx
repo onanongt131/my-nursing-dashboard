@@ -15,6 +15,7 @@ import ReadmitModal from '@/components/ReadmitModal';
 import AgainstMedicalAdviceModal from '@/components/AgainstMedicalAdviceModal';
 import BatchDetailModal from '@/components/BatchDetailModal';
 import DepartmentEditor from '@/components/DepartmentEditor';
+import DepartmentDailyStatsTab from '@/components/DepartmentDailyStatsTab';
 
 const YEARS = [2565, 2566, 2567, 2568, 2569] as const;
 
@@ -31,25 +32,26 @@ const RECORD_TABLES = [
   { name: 'ama_monthly_summary', key: 'ama_summary' },
 ] as const;
 
+
 export default function SingleDepartmentPage() {
   const params = useParams();
   const deptId = params?.id as string;
-
   const [departmentData, setDepartmentData] = useState<any>(null);
   const [activeKpi, setActiveKpi] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeModal, setActiveModal] = useState<'wp_qa' | 'iv_care' | 'fall' | 'audit' | 'readmit' | 'ama' | null>(null);
   
+  // เพิ่ม State สำหรับจัดการสลับ Tab (ระหว่าง KPI เดิม กับ สถิติหอผู้ป่วย)
+  const [activeTab, setActiveTab] = useState<'kpi' | 'daily_stats'>('kpi');
+  
   const [userRole, setUserRole] = useState<string>('admin');
   const [canApprove, setCanApprove] = useState<boolean>(true);
   const [userDepartmentId, setUserDepartmentId] = useState<number | string>(1);
-
   const [allPendingRows, setAllPendingRows] = useState<any[]>([]);
   const [pendingLoading, setPendingLoading] = useState(false);
   const [showPendingTable, setShowPendingTable] = useState(false);
   const [showEditorModal, setShowEditorModal] = useState(false);
-
-  // State สำหรับ Modal แสดงรายละเอียด ตัวตั้ง/ตัวหาร รายเดือน
+  
   const [detailModalData, setDetailModalData] = useState<{
     kpi: any;
     year: number;
@@ -79,13 +81,11 @@ export default function SingleDepartmentPage() {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
-
       const { data: profile } = await supabase
         .from('profiles')
         .select('role, department_id')
         .eq('id', user.id)
         .single();
-
       if (profile) {
         const role = profile.role || 'admin';
         setUserRole(role);
@@ -109,29 +109,26 @@ export default function SingleDepartmentPage() {
         supabase.from('kpi_entries').select('*').eq('department_id', deptId),
         supabase.from('kpi_department_map').select('department_id, kpi_id').eq('department_id', deptId)
       ]);
-
       if (deptRes.error || kpiRes.error || entryRes.error || mapRes.error) {
         console.error("Supabase Error:", deptRes.error || kpiRes.error || entryRes.error || mapRes.error);
         return;
       }
-
       const dept = deptRes.data;
       const kpis = kpiRes.data || [];
       const entries = entryRes.data || [];
       const maps = mapRes.data || [];
-
       const formattedDept = {
         ...dept,
         kpis: maps
           .map((m: any) => {
-      const kpiData = kpis.find((k: any) => k.id === m.kpi_id);
-          return kpiData ? {
-            ...kpiData,
-            entries: entries.filter((e: any) => e.kpi_id === kpiData.id)
-          } : null;
-        })
-        .filter(Boolean)
-    };
+            const kpiData = kpis.find((k: any) => k.id === m.kpi_id);
+            return kpiData ? {
+              ...kpiData,
+              entries: entries.filter((e: any) => e.kpi_id === kpiData.id)
+            } : null;
+          })
+          .filter(Boolean)
+      };
       
       setDepartmentData(formattedDept);
     } catch (err) {
@@ -153,7 +150,6 @@ export default function SingleDepartmentPage() {
           return { key: t.key, data: data || [] };
         })
       );
-
       const recordsMap = results.reduce((acc, curr) => {
         if (!acc[curr.key]) {
           acc[curr.key] = curr.data;
@@ -162,7 +158,6 @@ export default function SingleDepartmentPage() {
         }
         return acc;
       }, {} as Record<string, any[]>);
-
       setMonthlyRecords(recordsMap);
     } catch (err) {
       console.error("Error fetching monthly records:", err);
@@ -179,7 +174,6 @@ export default function SingleDepartmentPage() {
             .select('*')
             .eq('department_id', targetDeptId)
             .eq('status', 'pending');
-
           if (!error && data && data.length > 0) {
             const groupedMap = data.reduce((acc: any, item: any) => {
               const rawMonth = item.audit_month || item.month || item.record_date || item.incident_date || item.admit_date || item.created_at || '';
@@ -203,7 +197,6 @@ export default function SingleDepartmentPage() {
           return [];
         })
       );
-
       setAllPendingRows(results.flat());
     } catch (err) {
       console.error("Error fetching pending:", err);
@@ -232,7 +225,6 @@ export default function SingleDepartmentPage() {
     const prevMonth = String(now.getMonth() + 1).padStart(2, '0');
     const prevMonthStr = `${prevYear}-${prevMonth}`;
     const thaiYearStr = `${prevYear + 543}-${prevMonth}`;
-
     return records.some(item => {
       if (!item) return false;
       const rawMonth = item.audit_month || item.month || item.incident_date?.substring(0, 7) || item.admit_date?.substring(0, 7) || '';
@@ -259,11 +251,11 @@ export default function SingleDepartmentPage() {
     return String(userDepartmentId) === String(deptId);
   };
 
-  if (loading) return <div className="p-8 text-center text-gray-500 font-medium">กำลังโหลดข้อมูลหน่วยงาน...</div>;
+  if (loading) return <div className="p-8 text-center text-slate-500 font-medium">กำลังโหลดข้อมูลหน่วยงาน...</div>;
 
   if (!canAccessDepartment()) {
     return (
-      <div className="p-12 text-center space-y-4 bg-white rounded-2xl border border-gray-200 max-w-xl mx-auto mt-10 shadow-sm">
+      <div className="p-12 text-center space-y-4 bg-white rounded-2xl border border-slate-200 max-w-xl mx-auto mt-10 shadow-sm">
         <div className="text-red-600 font-bold text-xl flex items-center justify-center gap-2">
           <ExclamationTriangleIcon className="w-6 h-6" />
           <span>คุณไม่มีสิทธิ์เข้าถึงข้อมูลของหน่วยงานนี้</span>
@@ -343,7 +335,6 @@ export default function SingleDepartmentPage() {
               ระบบรายงานตัวชี้วัดและผลการดำเนินงานคุณภาพทางการพยาบาล ประจำปีงบประมาณ 2569
             </span>
           </div>
-
           <div className="flex flex-wrap items-center gap-2 shrink-0">
             <button 
               onClick={() => window.print()}
@@ -351,7 +342,6 @@ export default function SingleDepartmentPage() {
             >
               <PrinterIcon className="w-4 h-4" /> พิมพ์รายงาน
             </button>
-
             <button 
               onClick={() => totalPendingCount > 0 && setShowPendingTable(!showPendingTable)} 
               className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all ${
@@ -379,7 +369,6 @@ export default function SingleDepartmentPage() {
             <DocumentCheckIcon className="w-4 h-4" />
             <span>Audit เวชระเบียน</span>
           </button>
-
           <button 
             onClick={() => setActiveModal('wp_qa')} 
             className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer ${
@@ -389,7 +378,6 @@ export default function SingleDepartmentPage() {
             <PlusCircleIcon className="w-4 h-4" />
             <span>แนวปฏิบัติ (WP QA)</span>
           </button>
-
           <button 
             onClick={() => setActiveModal('iv_care')} 
             className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer ${
@@ -399,7 +387,6 @@ export default function SingleDepartmentPage() {
             <PlusCircleIcon className="w-4 h-4" />
             <span>ภาวะแทรกซ้อน IV</span>
           </button>
-
           <button 
             onClick={() => setActiveModal('fall')} 
             className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer ${
@@ -409,7 +396,6 @@ export default function SingleDepartmentPage() {
             <PlusCircleIcon className="w-4 h-4" />
             <span>พลัดตกหกล้ม</span>
           </button>
-
           <button 
             onClick={() => setActiveModal('readmit')} 
             className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer ${
@@ -419,7 +405,6 @@ export default function SingleDepartmentPage() {
             <PlusCircleIcon className="w-4 h-4" />
             <span>Readmit</span>
           </button>
-
           <button 
             onClick={() => setActiveModal('ama')} 
             className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer ${
@@ -432,230 +417,253 @@ export default function SingleDepartmentPage() {
         </div>
       </div>
 
-      {/* 2. ส่วนเนื้อหาหลัก */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        <div className="lg:col-span-3 space-y-4 print:hidden department-sidebar-card">
-          <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden p-4">
-            <DepartmentEditor departmentId={deptId}/>
-          </div>
-        </div>
-
-        <div className="lg:col-span-9 space-y-6 print-report-container">
-          <div className="hidden print-header-title">
-            <h2 className="text-xl font-bold text-black">กลุ่มภารกิจด้านการพยาบาล</h2>
-            <h1 className="text-2xl font-extrabold text-black mt-1">{departmentData.Department}</h1>
-            <p className="text-xs text-gray-700 mt-1">รายงานสรุปตัวชี้วัดและผลการดำเนินงานคุณภาพทางการพยาบาล</p>
-          </div>
-
-          {showPendingTable && totalPendingCount > 0 && (
-            <div className="border rounded-2xl p-4 space-y-3 bg-red-50/80 border-red-200 shadow-sm print:hidden">
-              <div className="flex justify-between items-center">
-                <h3 className="text-xs font-bold text-red-900 flex items-center gap-2 uppercase tracking-wider">
-                  <ExclamationTriangleIcon className="w-4 h-4 text-red-600 animate-pulse" />
-                  <span>รายการรอการตรวจสอบและอนุมัติ</span>
-                </h3>
-                <button onClick={() => setShowPendingTable(false)} className="text-slate-400 hover:text-slate-600 text-xs font-bold px-2 py-1 bg-white rounded border shadow-sm cursor-pointer">
-                  ปิด ✕
-                </button>
-              </div>
-              <div className="overflow-x-auto bg-white rounded-xl border border-red-200">
-                <table className="w-full text-left text-xs border-collapse">
-                  <thead className="bg-red-100/70 text-red-900">
-                    <tr>
-                      <th className="p-3">ประเภทระบบ</th>
-                      <th className="p-3">ประจำเดือน</th>
-                      <th className="p-3">จำนวน</th>
-                      <th className="p-3">ผู้บันทึก</th>
-                      <th className="p-3 text-center">สถานะ</th>
-                      <th className="p-3 text-center">จัดการ</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {allPendingRows.map((batch: any, index: number) => (
-                      <tr key={index} className="hover:bg-slate-50">
-                        <td className="p-3 font-bold text-slate-800 uppercase">{batch.type}</td>
-                        <td className="p-3 font-semibold text-slate-700">{batch.audit_month}</td>
-                        <td className="p-3 text-red-600 font-bold">{batch.items.length} รายการ</td>
-                        <td className="p-3 text-slate-600">{batch.auditor_name || '-'}</td>
-                        <td className="p-3 text-center">
-                          <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded-full font-bold text-[10px]">
-                            Pending
-                          </span>
-                        </td>
-                        <td className="p-3 text-center">
-                          <button 
-                            onClick={() => setViewingBatchGroup({
-                              type: batch.type,
-                              audit_month: batch.audit_month,
-                              items: batch.items,
-                              auditor_name: batch.auditor_name,
-                              status: batch.items?.[0]?.status || 'pending'
-                            })} 
-                            className="px-2.5 py-1 bg-sky-600 hover:bg-sky-700 text-white rounded-lg font-bold shadow-sm transition inline-flex items-center gap-1 cursor-pointer"
-                          >
-                            <EyeIcon className="w-3.5 h-3.5" />
-                            <span>ตรวจสอบ</span>
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          )}
-
-          {!activeKpi ? (
-            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6 print:p-0 print:border-none print:shadow-none">
-              {Object.entries(
-                (departmentData?.kpis || []).reduce((acc: any, kpi: any) => {
-                  const dim = kpi.dimension || 'มิติอื่นๆ';
-                  if (!acc[dim]) acc[dim] = [];
-                  acc[dim].push(kpi);
-                  return acc;
-                }, {})
-              )
-              .sort((a, b) => a[0].localeCompare(b[0]))
-              .map(([dimName, kpisInDim]: [string, any], dimIndex) => (
-                <div key={dimName} className="space-y-3 break-inside-avoid">
-                  <div className="flex items-center gap-2 bg-emerald-50/70 border-l-4 border-emerald-600 px-3 py-2 rounded-r-xl print:bg-gray-100 print:border-black">
-                    <span className="text-xs font-extrabold text-emerald-800 print:text-black uppercase tracking-wide">
-                      มิติที่ {dimIndex + 1}: {dimName}
-                    </span>
-                  </div>
-
-                  <div className="overflow-x-auto rounded-xl border border-slate-200 print:border-black">
-                    <table className="w-full text-xs text-left border-collapse table-fixed">
-                      <thead className="bg-slate-100 text-slate-700 font-bold uppercase tracking-wider text-[11px] border-b border-slate-200 print:bg-gray-200 print:text-black">
-                        <tr>
-                          <th className="w-[38%] px-3 py-2.5">ตัวชี้วัด (KPI)</th>
-                          <th className="w-[8%] px-2 py-2.5 text-center">GOAL</th>
-                          {YEARS.map(y => <th key={y} className="w-[7%] px-1 py-2.5 text-center">{y}</th>)}
-                          <th className="w-[9%] px-1 py-2.5 text-center">Trend</th>
-                          <th className="w-[9%] px-2 py-2.5 text-center print:hidden">จัดการ</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-slate-200 print:divide-black">
-                        {kpisInDim.map((kpi: any) => {
-                          const trend = calculateTrend(kpi.entries);
-                          const kpiType = (kpi.type || kpi.Type || '').toLowerCase();
-                          const isRatioOrPercent = kpiType === 'percent' || kpiType === 'rate';
-
-                          return (
-                            <tr key={kpi.id} className="hover:bg-slate-50/80">
-                              <td className="px-3 py-2.5 font-medium text-slate-800 print:text-black leading-snug">
-                                {kpi.name}
-                              </td>
-                              <td className="px-2 py-2.5 text-center font-bold text-emerald-700 print:text-black">
-                                {kpi.target_value}
-                              </td>
-                              {YEARS.map(year => {
-                                const entry = kpi.entries?.find((e: any) => Number(e.year) === year);
-                                const hasNumDenom = isRatioOrPercent && entry && (entry.numerator !== null && entry.denominator !== null && entry.denominator !== undefined);
-
-                                return (
-                                  <td key={year} className="px-1 py-2.5 text-center text-slate-600 print:text-black">
-                                    {entry ? (
-                                      <span 
-                                        onClick={() => {
-                                          if (isRatioOrPercent) {
-                                            setDetailModalData({ kpi, year, entries: kpi.entries || [] });
-                                          }
-                                        }}
-                                        className={`inline-block bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-bold text-[11px] print:bg-transparent print:p-0 ${isRatioOrPercent ? 'cursor-pointer hover:bg-emerald-200 transition-all' : ''}`}
-                                        title={isRatioOrPercent ? "คลิกเพื่อดูรายละเอียดตัวตั้ง/ตัวหาร" : undefined}
-                                      >
-                                        {entry.value}
-                                      </span>
-                                    ) : (
-                                      <span className="text-slate-300 print:text-gray-400">-</span>
-                                    )}
-                                  </td>
-                                );
-                              })}
-                              <td className="px-1 py-2.5 text-center">
-                                {trend === 'up' && (
-                                  <span className="inline-flex items-center justify-center px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded-full font-bold text-[10px] gap-0.5">
-                                    <ArrowTrendingUpIcon className="w-3.5 h-3.5" /> ขึ้น
-                                  </span>
-                                )}
-                                {trend === 'down' && (
-                                  <span className="inline-flex items-center justify-center px-2 py-0.5 bg-rose-50 text-rose-600 rounded-full font-bold text-[10px] gap-0.5">
-                                    <ArrowTrendingDownIcon className="w-3.5 h-3.5" /> ลง
-                                  </span>
-                                )}
-                                {trend === 'stable' && (
-                                  <span className="inline-flex items-center justify-center px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full font-bold text-[10px] gap-0.5">
-                                    <MinusIcon className="w-3.5 h-3.5" /> คงที่
-                                  </span>
-                                )}
-                                {!trend && <span className="text-slate-300">-</span>}
-                              </td>
-                              <td className="px-2 py-2.5 text-center print:hidden">
-                                <button 
-                                  onClick={() => setActiveKpi(kpi)} 
-                                  className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-[11px] font-bold shadow-sm transition cursor-pointer"
-                                >
-                                  บันทึก
-                                </button>
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
-              <button 
-                onClick={() => setActiveKpi(null)} 
-                className="text-emerald-700 font-bold hover:underline text-xs flex items-center gap-1 cursor-pointer"
-              >
-                ← กลับสู่ตารางภาพรวมตัวชี้วัด
-              </button>
-              
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-                <div className="space-y-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
-                  <h3 className="text-sm font-bold text-slate-800 leading-snug">{activeKpi.name}</h3>
-                  <div className="h-64">
-                    <ResponsiveContainer height="100%" width="100%">
-                      <BarChart data={YEARS.map(y => {
-                        const entry = activeKpi.entries?.find((e: any) => Number(e.year) === y);
-                        return { year: y, value: entry ? parseFloat(entry.value) || 0 : 0 };
-                      })}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
-                        <XAxis dataKey="year" axisLine={false} tickLine={false} tick={{fontSize: 11}} />
-                        <YAxis axisLine={false} tickLine={false} tick={{fontSize: 11}} />
-                        <Tooltip cursor={{fill: '#f1f5f9'}} />
-                        <Bar dataKey="value" fill="#0d9488" radius={[4, 4, 0, 0]} barSize={32} />
-                        <ReferenceLine 
-                          y={activeKpi.target_value} 
-                          stroke="#ef4444" 
-                          strokeDasharray="3 3" 
-                          label={{ value: 'Target', position: 'insideTopRight', fill: '#ef4444', fontSize: 10 }} 
-                        />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-                
-                <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
-                  <h4 className="text-xs font-bold mb-4 text-slate-700 uppercase tracking-wider">บันทึกข้อมูลผลงานย้อนหลัง / รายปี</h4>
-                  <AddEntryForm 
-                    kpiId={activeKpi.id} 
-                    type={activeKpi.type?.toLowerCase() || activeKpi.Type?.toLowerCase() || 'count'} 
-                    deptId={String(departmentData.id)}
-                    onSuccess={() => { setActiveKpi(null); fetchDepartmentData(); }} 
-                  />
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
+      {/* แถบสลับ Tab เมนู (ระหว่างตัวชี้วัด และ สถิติหอผู้ป่วย) */}
+      <div className="flex border-b border-slate-200 gap-6 print:hidden">
+        <button
+          onClick={() => setActiveTab('kpi')}
+          className={`pb-3 font-semibold text-sm transition border-b-2 cursor-pointer ${
+            activeTab === 'kpi'
+              ? 'border-emerald-600 text-emerald-700'
+              : 'border-transparent text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          📋 ตัวชี้วัดและผลการดำเนินงาน
+        </button>
+        <button
+          onClick={() => setActiveTab('daily_stats')}
+          className={`pb-3 font-semibold text-sm transition border-b-2 cursor-pointer ${
+            activeTab === 'daily_stats'
+              ? 'border-emerald-600 text-emerald-700'
+              : 'border-transparent text-slate-500 hover:text-slate-700'
+          }`}
+        >
+          📈 สถิติหอผู้ป่วยรายเดือน
+        </button>
       </div>
+
+      {/* 2. ส่วนเนื้อหาหลัก แยกตาม Tab ที่เลือก */}
+      {activeTab === 'daily_stats' ? (
+        <DepartmentDailyStatsTab departmentId={deptId} />
+      ) : (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          <div className="lg:col-span-3 space-y-4 print:hidden department-sidebar-card">
+            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden p-4">
+              <DepartmentEditor departmentId={deptId}/>
+            </div>
+          </div>
+          <div className="lg:col-span-9 space-y-6 print-report-container">
+            <div className="hidden print-header-title">
+              <h2 className="text-xl font-bold text-black">กลุ่มภารกิจด้านการพยาบาล</h2>
+              <h1 className="text-2xl font-extrabold text-black mt-1">{departmentData.Department}</h1>
+              <p className="text-xs text-slate-700 mt-1">รายงานสรุปตัวชี้วัดและผลการดำเนินงานคุณภาพทางการพยาบาล</p>
+            </div>
+            
+            {showPendingTable && totalPendingCount > 0 && (
+              <div className="border rounded-2xl p-4 space-y-3 bg-red-50/80 border-red-200 shadow-sm print:hidden">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-xs font-bold text-red-900 flex items-center gap-2 uppercase tracking-wider">
+                    <ExclamationTriangleIcon className="w-4 h-4 text-red-600 animate-pulse" />
+                    <span>รายการรอการตรวจสอบและอนุมัติ</span>
+                  </h3>
+                  <button onClick={() => setShowPendingTable(false)} className="text-slate-400 hover:text-slate-600 text-xs font-bold px-2 py-1 bg-white rounded border shadow-sm cursor-pointer">
+                    ปิด ✕
+                  </button>
+                </div>
+                <div className="overflow-x-auto bg-white rounded-xl border border-red-200">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead className="bg-red-100/70 text-red-900">
+                      <tr>
+                        <th className="p-3">ประเภทระบบ</th>
+                        <th className="p-3">ประจำเดือน</th>
+                        <th className="p-3">จำนวน</th>
+                        <th className="p-3">ผู้บันทึก</th>
+                        <th className="p-3 text-center">สถานะ</th>
+                        <th className="p-3 text-center">จัดการ</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {allPendingRows.map((batch: any, index: number) => (
+                        <tr key={index} className="hover:bg-slate-50">
+                          <td className="p-3 font-bold text-slate-800 uppercase">{batch.type}</td>
+                          <td className="p-3 font-semibold text-slate-700">{batch.audit_month}</td>
+                          <td className="p-3 text-red-600 font-bold">{batch.items.length} รายการ</td>
+                          <td className="p-3 text-slate-600">{batch.auditor_name || '-'}</td>
+                          <td className="p-3 text-center">
+                            <span className="px-2 py-0.5 bg-red-100 text-red-700 rounded-full font-bold text-[10px]">
+                              Pending
+                            </span>
+                          </td>
+                          <td className="p-3 text-center">
+                            <button 
+                              onClick={() => setViewingBatchGroup({
+                                type: batch.type,
+                                audit_month: batch.audit_month,
+                                items: batch.items,
+                                auditor_name: batch.auditor_name,
+                                status: batch.items?.[0]?.status || 'pending'
+                              })} 
+                              className="px-2.5 py-1 bg-sky-600 hover:bg-sky-700 text-white rounded-lg font-bold shadow-sm transition inline-flex items-center gap-1 cursor-pointer"
+                            >
+                              <EyeIcon className="w-3.5 h-3.5" />
+                              <span>ตรวจสอบ</span>
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            {!activeKpi ? (
+              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6 print:p-0 print:border-none print:shadow-none">
+                {Object.entries(
+                  (departmentData?.kpis || []).reduce((acc: any, kpi: any) => {
+                    const dim = kpi.dimension || 'มิติอื่นๆ';
+                    if (!acc[dim]) acc[dim] = [];
+                    acc[dim].push(kpi);
+                    return acc;
+                  }, {})
+                )
+                .sort((a, b) => a[0].localeCompare(b[0]))
+                .map(([dimName, kpisInDim]: [string, any], dimIndex) => (
+                  <div key={dimName} className="space-y-3 break-inside-avoid">
+                    <div className="flex items-center gap-2 bg-emerald-50/70 border-l-4 border-emerald-600 px-3 py-2 rounded-r-xl print:bg-gray-100 print:border-black">
+                      <span className="text-xs font-extrabold text-emerald-800 print:text-black uppercase tracking-wide">
+                        มิติที่ {dimIndex + 1}: {dimName}
+                      </span>
+                    </div>
+                    <div className="overflow-x-auto rounded-xl border border-slate-200 print:border-black">
+                      <table className="w-full text-xs text-left border-collapse table-fixed">
+                        <thead className="bg-slate-100 text-slate-700 font-bold uppercase tracking-wider text-[11px] border-b border-slate-200 print:bg-gray-200 print:text-black">
+                          <tr>
+                            <th className="w-[38%] px-3 py-2.5">ตัวชี้วัด (KPI)</th>
+                            <th className="w-[8%] px-2 py-2.5 text-center">GOAL</th>
+                            {YEARS.map(y => <th key={y} className="w-[7%] px-1 py-2.5 text-center">{y}</th>)}
+                            <th className="w-[9%] px-1 py-2.5 text-center">Trend</th>
+                            <th className="w-[9%] px-2 py-2.5 text-center print:hidden">จัดการ</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-200 print:divide-black">
+                          {kpisInDim.map((kpi: any) => {
+                            const trend = calculateTrend(kpi.entries);
+                            const kpiType = (kpi.type || kpi.Type || '').toLowerCase();
+                            const isRatioOrPercent = kpiType === 'percent' || kpiType === 'rate';
+                            return (
+                              <tr key={kpi.id} className="hover:bg-slate-50/80">
+                                <td className="px-3 py-2.5 font-medium text-slate-800 print:text-black leading-snug">
+                                  {kpi.name}
+                                </td>
+                                <td className="px-2 py-2.5 text-center font-bold text-emerald-700 print:text-black">
+                                  {kpi.target_value}
+                                </td>
+                                {YEARS.map(year => {
+                                  const entry = kpi.entries?.find((e: any) => Number(e.year) === year);
+                                  return (
+                                    <td key={year} className="px-1 py-2.5 text-center text-slate-600 print:text-black">
+                                      {entry ? (
+                                        <span 
+                                          onClick={() => {
+                                            if (isRatioOrPercent) {
+                                              setDetailModalData({ kpi, year, entries: kpi.entries || [] });
+                                            }
+                                          }}
+                                          className={`inline-block bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded font-bold text-[11px] print:bg-transparent print:p-0 ${isRatioOrPercent ? 'cursor-pointer hover:bg-emerald-200 transition-all' : ''}`}
+                                          title={isRatioOrPercent ? "คลิกเพื่อดูรายละเอียดตัวตั้ง/ตัวหาร" : undefined}
+                                        >
+                                          {entry.value}
+                                        </span>
+                                      ) : (
+                                        <span className="text-slate-300 print:text-gray-400">-</span>
+                                      )}
+                                    </td>
+                                  );
+                                })}
+                                <td className="px-1 py-2.5 text-center">
+                                  {trend === 'up' && (
+                                    <span className="inline-flex items-center justify-center px-2 py-0.5 bg-emerald-50 text-emerald-600 rounded-full font-bold text-[10px] gap-0.5">
+                                      <ArrowTrendingUpIcon className="w-3.5 h-3.5" /> ขึ้น
+                                    </span>
+                                  )}
+                                  {trend === 'down' && (
+                                    <span className="inline-flex items-center justify-center px-2 py-0.5 bg-rose-50 text-rose-600 rounded-full font-bold text-[10px] gap-0.5">
+                                      <ArrowTrendingDownIcon className="w-3.5 h-3.5" /> ลง
+                                    </span>
+                                  )}
+                                  {trend === 'stable' && (
+                                    <span className="inline-flex items-center justify-center px-2 py-0.5 bg-slate-100 text-slate-600 rounded-full font-bold text-[10px] gap-0.5">
+                                      <MinusIcon className="w-3.5 h-3.5" /> คงที่
+                                    </span>
+                                  )}
+                                  {!trend && <span className="text-slate-300">-</span>}
+                                </td>
+                                <td className="px-2 py-2.5 text-center print:hidden">
+                                  <button 
+                                    onClick={() => setActiveKpi(kpi)} 
+                                    className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-[11px] font-bold shadow-sm transition cursor-pointer"
+                                  >
+                                    บันทึก
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
+                <button 
+                  onClick={() => setActiveKpi(null)} 
+                  className="text-emerald-700 font-bold hover:underline text-xs flex items-center gap-1 cursor-pointer"
+                >
+                  ← กลับสู่ตารางภาพรวมตัวชี้วัด
+                </button>
+                
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+                  <div className="space-y-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
+                    <h3 className="text-sm font-bold text-slate-800 leading-snug">{activeKpi.name}</h3>
+                    <div className="h-64">
+                      <ResponsiveContainer height="100%" width="100%">
+                        <BarChart data={YEARS.map(y => {
+                          const entry = activeKpi.entries?.find((e: any) => Number(e.year) === y);
+                          return { year: y, value: entry ? parseFloat(entry.value) || 0 : 0 };
+                        })}>
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e2e8f0" />
+                          <XAxis dataKey="year" axisLine={false} tickLine={false} tick={{fontSize: 11}} />
+                          <YAxis axisLine={false} tickLine={false} tick={{fontSize: 11}} />
+                          <Tooltip cursor={{fill: '#f1f5f9'}} />
+                          <Bar dataKey="value" fill="#0d9488" radius={[4, 4, 0, 0]} barSize={32} />
+                          <ReferenceLine 
+                            y={activeKpi.target_value} 
+                            stroke="#ef4444" 
+                            strokeDasharray="3 3" 
+                            label={{ value: 'Target', position: 'insideTopRight', fill: '#ef4444', fontSize: 10 }} 
+                          />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+                  
+                  <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
+                    <h4 className="text-xs font-bold mb-4 text-slate-700 uppercase tracking-wider">บันทึกข้อมูลผลงานย้อนหลัง / รายปี</h4>
+                    <AddEntryForm 
+                      kpiId={activeKpi.id} 
+                      type={activeKpi.type?.toLowerCase() || activeKpi.Type?.toLowerCase() || 'count'} 
+                      deptId={String(departmentData.id)}
+                      onSuccess={() => { setActiveKpi(null); fetchDepartmentData(); }} 
+                    />
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Modal แสดงรายละเอียดตัวตั้ง / ตัวหาร รายเดือน */}
       {detailModalData && (
@@ -677,7 +685,6 @@ export default function SingleDepartmentPage() {
                 ✕
               </button>
             </div>
-
             <div className="overflow-x-auto rounded-xl border border-slate-200">
               <table className="w-full text-left text-xs border-collapse">
                 <thead className="bg-slate-50 text-slate-700 font-bold uppercase tracking-wider border-b border-slate-200">
@@ -714,8 +721,7 @@ export default function SingleDepartmentPage() {
                                   .from('kpi_entries')
                                   .delete()
                                   .eq('id', entry.id)
-                                  .eq('department_id', deptId); // เพิ่มความปลอดภัยให้ตรงกับหน่วยงานปัจจุบัน
-
+                                  .eq('department_id', deptId);
                                 if (!error) {
                                   fetchDepartmentData();
                                   setDetailModalData(null);
@@ -741,7 +747,6 @@ export default function SingleDepartmentPage() {
                 </tbody>
               </table>
             </div>
-
             <div className="flex justify-end pt-2">
               <button 
                 onClick={() => setDetailModalData(null)}

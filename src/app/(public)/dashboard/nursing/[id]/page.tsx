@@ -117,7 +117,7 @@ export default function NursingBranchPage() {
   if (loading) return <div className="p-8 text-center text-emerald-800">กำลังโหลดข้อมูล...</div>;
 
   return (
-    <div className="p-6 md:p-8 space-y-6 bg-stone-50 min-h-screen">
+    <div className="pt-2 pb-6 px-6 md:px-8 space-y-6 bg-stone-50 min-h-screen">
       
       {/* ส่วนหัว: ชื่อกลุ่มงาน (ธีมเขียว-ทอง) */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-amber-300">

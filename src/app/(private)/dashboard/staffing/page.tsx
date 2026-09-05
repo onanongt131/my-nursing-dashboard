@@ -144,7 +144,7 @@ export default function StaffingDashboardPage() {
   }, [selectedDate, selectedShift]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       {/* ส่วนหัวข้อหน้าเว็บ พร้อมแถบ Tabs สลับหน้า */}
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-emerald-100">
         <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">

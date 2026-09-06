@@ -1,6 +1,7 @@
 // src/app/(private)/dashboard/staffing/schedule/page.tsx
 'use client';
 import { useState, useEffect, useCallback } from 'react';
+import { Sarabun } from 'next/font/google';
 import { createClient } from '@/utils/supabase/client';
 import { CheckCircleIcon, ArrowUpTrayIcon } from '@heroicons/react/24/solid';
 import * as XLSX from 'xlsx';
@@ -47,6 +48,12 @@ interface ShiftValidationSummary {
   valid: boolean;
 }
 
+const sarabun = Sarabun({
+  subsets: ['thai', 'latin'],
+  weight: ['400', '500', '600', '700'],
+  display: 'swap',
+});
+
 export default function StaffingSchedulePage() {
   const supabase = createClient();
   const [departments, setDepartments] = useState<any[]>([]);
@@ -69,6 +76,7 @@ export default function StaffingSchedulePage() {
   const [currentUserEmail, setCurrentUserEmail] = useState<string>('');
   const [autoScheduleWarnings, setAutoScheduleWarnings] = useState<AutoScheduleWarning[]>([]);
   const [autoScheduling, setAutoScheduling] = useState(false);
+  const [pdfExporting, setPdfExporting] = useState(false);
   const [selectedProblemDay, setSelectedProblemDay] = useState<string | null>(null);
   const [staffView, setStaffView] = useState<'all' | 'nurse' | 'support'>('all');
 
@@ -1100,6 +1108,962 @@ setHasValidated(false);
     }
   };
 
+  const buildRosterPdf = async () => {
+    if (!selectedDept || staffList.length === 0) {
+      alert('ไม่พบข้อมูลสำหรับสร้าง PDF');
+      return;
+    }
+
+    try {
+      const html2canvas = (await import('html2canvas')).default;
+      const { jsPDF } = await import('jspdf');
+
+      const departmentName =
+        visibleDepartments.find(
+          (dept) => Number(dept.id) === Number(selectedDept)
+        )?.Department || 'หน่วยงาน';
+
+      const exportStaff =
+        staffView === 'all'
+          ? staffList
+          : staffList.filter((staff) => {
+              const position = String(staff.position || '')
+                .trim()
+                .toUpperCase();
+
+              if (staffView === 'nurse') {
+                return ['RN', 'HW', 'TN'].includes(position);
+              }
+
+              return !['RN', 'HW', 'TN'].includes(position);
+            });
+
+      const [selectedYear, selectedMonthNumber] =
+        selectedMonth.split('-').map(Number);
+
+      const thaiMonths = [
+        'มกราคม',
+        'กุมภาพันธ์',
+        'มีนาคม',
+        'เมษายน',
+        'พฤษภาคม',
+        'มิถุนายน',
+        'กรกฎาคม',
+        'สิงหาคม',
+        'กันยายน',
+        'ตุลาคม',
+        'พฤศจิกายน',
+        'ธันวาคม',
+      ];
+
+      const thaiMonth =
+        thaiMonths[selectedMonthNumber - 1] || '';
+
+      const buddhistYear = selectedYear + 543;
+
+      const workingDays = daysArray.filter(
+        (day) => !isWeekend(day)
+      ).length;
+
+      const escapeHtml = (value: unknown) =>
+        String(value ?? '')
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#039;');
+
+      const normalizeRosterCode = (value: unknown) =>
+        String(value ?? '')
+          .trim()
+          .toUpperCase()
+          .replace(/\s+/g, '');
+
+      const splitRosterTokens = (value: unknown) =>
+        normalizeRosterCode(value)
+          .split('/')
+          .map((token) => token.trim())
+          .filter(Boolean);
+
+      const isWorkToken = (token: string) =>
+        token === 'ช' || token === 'บ' || token === 'ด';
+
+      const countShift = (
+        staffId: number | string,
+        shiftCode: WorkShift
+      ) =>
+        daysArray.reduce((sum, day) => {
+          const code =
+            rosterData[`${staffId}_${day}`] || '';
+
+          return parseShift(code).includes(shiftCode)
+            ? sum + 1
+            : sum;
+        }, 0);
+
+      // เวร OFF = มี 0 อยู่ในรหัสเวร
+      // เช่น 0, ช/0, บ/0, ด/0
+      const countOff = (
+        staffId: number | string
+      ) =>
+        daysArray.reduce((sum, day) => {
+          const tokens = splitRosterTokens(
+            rosterData[`${staffId}_${day}`] || ''
+          );
+
+          return tokens.includes('0')
+            ? sum + 1
+            : sum;
+        }, 0);
+
+      // จำนวนเวรทั้งหมด = นับทุกเวร ช / บ / ด ที่ปฏิบัติงานจริง
+      // เวรควบ 1 วันจึงนับได้ 2 เวร
+      const countAllWorkedShifts = (
+        staffId: number | string
+      ) =>
+        daysArray.reduce((sum, day) => {
+          const tokens = splitRosterTokens(
+            rosterData[`${staffId}_${day}`] || ''
+          );
+
+          return (
+            sum +
+            tokens.filter(isWorkToken).length
+          );
+        }, 0);
+
+      // Total OT = จำนวนวันที่มี OT
+      // รวม:
+      // - เวรควบ เช่น ช/บ, ช/ด
+      // - เวรคุณภาพที่มีเวรทำงานร่วมด้วย เช่น ปช/บ, ปช/ด
+      // บ/ด เป็น Hard Rule และไม่ควรเกิดในตาราง
+      const countTotalOt = (
+        staffId: number | string
+      ) =>
+        daysArray.reduce((sum, day) => {
+          const code = normalizeRosterCode(
+            rosterData[`${staffId}_${day}`] || ''
+          );
+
+          const tokens = splitRosterTokens(code);
+
+          const workShiftCount =
+            tokens.filter(isWorkToken).length;
+
+          const hasQuality =
+            tokens.includes('ปช') ||
+            tokens.includes('ปชช');
+
+          const hasEveningOrNight =
+            tokens.includes('บ') ||
+            tokens.includes('ด');
+
+          const isDoubleWorkShift =
+            workShiftCount >= 2;
+
+          const isQualityOt =
+            hasQuality && hasEveningOrNight;
+
+          return (
+            isDoubleWorkShift ||
+            isQualityOt
+          )
+            ? sum + 1
+            : sum;
+        }, 0);
+
+      // ช คุณภาพ (OT) = รหัสที่ขึ้นต้นด้วย ปช/...
+      // รองรับ ปชช/... ด้วย เผื่อมีการบันทึกในรูปแบบเดียวกัน
+      const countQualityOt = (
+        staffId: number | string
+      ) =>
+        daysArray.reduce((sum, day) => {
+          const code = normalizeRosterCode(
+            rosterData[`${staffId}_${day}`] || ''
+          );
+
+          return (
+            code.startsWith('ปช/') ||
+            code.startsWith('ปชช/')
+          )
+            ? sum + 1
+            : sum;
+        }, 0);
+
+      // ช คุณภาพ (ไม่ OT) = .../ปช หรือ ปชช
+      const countQualityNonOt = (
+        staffId: number | string
+      ) =>
+        daysArray.reduce((sum, day) => {
+          const code = normalizeRosterCode(
+            rosterData[`${staffId}_${day}`] || ''
+          );
+
+          return (
+            code.endsWith('/ปช') ||
+            code === 'ปชช'
+          )
+            ? sum + 1
+            : sum;
+        }, 0);
+
+      // ช ward = มีเวรเช้า แต่ไม่มี ปช / ปชช
+      const countWardMorning = (
+        staffId: number | string
+      ) =>
+        daysArray.reduce((sum, day) => {
+          const code = normalizeRosterCode(
+            rosterData[`${staffId}_${day}`] || ''
+          );
+
+          const tokens = splitRosterTokens(code);
+          const hasMorning = tokens.includes('ช');
+          const hasQuality =
+            code.includes('ปช') ||
+            code.includes('ปชช');
+
+          return hasMorning && !hasQuality
+            ? sum + 1
+            : sum;
+        }, 0);
+
+      const countVac = (
+        staffId: number | string
+      ) =>
+        daysArray.reduce((sum, day) => {
+          const code = normalizeRosterCode(
+            rosterData[`${staffId}_${day}`] || ''
+          );
+
+          return code.includes('VAC')
+            ? sum + 1
+            : sum;
+        }, 0);
+
+      const dayHeaders = daysArray
+        .map((day) => {
+          const weekend = isWeekend(day);
+
+          return `
+            <th class="day-head ${
+              weekend ? 'weekend' : ''
+            }">${Number(day)}</th>
+          `;
+        })
+        .join('');
+
+      const staffRows = exportStaff
+        .map((staff, index) => {
+          const shiftCells = daysArray
+            .map((day) => {
+              const code =
+                rosterData[`${staff.id}_${day}`] || '';
+
+              const upperCode = code
+                .trim()
+                .toUpperCase();
+
+              const isOff = upperCode === '0';
+
+              return `
+                <td class="day-cell ${
+                  isOff ? 'off-cell' : ''
+                }">${escapeHtml(code)}</td>
+              `;
+            })
+            .join('');
+
+          return `
+            <tr>
+              <td class="index-cell">${index + 1}</td>
+              <td class="name-cell">${escapeHtml(
+                staff.full_name
+              )}</td>
+              <td class="position-cell">${escapeHtml(
+                staff.position
+              )}</td>
+              ${shiftCells}
+              <td class="summary-cell">${countOff(
+                staff.id
+              )}</td>
+              <td class="summary-cell">${countAllWorkedShifts(
+                staff.id
+              )}</td>
+              <td class="summary-cell">${countTotalOt(
+                staff.id
+              )}</td>
+              <td class="summary-cell">${countQualityOt(
+                staff.id
+              )}</td>
+              <td class="summary-cell">${countQualityNonOt(
+                staff.id
+              )}</td>
+              <td class="summary-cell">${countWardMorning(
+                staff.id
+              )}</td>
+              <td class="summary-cell">${countShift(
+                staff.id,
+                'บ'
+              )}</td>
+              <td class="summary-cell">${countShift(
+                staff.id,
+                'ด'
+              )}</td>
+              <td class="summary-cell">${countVac(
+                staff.id
+              )}</td>
+            </tr>
+          `;
+        })
+        .join('');
+
+      const countPositionShift = (
+        positionFilter: (staff: any) => boolean,
+        day: string,
+        shift: WorkShift
+      ) =>
+        staffList.filter((staff) => {
+          if (!positionFilter(staff)) return false;
+
+          const code =
+            rosterData[`${staff.id}_${day}`] || '';
+
+          return parseShift(code).includes(shift);
+        }).length;
+
+      const rnOnly = (staff: any) =>
+        String(staff.position || '')
+          .trim()
+          .toUpperCase() === 'RN';
+
+      const tnOnly = (staff: any) =>
+        String(staff.position || '')
+          .trim()
+          .toUpperCase() === 'TN';
+
+      const totalWardStaffPerDay = (day: string) => {
+        const morningRn = countPositionShift(
+          rnOnly,
+          day,
+          'ช'
+        );
+        const morningTn = countPositionShift(
+          tnOnly,
+          day,
+          'ช'
+        );
+        const eveningRn = countPositionShift(
+          rnOnly,
+          day,
+          'บ'
+        );
+        const nightRn = countPositionShift(
+          rnOnly,
+          day,
+          'ด'
+        );
+
+        return (
+          morningRn +
+          morningTn +
+          eveningRn +
+          nightRn
+        );
+      };
+
+      const summaryRows =
+        staffView === 'support'
+          ? ''
+          : `
+          <tr class="summary-title-row">
+            <td colspan="3" class="summary-title-cell">
+              สรุปกำลังงานปฏิบัติงานใน ward แต่ละวัน
+            </td>
+            ${daysArray.map(() => '<td></td>').join('')}
+            <td colspan="9"></td>
+          </tr>
+
+          <tr class="summary-row">
+            <td colspan="2" class="summary-label">
+              เวรเช้า (ไม่รวม HW)
+            </td>
+            <td>RN</td>
+            ${daysArray
+              .map(
+                (day) =>
+                  `<td class="day-cell">${countPositionShift(
+                    rnOnly,
+                    day,
+                    'ช'
+                  )}</td>`
+              )
+              .join('')}
+            <td colspan="9"></td>
+          </tr>
+
+          <tr class="summary-row">
+            <td colspan="2" class="summary-label"></td>
+            <td>TN</td>
+            ${daysArray
+              .map(
+                (day) =>
+                  `<td class="day-cell">${countPositionShift(
+                    tnOnly,
+                    day,
+                    'ช'
+                  )}</td>`
+              )
+              .join('')}
+            <td colspan="9"></td>
+          </tr>
+
+          <tr class="summary-row">
+            <td colspan="2" class="summary-label">
+              เวรบ่าย
+            </td>
+            <td>RN</td>
+            ${daysArray
+              .map(
+                (day) =>
+                  `<td class="day-cell">${countPositionShift(
+                    rnOnly,
+                    day,
+                    'บ'
+                  )}</td>`
+              )
+              .join('')}
+            <td colspan="9"></td>
+          </tr>
+
+          <tr class="summary-row">
+            <td colspan="2" class="summary-label">
+              เวรดึก
+            </td>
+            <td>RN</td>
+            ${daysArray
+              .map(
+                (day) =>
+                  `<td class="day-cell">${countPositionShift(
+                    rnOnly,
+                    day,
+                    'ด'
+                  )}</td>`
+              )
+              .join('')}
+            <td colspan="9"></td>
+          </tr>
+
+          <tr class="summary-total-row">
+            <td colspan="3" class="summary-label">รวม</td>
+            ${daysArray
+              .map(
+                (day) =>
+                  `<td class="day-cell">${totalWardStaffPerDay(day)}</td>`
+              )
+              .join('')}
+            <td colspan="9"></td>
+          </tr>
+        `;
+
+      const viewLabel =
+        staffView === 'nurse'
+          ? 'พยาบาล'
+          : staffView === 'support'
+          ? 'สนับสนุน'
+          : 'ทั้งหมด';
+
+      const printRoot = document.createElement('div');
+
+      printRoot.style.position = 'fixed';
+      printRoot.style.left = '-100000px';
+      printRoot.style.top = '0';
+      printRoot.style.width = '1780px';
+      printRoot.style.background = '#ffffff';
+      printRoot.style.padding = '16px';
+      printRoot.className = sarabun.className;
+      printRoot.style.fontFamily =
+        '"Sarabun", "TH Sarabun New", "TH SarabunPSK", Tahoma, sans-serif';
+
+      printRoot.innerHTML = `
+        <style>
+          .pdf-sheet {
+            width: 100%;
+            color: #111827;
+            background: white;
+          }
+
+          .pdf-title {
+            text-align: center;
+            font-size: 20px;
+            font-weight: 700;
+            line-height: 1.35;
+            margin-bottom: 4px;
+          }
+
+          .pdf-subtitle {
+            text-align: center;
+            font-size: 15px;
+            font-weight: 600;
+            margin-bottom: 8px;
+          }
+
+          .pdf-meta {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+            font-size: 13px;
+            margin-bottom: 4px;
+            padding-right: 6px;
+          }
+
+
+          .roster-pdf-table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: auto;
+            font-size: 16px;
+          }
+
+          .roster-pdf-table th,
+          .roster-pdf-table td {
+            border: 1px solid #52525b;
+            text-align: center;
+            vertical-align: middle;
+            padding: 5px 1px;
+            height: 40px;
+            overflow: hidden;
+            white-space: nowrap;
+          }
+
+          .roster-pdf-table thead th {
+            background: #ffffff;
+            font-weight: 600;
+          }
+
+          .roster-pdf-table thead .major-head {
+            height: 28px;
+            font-size: 13px;
+            padding: 0 6px;
+          }
+
+          .roster-pdf-table thead .major-head-content {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: 100%;
+            height: 100%;
+          }
+
+          .roster-pdf-table thead .staffing-ratio {
+            font-size: 12px;
+            font-weight: 500;
+            letter-spacing: 0.2px;
+            padding-right: 4px;
+          }
+
+          .roster-pdf-table thead .day-head {
+            height: 28px;
+            font-size: 13px;
+            font-weight: 500;
+            line-height: 1;
+            white-space: nowrap;
+          }
+
+          .roster-pdf-table thead .position-head {
+            position: relative;
+            width: 30px;
+            min-width: 30px;
+            max-width: 30px;
+            padding: 0;
+            overflow: hidden;
+            vertical-align: middle;
+          }
+
+          .roster-pdf-table thead .position-head-text {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            display: block;
+            white-space: nowrap;
+            transform: translate(-50%, -50%) rotate(-90deg);
+            transform-origin: center center;
+            font-size: 10px;
+            font-weight: 400;
+            line-height: 1;
+          }
+
+          .roster-pdf-table .weekend {
+            background: #e5e7eb;
+          }
+
+          .roster-pdf-table .day-head,
+          .roster-pdf-table .day-cell {
+            width: 33px;
+            min-width: 33px;
+            max-width: 33px;
+            padding-left: 0;
+            padding-right: 0;
+            text-align: center;
+          }
+
+          .roster-pdf-table .index-cell {
+            width: 28px;
+          }
+
+          .roster-pdf-table .name-cell {
+            text-align: left;
+            padding-left: 5px;
+            width: 195px;
+            font-size: 16px;
+            font-weight: 600;
+          }
+
+          .roster-pdf-table .position-cell {
+            width: 30px;
+            font-weight: 400;
+            font-size: 12px;
+          }
+
+          .roster-pdf-table .off-cell {
+            color: #dc2626;
+          }
+
+
+          .roster-pdf-table .summary-cell,
+          .roster-pdf-table thead .summary-head {
+            background: #fffce8;
+            width: 20px;
+            min-width: 20px;
+            max-width: 20px;
+            padding-left: 0;
+            padding-right: 0;
+            font-size: 12px;
+          }
+
+          .roster-pdf-table thead .summary-head {
+            position: relative;
+            height: 94px;
+            padding: 0;
+            background: #fffce8 !important;
+            overflow: hidden;
+            vertical-align: middle;
+          }
+
+          .roster-pdf-table thead .summary-head-text {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            display: block;
+            width: 86px;
+            text-align: center;
+            white-space: nowrap;
+            transform: translate(-50%, -50%) rotate(-90deg);
+            transform-origin: center center;
+            font-size: 8.5px;
+            font-weight: 500;
+            line-height: 1;
+            letter-spacing: 0;
+          }
+
+          .roster-pdf-table thead .summary-head.short .summary-head-text {
+            width: 42px;
+            font-size: 9px;
+          }
+
+          .roster-pdf-table .summary-title-row td,
+          .roster-pdf-table .summary-row td,
+          .roster-pdf-table .summary-total-row td {
+            background: #fffce8;
+            height: 27px;
+            font-size: 11px;
+          }
+
+          .roster-pdf-table .summary-title-cell {
+            text-align: left;
+            padding-left: 5px;
+            font-weight: 700;
+            text-decoration: underline;
+          }
+
+          .roster-pdf-table .summary-total-row td {
+            font-weight: 700;
+          }
+
+          .roster-pdf-table .summary-label {
+            text-align: left;
+            padding-left: 5px;
+            font-weight: 700;
+          }
+
+          .note-section {
+            display: flex;
+            justify-content: space-between;
+            gap: 24px;
+            margin-top: 8px;
+            font-size: 11px;
+          }
+
+          .note-text {
+            flex: 1;
+          }
+
+          .signature-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 50px;
+            margin-top: 18px;
+            text-align: center;
+            font-size: 11px;
+          }
+
+          .signature-line {
+            margin-bottom: 5px;
+          }
+        </style>
+
+        <div class="pdf-sheet">
+          <div class="pdf-title">
+            ตารางเวรปฏิบัติงาน ${escapeHtml(
+              departmentName
+            )} กลุ่มภารกิจด้านการพยาบาล โรงพยาบาลวชิระภูเก็ต
+          </div>
+
+          <div class="pdf-subtitle">
+            ประจำเดือน ${thaiMonth} พ.ศ.${buddhistYear}
+            ${
+              staffView === 'all'
+                ? ''
+                : ` - ${viewLabel}`
+            }
+          </div>
+
+          <div class="pdf-meta">
+            <span>จำนวน</span>
+            <b>${daysInMonth}</b>
+            <span>วัน</span>
+            <span>/</span>
+            <b>${workingDays}</b>
+            <span>วันทำการ</span>
+          </div>
+
+
+          <table class="roster-pdf-table">
+            <colgroup>
+              <col style="width:28px" />
+              <col style="width:195px" />
+              <col style="width:30px" />
+              ${daysArray
+                .map(() => '<col style="width:33px" />')
+                .join('')}
+              ${Array.from({ length: 9 })
+                .map(() => '<col style="width:20px" />')
+                .join('')}
+            </colgroup>
+
+            <thead>
+              <tr>
+                <th rowspan="2" style="width:28px">ที่</th>
+                <th rowspan="2" style="width:195px">ชื่อ-สกุล</th>
+                <th rowspan="2" class="position-head" style="width:30px">
+                  <span class="position-head-text">ตำแหน่ง</span>
+                </th>
+
+                <th
+                  colspan="${daysInMonth}"
+                  class="major-head"
+                >
+                  <div class="major-head-content">
+                    <span>วันที่</span>
+                    <span class="staffing-ratio">7&nbsp;&nbsp;:&nbsp;&nbsp;6&nbsp;&nbsp;:&nbsp;&nbsp;5</span>
+                  </div>
+                </th>
+
+                <th rowspan="2" class="summary-head short"><span class="summary-head-text">เวร OFF</span></th>
+                <th rowspan="2" class="summary-head"><span class="summary-head-text">จน.เวรทั้งหมด</span></th>
+                <th rowspan="2" class="summary-head short"><span class="summary-head-text">Total OT</span></th>
+                <th rowspan="2" class="summary-head"><span class="summary-head-text">ช คุณภาพ(OT)</span></th>
+                <th rowspan="2" class="summary-head"><span class="summary-head-text">ช คุณภาพไม่ OT</span></th>
+                <th rowspan="2" class="summary-head short"><span class="summary-head-text">ช ward</span></th>
+                <th rowspan="2" class="summary-head short"><span class="summary-head-text">บ</span></th>
+                <th rowspan="2" class="summary-head short"><span class="summary-head-text">ด</span></th>
+                <th rowspan="2" class="summary-head short"><span class="summary-head-text">vac</span></th>
+              </tr>
+
+              <tr>
+                ${dayHeaders}
+              </tr>
+            </thead>
+
+            <tbody>
+              ${staffRows}
+              ${summaryRows}
+            </tbody>
+          </table>
+
+          <div class="note-section">
+            <div class="note-text">
+              <b>หมายเหตุ</b>
+              &nbsp;&nbsp;
+              เวรเช้า (ช) ปฏิบัติงาน 08.30 - 16.30 น.
+              &nbsp;&nbsp;
+              เวรบ่าย (บ) 16.30 - 00.30 น.
+              &nbsp;&nbsp;
+              เวรดึก (ด) 00.30 - 08.30 น. ของวันรุ่งขึ้น
+            </div>
+          </div>
+
+          <div class="signature-grid">
+            <div>
+              <div class="signature-line">
+                ลงชื่อ ................................................ ผู้จัด
+              </div>
+              <div>(................................................)</div>
+            </div>
+
+            <div>
+              <div class="signature-line">
+                ลงชื่อ ................................................ ผู้ตรวจสอบ
+              </div>
+              <div>(................................................)</div>
+            </div>
+
+            <div>
+              <div class="signature-line">
+                ลงชื่อ ................................................ ผู้อนุมัติ
+              </div>
+              <div>(................................................)</div>
+            </div>
+          </div>
+        </div>
+      `;
+
+      document.body.appendChild(printRoot);
+
+      const canvas = await html2canvas(printRoot, {
+        scale: 2,
+        backgroundColor: '#ffffff',
+        useCORS: true,
+        logging: false,
+      });
+
+      document.body.removeChild(printRoot);
+
+      const pdf = new jsPDF({
+        orientation: 'landscape',
+        unit: 'mm',
+        format: 'a4',
+        compress: true,
+      });
+
+      const pageWidth = pdf.internal.pageSize.getWidth();
+      const pageHeight = pdf.internal.pageSize.getHeight();
+
+      const margin = 4;
+      const maxWidth = pageWidth - margin * 2;
+      const maxHeight = pageHeight - margin * 2;
+
+      const imageRatio =
+        canvas.width / canvas.height;
+
+      let renderWidth = maxWidth;
+      let renderHeight = renderWidth / imageRatio;
+
+      if (renderHeight > maxHeight) {
+        renderHeight = maxHeight;
+        renderWidth = renderHeight * imageRatio;
+      }
+
+      const x = (pageWidth - renderWidth) / 2;
+      const y = (pageHeight - renderHeight) / 2;
+
+      const imageData = canvas.toDataURL(
+        'image/jpeg',
+        0.95
+      );
+
+      pdf.addImage(
+        imageData,
+        'JPEG',
+        x,
+        y,
+        renderWidth,
+        renderHeight,
+        undefined,
+        'FAST'
+      );
+
+      const safeDepartmentName =
+        String(departmentName)
+          .replace(/[\\/:*?"<>|]/g, '-')
+          .trim();
+
+      const fileName =
+        `ตารางเวร_${safeDepartmentName}_${selectedMonth}_${viewLabel}.pdf`;
+
+      return {
+        pdf,
+        fileName,
+      };
+    } catch (error) {
+      console.error('Export PDF error:', error);
+
+      alert(
+        'สร้าง PDF ไม่สำเร็จ กรุณาตรวจสอบว่าได้ติดตั้ง html2canvas และ jspdf แล้ว'
+      );
+
+      return null;
+    }
+  };
+
+  const handlePreviewPdf = async () => {
+    if (pdfExporting) return;
+
+    setPdfExporting(true);
+
+    try {
+      const result = await buildRosterPdf();
+
+      if (!result) return;
+
+      const pdfBlob = result.pdf.output('blob');
+      const pdfUrl = URL.createObjectURL(pdfBlob);
+
+      const previewWindow = window.open(
+        pdfUrl,
+        '_blank',
+        'noopener,noreferrer'
+      );
+
+      if (!previewWindow) {
+        alert(
+          'เบราว์เซอร์บล็อกหน้าต่าง PDF กรุณาอนุญาต Pop-up แล้วลองใหม่'
+        );
+      }
+
+      window.setTimeout(() => {
+        URL.revokeObjectURL(pdfUrl);
+      }, 60_000);
+    } finally {
+      setPdfExporting(false);
+    }
+  };
+
+  const handleDownloadPdf = async () => {
+    if (pdfExporting) return;
+
+    setPdfExporting(true);
+
+    try {
+      const result = await buildRosterPdf();
+
+      if (!result) return;
+
+      result.pdf.save(result.fileName);
+    } finally {
+      setPdfExporting(false);
+    }
+  };
+
   const handleExportExcel = () => {
     if (!selectedDept || staffList.length === 0) {
       alert('ไม่พบข้อมูลสำหรับดาวน์โหลด');
@@ -1339,6 +2303,34 @@ setHasValidated(false);
                 className="h-9 inline-flex items-center bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-300 px-3 rounded-xl text-[11px] font-bold transition disabled:opacity-50"
               >
                 ดาวน์โหลด Excel
+              </button>
+
+              <button
+                type="button"
+                onClick={handlePreviewPdf}
+                disabled={
+                  pdfExporting ||
+                  loading ||
+                  staffList.length === 0
+                }
+                className="h-9 inline-flex items-center bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 px-3 rounded-xl text-[11px] font-bold transition disabled:opacity-50"
+              >
+                {pdfExporting
+                  ? 'กำลังสร้าง PDF...'
+                  : 'ดูตัวอย่าง PDF'}
+              </button>
+
+              <button
+                type="button"
+                onClick={handleDownloadPdf}
+                disabled={
+                  pdfExporting ||
+                  loading ||
+                  staffList.length === 0
+                }
+                className="h-9 inline-flex items-center bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-300 px-3 rounded-xl text-[11px] font-bold transition disabled:opacity-50"
+              >
+                ดาวน์โหลด PDF
               </button>
 
               <a

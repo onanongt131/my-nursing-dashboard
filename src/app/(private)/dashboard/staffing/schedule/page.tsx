@@ -1308,6 +1308,17 @@ setHasValidated(false);
         </div>
 
         <div className="px-5 py-3 flex flex-wrap items-center gap-2 bg-slate-50/60">
+          {/* ทุก staff ที่ login แล้วต้องเห็นปุ่มขอหยุด */}
+          {userProfile && (
+            <a
+              href="/dashboard/staffing/day-off"
+              className="h-9 inline-flex items-center bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 px-3 rounded-xl text-[11px] font-bold transition"
+            >
+              ขอหยุด
+            </a>
+          )}
+
+          {/* ปุ่มจัดการระบบ แสดงเฉพาะผู้ที่มีสิทธิ์แก้ตารางเวร */}
           {allowEdit && (
             <>
               <label className="h-9 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 px-3 rounded-xl text-[11px] font-bold cursor-pointer transition flex items-center gap-1.5">
@@ -1329,13 +1340,6 @@ setHasValidated(false);
               >
                 ดาวน์โหลด Excel
               </button>
-
-              <a
-                href="/dashboard/staffing/day-off"
-                className="h-9 inline-flex items-center bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 px-3 rounded-xl text-[11px] font-bold transition"
-              >
-                ขอหยุด
-              </a>
 
               <a
                 href="/dashboard/staffing/staff"

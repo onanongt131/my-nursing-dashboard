@@ -66,7 +66,7 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
     { name: 'คณะกรรมการบ้านพัก', path: '/dashboard/committee/home' },
   ];
 
-  // รายการเมนูย่อยของ "อัตรากำลัง"
+  // รายการเมนูย่อยของ "อัตรากำลัง" (ปรับให้ลิงก์ตรงเหมือน 16 กลุ่มงาน/คณะกรรมการ)
   const staffingSubMenus = [
     { name: 'staffing-overview', label: 'บุคลากรและสมรรถนะ', path: '/dashboard/staffing' },
     { name: 'command-center', label: 'Ward Command Center', path: '/dashboard/staffing/command-center' },
@@ -176,103 +176,99 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
     <div className="bg-white shadow-sm w-full rounded-2xl overflow-visible border border-emerald-100">
       {/* Header ส่วนบน */}
       <header className="flex flex-col md:flex-row items-center justify-between px-4 sm:px-6 py-4 bg-white gap-4 border-b border-gray-100">
-  <div className="flex items-center justify-between w-full md:w-auto">
-    <div className="flex items-center gap-3 sm:gap-4 text-center sm:text-left pl-2 sm:pl-4">
-      
-      {/* โลโก้โรงพยาบาล */}
-      <img 
-        src="/Logo VCR.png" 
-        alt="Hospital Logo" 
-        className="h-10 sm:h-12 w-auto object-contain flex-shrink-0" 
-        onError={(e) => { e.currentTarget.style.display = 'none'; }} 
-      />
+        <div className="flex items-center justify-between w-full md:w-auto">
+          <div className="flex items-center gap-3 sm:gap-4 text-center sm:text-left pl-2 sm:pl-4">
+            
+            {/* โลโก้โรงพยาบาล */}
+            <img 
+              src="/Logo VCR.png" 
+              alt="Hospital Logo" 
+              className="h-10 sm:h-12 w-auto object-contain flex-shrink-0" 
+              onError={(e) => { e.currentTarget.style.display = 'none'; }} 
+            />
 
-      {/* เส้นคั่นระหว่างโลโก้ */}
-      <div className="h-8 w-[1px] bg-gray-200 hidden sm:block"></div>
+            {/* เส้นคั่นระหว่างโลโก้ */}
+            <div className="h-8 w-[1px] bg-gray-200 hidden sm:block"></div>
 
-      {/* โลโก้กลุ่มภารกิจฯ (Logo-NSO) */}
-      <img 
-        src="/Logo-NSO.png" 
-        alt="Logo" 
-        className="h-12 w-12 sm:h-14 sm:w-14 object-contain flex-shrink-0" 
-        onError={(e) => { e.currentTarget.style.display = 'none'; }} 
-      />
-      
-      {/* ส่วนหัวข้อ: บรรทัดบนชื่อกลุ่มภารกิจฯ / บรรทัดล่างโรงพยาบาลวชิระภูเก็ต */}
-      <div className="flex flex-col justify-center">
-        <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-800 leading-snug">
-          {title || "กลุ่มภารกิจด้านการพยาบาล"}
-        </h1>
-        <span className="text-xs sm:text-sm text-gray-500 font-medium tracking-wide">
-          โรงพยาบาลวชิระภูเก็ต
-        </span>
-      </div>
+            {/* โลโก้กลุ่มภารกิจฯ (Logo-NSO) */}
+            <img 
+              src="/Logo-NSO.png" 
+              alt="Logo" 
+              className="h-12 w-12 sm:h-14 sm:w-14 object-contain flex-shrink-0" 
+              onError={(e) => { e.currentTarget.style.display = 'none'; }} 
+            />
+            
+            {/* ส่วนหัวข้อ */}
+            <div className="flex flex-col justify-center">
+              <h1 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-800 leading-snug">
+                {title || "กลุ่มภารกิจด้านการพยาบาล"}
+              </h1>
+              <span className="text-xs sm:text-sm text-gray-500 font-medium tracking-wide">
+                โรงพยาบาลวชิระภูเก็ต
+              </span>
+            </div>
 
-    </div>
-    
-    <button 
-      type="button" 
-      onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} 
-      className="md:hidden p-2 rounded-lg bg-emerald-900 text-amber-300 hover:bg-emerald-800 focus:outline-none flex-shrink-0 ml-2"
-    >
-      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        {isMobileMenuOpen ? (
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-        ) : (
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-        )}
-      </svg>
-    </button>
-  </div>
+          </div>
+          
+          <button 
+            type="button" 
+            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} 
+            className="md:hidden p-2 rounded-lg bg-emerald-900 text-amber-300 hover:bg-emerald-800 focus:outline-none flex-shrink-0 ml-2"
+          >
+            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              {isMobileMenuOpen ? (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              ) : (
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              )}
+            </svg>
+          </button>
+        </div>
 
-  {/* ส่วนแสดงชื่อ Login และ Badge สิทธิ์ (Desktop View) */}
-  <div className="hidden md:flex items-center gap-3">
-    
-    {/* ปุ่มอนุมัติสมาชิก */}
-    {userRole && userRole.toLowerCase() === 'admin' && (
-      <a 
-        href="/dashboard/admin/approve-members" 
-        className="h-11 flex items-center gap-2 px-4 rounded-2xl border border-emerald-300/60 bg-white text-emerald-900 font-bold text-sm hover:bg-emerald-50 transition-colors shadow-2xs"
-      >
-        <svg className="w-4 h-4 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-        อนุมัติสมาชิก
-      </a>
-    )}
+        {/* ส่วนแสดงชื่อ Login และ Badge สิทธิ์ (Desktop View) */}
+        <div className="hidden md:flex items-center gap-3">
+          {userRole && userRole.toLowerCase() === 'admin' && (
+            <a 
+              href="/dashboard/admin/approve-members" 
+              className="h-11 flex items-center gap-2 px-4 rounded-2xl border border-emerald-300/60 bg-white text-emerald-900 font-bold text-sm hover:bg-emerald-50 transition-colors shadow-2xs"
+            >
+              <svg className="w-4 h-4 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              อนุมัติสมาชิก
+            </a>
+          )}
 
-    {/* กล่องชื่อผู้ใช้งาน */}
-    <div className="h-11 flex items-center gap-3 px-4 rounded-2xl border border-emerald-300/60 bg-white shadow-2xs">
-      <div className="w-8 h-8 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-800 shrink-0">
-        <svg className="w-4 h-4 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-        </svg>
-      </div>
-      
-      <div className="flex flex-col justify-center">
-        <span className="text-sm font-bold text-emerald-900 tracking-tight leading-tight">
-          {displayUserName}
-        </span>
-        {userRole && (
-          <span className="text-[10px] text-emerald-600 font-medium uppercase tracking-wider mt-0.5">
-            {userRole} {userGroup ? `(${userGroup})` : ''}
-          </span>
-        )}
-      </div>
-    </div>
-    
-    {/* ปุ่มออกจากระบบ */}
-    <div className="h-11 flex items-center px-2 rounded-2xl border border-rose-200 bg-rose-50/50 hover:bg-rose-100/60 transition-colors">
-      <LogoutButton />
-    </div>
-  </div>
-</header>
+          <div className="h-11 flex items-center gap-3 px-4 rounded-2xl border border-emerald-300/60 bg-white shadow-2xs">
+            <div className="w-8 h-8 rounded-xl bg-emerald-100 flex items-center justify-center text-emerald-800 shrink-0">
+              <svg className="w-4 h-4 text-emerald-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+            </div>
+            
+            <div className="flex flex-col justify-center">
+              <span className="text-sm font-bold text-emerald-900 tracking-tight leading-tight">
+                {displayUserName}
+              </span>
+              {userRole && (
+                <span className="text-[10px] text-emerald-600 font-medium uppercase tracking-wider mt-0.5">
+                  {userRole} {userGroup ? `(${userGroup})` : ''}
+                </span>
+              )}
+            </div>
+          </div>
+          
+          <div className="h-11 flex items-center px-2 rounded-2xl border border-rose-200 bg-rose-50/50 hover:bg-rose-100/60 transition-colors">
+            <LogoutButton />
+          </div>
+        </div>
+      </header>
 
       {/* Navigation เมนูด้านล่าง */}
       <div className={`w-full bg-emerald-900 shadow-md transition-all duration-300 ${isMobileMenuOpen ? 'block' : 'hidden'} md:block`}>
         <nav className="flex flex-col md:flex-row items-start md:items-center justify-start gap-3 px-4 sm:px-6 py-1.5">
           
-          {/* 1. หน้าหลัก (Home / วิสัยทัศน์) */}
+          {/* 1. หน้าหลัก */}
           <a 
             href="/dashboard"
             onClick={() => { if (onTabChange) onTabChange('home'); setIsMobileMenuOpen(false); }}
@@ -281,11 +277,15 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
             <span>หน้าหลัก</span>
           </a>
 
-          {/* 2. Nursing Dashboard (6 แดชบอร์ดดีย่อย) */}
+          {/* 2. Nursing Dashboard (ปรับให้ใช้โครงสร้างลิงก์ตรงเหมือนคณะกรรมการ) */}
           <div className="relative w-full md:w-auto" ref={dashboardDropdownRef}>
             <button 
               type="button" 
-              onClick={() => setIsDashboardDropdownOpen(!isDashboardDropdownOpen)} 
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsDashboardDropdownOpen(!isDashboardDropdownOpen);
+              }} 
               className={`${buttonBaseClass} ${isDashboardActive || isDashboardDropdownOpen ? activeStyle : inactiveStyle}`}
             >
               <span>Nursing Dashboard</span>
@@ -300,7 +300,6 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
                     key={`${m.name}-${index}`} 
                     href={m.path}
                     onClick={() => {
-                      if (onTabChange) onTabChange(m.name);
                       setIsMobileMenuOpen(false);
                       setIsDashboardDropdownOpen(false);
                     }} 
@@ -318,7 +317,11 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
           <div className="relative w-full md:w-auto" ref={committeeDropdownRef}>
             <button 
               type="button" 
-              onClick={() => setIsCommitteeDropdownOpen(!isCommitteeDropdownOpen)} 
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsCommitteeDropdownOpen(!isCommitteeDropdownOpen);
+              }} 
               className={`${buttonBaseClass} ${isCommitteeActive || isCommitteeDropdownOpen ? activeStyle : inactiveStyle}`}
             >
               <span>คณะกรรมการ</span>
@@ -339,7 +342,11 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
           <div className="relative w-full md:w-auto" ref={nursingDropdownRef}>
             <button 
               type="button" 
-              onClick={() => setIsNursingDropdownOpen(!isNursingDropdownOpen)} 
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsNursingDropdownOpen(!isNursingDropdownOpen);
+              }} 
               className={`${buttonBaseClass} ${isNursingActive || isNursingDropdownOpen ? activeStyle : inactiveStyle}`}
             >
               <span>16 กลุ่มงาน</span>
@@ -356,11 +363,15 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
             )}
           </div>
 
-          {/* 5. อัตรากำลัง */}
+          {/* 5. อัตรากำลัง (ปรับให้ใช้โครงสร้างลิงก์ตรงเหมือนคณะกรรมการ) */}
           <div className="relative w-full md:w-auto" ref={staffingDropdownRef}>
             <button 
               type="button" 
-              onClick={() => setIsStaffingDropdownOpen(!isStaffingDropdownOpen)} 
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsStaffingDropdownOpen(!isStaffingDropdownOpen);
+              }} 
               className={`${buttonBaseClass} ${isStaffingActive || isStaffingDropdownOpen ? activeStyle : inactiveStyle}`}
             >
               <span>อัตรากำลัง</span>
@@ -375,7 +386,6 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
                     key={`${m.name}-${index}`} 
                     href={m.path}
                     onClick={() => {
-                      if (onTabChange) onTabChange(m.name);
                       setIsMobileMenuOpen(false);
                       setIsStaffingDropdownOpen(false);
                     }} 
@@ -390,7 +400,15 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
 
           {/* 6. ตัวชี้วัดตามแผน */}
           <div className="relative w-full md:w-auto" ref={kpiDropdownRef}>
-            <button type="button" onClick={() => setIsKpiDropdownOpen(!isKpiDropdownOpen)} className={`${buttonBaseClass} ${isKpiActive ? activeStyle : inactiveStyle}`}>
+            <button 
+              type="button" 
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsKpiDropdownOpen(!isKpiDropdownOpen);
+              }} 
+              className={`${buttonBaseClass} ${isKpiActive ? activeStyle : inactiveStyle}`}
+            >
               <span>ตัวชี้วัดตามแผน</span>
               <svg className={`w-4 h-4 ml-1 transition-transform ${isKpiDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
             </button>
@@ -411,7 +429,15 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
 
           {/* 7. ตัวชี้วัดรายเดือน */}
           <div className="relative w-full md:w-auto" ref={monthlyDropdownRef}>
-            <button type="button" onClick={() => setIsMonthlyDropdownOpen(!isMonthlyDropdownOpen)} className={`${buttonBaseClass} ${isMonthlyActive ? activeStyle : inactiveStyle}`}>
+            <button 
+              type="button" 
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsMonthlyDropdownOpen(!isMonthlyDropdownOpen);
+              }} 
+              className={`${buttonBaseClass} ${isMonthlyActive ? activeStyle : inactiveStyle}`}
+            >
               <span>ตัวชี้วัดรายเดือน</span>
               <svg className={`w-4 h-4 ml-1 transition-transform ${isMonthlyDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
             </button>
@@ -424,7 +450,15 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
 
           {/* 8. หน่วยงาน */}
           <div className="relative w-full md:w-auto" ref={unitDropdownRef}>
-            <button type="button" onClick={() => setIsUnitDropdownOpen(!isUnitDropdownOpen)} className={`${buttonBaseClass} ${isUnitActive || isUnitDropdownOpen ? activeStyle : inactiveStyle}`}>
+            <button 
+              type="button" 
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setIsUnitDropdownOpen(!isUnitDropdownOpen);
+              }} 
+              className={`${buttonBaseClass} ${isUnitActive || isUnitDropdownOpen ? activeStyle : inactiveStyle}`}
+            >
               <span>หน่วยงานภายใน</span>
               <svg className={`w-4 h-4 ml-1 transition-transform ${isUnitDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
             </button>

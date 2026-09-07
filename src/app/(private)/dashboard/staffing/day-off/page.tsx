@@ -251,6 +251,56 @@ export default function StaffingDayOffPage() {
     userProfile?.role === 'admin' ||
     userProfile?.role === 'head_department';
 
+  // กติกาการขอหยุดสำหรับ staff:
+  // ขอหยุด "เดือนถัดไป" ได้เฉพาะวันที่ 1-10 ของเดือนปัจจุบัน
+  // admin / head_department ไม่ถูกจำกัดด้วยช่วงเวลานี้
+  const isStaffRole = userProfile?.role === 'staff';
+
+  const getRequestWindow = () => {
+    const now = new Date();
+
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth(); // 0-11
+    const currentDay = now.getDate();
+
+    const targetStart = new Date(
+      currentYear,
+      currentMonth + 1,
+      1
+    );
+
+    const targetEnd = new Date(
+      currentYear,
+      currentMonth + 2,
+      0
+    );
+
+    const toLocalDateString = (date: Date) => {
+      const year = date.getFullYear();
+      const month = String(
+        date.getMonth() + 1
+      ).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+
+      return `${year}-${month}-${day}`;
+    };
+
+    return {
+      isOpen: currentDay >= 1 && currentDay <= 10,
+      currentDay,
+      targetMonth: `${targetStart.getFullYear()}-${String(
+        targetStart.getMonth() + 1
+      ).padStart(2, '0')}`,
+      targetStartDate: toLocalDateString(targetStart),
+      targetEndDate: toLocalDateString(targetEnd),
+    };
+  };
+
+  const requestWindow = getRequestWindow();
+
+  const canStaffSubmitRequest =
+    !isStaffRole || requestWindow.isOpen;
+
   // โหลดบุคลากรในหน่วยงาน
   useEffect(() => {
     async function loadStaff() {
@@ -390,6 +440,13 @@ export default function StaffingDayOffPage() {
       return;
     }
 
+    if (isStaffRole && !requestWindow.isOpen) {
+      setMessage(
+        'พนักงานสามารถยื่นคำขอหยุดของเดือนถัดไปได้เฉพาะวันที่ 1-10 ของเดือนปัจจุบัน'
+      );
+      return;
+    }
+
     if (!selectedDept) {
       setMessage('กรุณาเลือกหน่วยงาน');
       return;
@@ -413,6 +470,23 @@ export default function StaffingDayOffPage() {
     if (requestEndDate < requestStartDate) {
       setMessage('ถึงวันที่ต้องไม่น้อยกว่าจากวันที่');
       return;
+    }
+
+    if (isStaffRole) {
+      const isStartInTargetMonth =
+        requestStartDate >= requestWindow.targetStartDate &&
+        requestStartDate <= requestWindow.targetEndDate;
+
+      const isEndInTargetMonth =
+        requestEndDate >= requestWindow.targetStartDate &&
+        requestEndDate <= requestWindow.targetEndDate;
+
+      if (!isStartInTargetMonth || !isEndInTargetMonth) {
+        setMessage(
+          'staff สามารถขอหยุดได้เฉพาะเดือนถัดไปเท่านั้น'
+        );
+        return;
+      }
     }
 
     const dates = buildDateRange(requestStartDate, requestEndDate);
@@ -667,6 +741,20 @@ export default function StaffingDayOffPage() {
           <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5">
             <h2 className="font-bold text-slate-900 mb-4">เพิ่มคำขอหยุด</h2>
 
+            {isStaffRole && (
+              <div
+                className={`mb-4 rounded-xl border px-4 py-3 text-xs font-semibold ${
+                  requestWindow.isOpen
+                    ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                    : 'bg-slate-100 text-slate-600 border-slate-200'
+                }`}
+              >
+                {requestWindow.isOpen
+                  ? `เปิดรับคำขอหยุดเดือนถัดไป (${requestWindow.targetMonth}) ถึงวันที่ 10 ของเดือนนี้`
+                  : 'ปิดรับคำขอหยุดสำหรับ staff — เปิดรับเฉพาะวันที่ 1-10 ของเดือน เพื่อขอหยุดในเดือนถัดไป'}
+              </div>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-12 gap-4 items-end">
               <div className="xl:col-span-3">
                 <label className="text-xs font-bold text-slate-600">
@@ -695,6 +783,20 @@ export default function StaffingDayOffPage() {
                 <input
                   type="date"
                   value={requestStartDate}
+                  min={
+                    isStaffRole
+                      ? requestWindow.targetStartDate
+                      : undefined
+                  }
+                  max={
+                    isStaffRole
+                      ? requestWindow.targetEndDate
+                      : undefined
+                  }
+                  disabled={
+                    isStaffRole &&
+                    !requestWindow.isOpen
+                  }
                   onChange={(e) => {
                     const nextStart = e.target.value;
                     setRequestStartDate(nextStart);
@@ -703,7 +805,7 @@ export default function StaffingDayOffPage() {
                       setRequestEndDate(nextStart);
                     }
                   }}
-                  className="mt-1 w-full border border-slate-300 rounded-xl px-3 py-2 bg-white"
+                  className="mt-1 w-full border border-slate-300 rounded-xl px-3 py-2 bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
                 />
               </div>
 
@@ -715,9 +817,23 @@ export default function StaffingDayOffPage() {
                 <input
                   type="date"
                   value={requestEndDate}
-                  min={requestStartDate || undefined}
+                  min={
+                    requestStartDate ||
+                    (isStaffRole
+                      ? requestWindow.targetStartDate
+                      : undefined)
+                  }
+                  max={
+                    isStaffRole
+                      ? requestWindow.targetEndDate
+                      : undefined
+                  }
+                  disabled={
+                    isStaffRole &&
+                    !requestWindow.isOpen
+                  }
                   onChange={(e) => setRequestEndDate(e.target.value)}
-                  className="mt-1 w-full border border-slate-300 rounded-xl px-3 py-2 bg-white"
+                  className="mt-1 w-full border border-slate-300 rounded-xl px-3 py-2 bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
                 />
               </div>
 
@@ -730,8 +846,12 @@ export default function StaffingDayOffPage() {
                   type="text"
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
+                  disabled={
+                    isStaffRole &&
+                    !requestWindow.isOpen
+                  }
                   placeholder="ไม่บังคับ"
-                  className="mt-1 w-full border border-slate-300 rounded-xl px-3 py-2"
+                  className="mt-1 w-full border border-slate-300 rounded-xl px-3 py-2 disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
                 />
               </div>
 
@@ -742,11 +862,16 @@ export default function StaffingDayOffPage() {
                     saving ||
                     !selectedStaffId ||
                     !requestStartDate ||
-                    !requestEndDate
+                    !requestEndDate ||
+                    !canStaffSubmitRequest
                   }
                   className="w-full bg-emerald-700 hover:bg-emerald-800 text-white px-5 py-2 rounded-xl text-sm font-bold disabled:opacity-50"
                 >
-                  {saving ? 'กำลังบันทึก...' : 'บันทึกคำขอหยุด'}
+                  {saving
+                    ? 'กำลังบันทึก...'
+                    : isStaffRole && !requestWindow.isOpen
+                    ? 'ปิดรับคำขอ'
+                    : 'บันทึกคำขอหยุด'}
                 </button>
               </div>
             </div>

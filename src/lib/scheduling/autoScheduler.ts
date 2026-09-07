@@ -55,11 +55,6 @@ export type SchedulerRequirements = {
   morningSupport?: number;
   eveningSupport?: number;
   nightSupport?: number;
-
-  // บุคลากรสนับสนุน:
-  // เริ่มพยายามให้พักหลังทำงาน 2 วัน และห้ามเกิน 3 วันติด
-  supportPreferredRestAfterDays?: number; // default 2
-  supportMaxConsecutiveWorkDays?: number; // default 3
 };
 
 export type AutoScheduleInput = {
@@ -892,7 +887,7 @@ function supportCandidateScore(args: {
   );
 
   const preferredRestAfterDays =
-    requirements.supportPreferredRestAfterDays ?? 2;
+    requirements.preferredRestAfterDays ?? 3;
 
   const blockMin = blockMinForShift(shift, requirements);
   const blockMax = blockMaxForShift(shift, requirements);
@@ -903,7 +898,6 @@ function supportCandidateScore(args: {
   if (shift === 'บ') score += stat.evening * 25;
   if (shift === 'ด') score += stat.night * 30;
 
-  // พยายามคงเวรเดิมเป็น block 2–3 วัน
   if (sameShiftBlock > 0 && sameShiftBlock < blockMin) {
     score -= 250;
   }
@@ -912,17 +906,11 @@ function supportCandidateScore(args: {
     score += 700;
   }
 
-  // Staggered rest:
-  // หลังทำงาน 2 วัน เริ่มลดความสำคัญ แต่ยังทำวันที่ 3 ได้หากจำเป็น
-  if (consecutiveDays >= preferredRestAfterDays) {
-    score += 700;
+  if (consecutiveDays >= preferredRestAfterDays + 1) {
+    score += 1400;
+  } else if (consecutiveDays >= preferredRestAfterDays) {
+    score += 500;
   }
-
-  // เพิ่ม tie-breaker เล็กน้อยจาก staff id เพื่อไม่ให้ทุกคนเกิด pattern เหมือนกัน
-  const stableOffset =
-    Number(String(staff.id).replace(/\D/g, '').slice(-2) || 0) % 7;
-
-  score += stableOffset * 3;
 
   return score;
 }
@@ -998,7 +986,7 @@ function canAssignSupportSingleShift(args: {
 
   if (
     consecutiveDays >=
-    (requirements.supportMaxConsecutiveWorkDays ?? 3)
+    (requirements.maxConsecutiveWorkDays ?? 5)
   ) {
     return false;
   }
@@ -1109,7 +1097,7 @@ function scheduleSupportRole(args: {
             })
           )
           .sort((a, b) => {
-            let scoreA = supportCandidateScore({
+            const scoreA = supportCandidateScore({
               staff: a,
               shift,
               dayIndex,
@@ -1120,7 +1108,7 @@ function scheduleSupportRole(args: {
               requirements,
             });
 
-            let scoreB = supportCandidateScore({
+            const scoreB = supportCandidateScore({
               staff: b,
               shift,
               dayIndex,
@@ -1130,15 +1118,6 @@ function scheduleSupportRole(args: {
               stats,
               requirements,
             });
-
-            // กระจายวันพักให้เหลื่อมกันตาม phase ของแต่ละคน
-            const phaseA =
-              Number(String(a.id).replace(/\D/g, '').slice(-2) || 0) % 3;
-            const phaseB =
-              Number(String(b.id).replace(/\D/g, '').slice(-2) || 0) % 3;
-
-            if ((dayIndex + phaseA) % 3 === 2) scoreA += 180;
-            if ((dayIndex + phaseB) % 3 === 2) scoreB += 180;
 
             if (scoreA !== scoreB) return scoreA - scoreB;
 
@@ -1153,154 +1132,6 @@ function scheduleSupportRole(args: {
 
         roster[rosterKey(selected.id, day)] = shift;
         addStat(selected.id, shift, stats);
-
-        staffInShift = getStaffInShift(
-          allRoleStaff,
-          roster,
-          day,
-          shift
-        );
-      }
-
-      // ถ้ายังไม่ครบ ให้ใช้เวรควบเฉพาะเมื่อจำเป็น
-      // อนุญาต ช/บ และ ช/ด, ห้าม บ/ด
-      staffInShift = getStaffInShift(
-        allRoleStaff,
-        roster,
-        day,
-        shift
-      );
-
-      while (
-        staffInShift.length < required &&
-        (requirements.allowDoubleShift ?? true)
-      ) {
-        const doubleCandidates = autoRoleStaff
-          .map((staff) => {
-            const key = rosterKey(staff.id, day);
-            const currentCode = roster[key] || '';
-
-            if (
-              approvedDayOffKeys.has(
-                dayOffKey(staff.id, selectedMonth, day)
-              )
-            ) {
-              return null;
-            }
-
-            if (isProtectedNonWorkCode(currentCode)) {
-              return null;
-            }
-
-            if (getShiftCount(currentCode) !== 1) {
-              return null;
-            }
-
-            const doubleCode =
-              getAllowedDoubleCode(currentCode, shift);
-
-            if (!doubleCode) return null;
-
-            // ห้าม บ/ด และ ด/บ โดย getAllowedDoubleCode คืน null อยู่แล้ว
-
-            if (
-              wouldCreateNightToMorning(
-                staff.id,
-                dayIndex,
-                shift,
-                daysArray,
-                roster,
-                previousDayRoster
-              )
-            ) {
-              return null;
-            }
-
-            if (shift === 'ด') {
-              const consecutiveNight =
-                countConsecutiveNightBefore(
-                  staff.id,
-                  dayIndex,
-                  daysArray,
-                  roster,
-                  previousDayRoster
-                );
-
-              if (
-                consecutiveNight >=
-                (requirements.maxConsecutiveNightShifts ?? 2)
-              ) {
-                return null;
-              }
-            }
-
-            const stat = stats.get(String(staff.id)) || {
-              total: 0,
-              morning: 0,
-              evening: 0,
-              night: 0,
-              doubleShiftDays: 0,
-            };
-
-            // คนที่มีเวรควบน้อยกว่าจะถูกเลือกก่อน
-            let score =
-              stat.total * 100 +
-              stat.doubleShiftDays * 700;
-
-            if (shift === 'บ') {
-              score += Math.max(
-                0,
-                stat.evening - stat.night
-              ) * 100;
-            }
-
-            if (shift === 'ด') {
-              score += Math.max(
-                0,
-                stat.night - stat.evening
-              ) * 100;
-            }
-
-            return {
-              staff,
-              doubleCode,
-              score,
-            };
-          })
-          .filter(
-            (
-              item
-            ): item is {
-              staff: SchedulerStaff;
-              doubleCode: string;
-              score: number;
-            } => item !== null
-          )
-          .sort((a, b) => a.score - b.score);
-
-        const selectedDouble = doubleCandidates[0];
-        if (!selectedDouble) break;
-
-        const key = rosterKey(selectedDouble.staff.id, day);
-        const oldShiftCount = getShiftCount(roster[key]);
-
-        roster[key] = selectedDouble.doubleCode;
-
-        addStat(
-          selectedDouble.staff.id,
-          shift,
-          stats,
-          oldShiftCount === 1
-        );
-
-        warnings.push({
-          day,
-          shift,
-          type: 'DOUBLE_SHIFT_USED',
-          message:
-            `วันที่ ${Number(day)} ${selectedDouble.staff.full_name}: ` +
-            `ใช้เวรควบ ${selectedDouble.doubleCode}`,
-        });
 
         staffInShift = getStaffInShift(
           allRoleStaff,
@@ -1337,7 +1168,6 @@ function scheduleSupportRole(args: {
   });
 
   // เติม 0 เฉพาะ staff auto
-  // ระบบจะพยายามกระจายวันพักหลังทำงาน 2–3 วันแบบเหลื่อมกัน
   autoRoleStaff.forEach((staff) => {
     daysArray.forEach((day) => {
       const key = rosterKey(staff.id, day);

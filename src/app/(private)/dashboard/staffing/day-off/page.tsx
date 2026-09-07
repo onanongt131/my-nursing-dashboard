@@ -73,6 +73,25 @@ function formatThaiDate(date: string) {
   });
 }
 
+function toDateValue(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
+    2,
+    '0'
+  )}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function getCalendarDays(monthValue: string) {
+  const [year, month] = monthValue.split('-').map(Number);
+  const firstDay = new Date(year, month - 1, 1);
+  const leadingDays = firstDay.getDay();
+  const daysInMonth = new Date(year, month, 0).getDate();
+
+  return Array.from({ length: leadingDays + daysInMonth }, (_, index) => {
+    if (index < leadingDays) return null;
+    return toDateValue(new Date(year, month - 1, index - leadingDays + 1));
+  });
+}
+
 export default function StaffingDayOffPage() {
   const supabase = createClient();
 
@@ -92,6 +111,10 @@ export default function StaffingDayOffPage() {
   const [selectedStaffId, setSelectedStaffId] = useState<number | string>('');
   const [requestStartDate, setRequestStartDate] = useState('');
   const [requestEndDate, setRequestEndDate] = useState('');
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
+  const [calendarMonth, setCalendarMonth] = useState(
+    new Date().toISOString().slice(0, 7)
+  );
   const [note, setNote] = useState('');
 
   const [loading, setLoading] = useState(false);
@@ -298,6 +321,38 @@ export default function StaffingDayOffPage() {
 
   const requestWindow = getRequestWindow();
 
+  const calendarDays = useMemo(
+    () => getCalendarDays(calendarMonth),
+    [calendarMonth]
+  );
+
+  const selectRequestDate = (date: string) => {
+    // คลิกแรกเป็นคำขอ 1 วันทันที และคลิกวันที่ถัดไปเพื่อขยายเป็นช่วง
+    if (!requestStartDate || requestEndDate !== requestStartDate) {
+      setRequestStartDate(date);
+      setRequestEndDate(date);
+      return;
+    }
+
+    if (date >= requestStartDate) {
+      setRequestEndDate(date);
+    } else {
+      setRequestStartDate(date);
+      setRequestEndDate(date);
+    }
+  };
+
+  const changeCalendarMonth = (offset: number) => {
+    const [year, month] = calendarMonth.split('-').map(Number);
+    const nextMonth = new Date(year, month - 1 + offset, 1);
+    setCalendarMonth(
+      `${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(
+        2,
+        '0'
+      )}`
+    );
+  };
+
   const canStaffSubmitRequest =
     !isStaffRole || requestWindow.isOpen;
 
@@ -462,12 +517,15 @@ export default function StaffingDayOffPage() {
       return;
     }
 
-    if (!requestStartDate || !requestEndDate) {
-      setMessage('กรุณาเลือกจากวันที่และถึงวันที่');
+    if (!requestStartDate) {
+      setMessage('กรุณาเลือกวันที่ขอหยุด');
       return;
     }
 
-    if (requestEndDate < requestStartDate) {
+    // หากเลือกเพียงครั้งเดียว ให้ถือว่าวันสิ้นสุดเป็นวันเดียวกับวันเริ่มต้น
+    const effectiveEndDate = requestEndDate || requestStartDate;
+
+    if (effectiveEndDate < requestStartDate) {
       setMessage('ถึงวันที่ต้องไม่น้อยกว่าจากวันที่');
       return;
     }
@@ -478,8 +536,8 @@ export default function StaffingDayOffPage() {
         requestStartDate <= requestWindow.targetEndDate;
 
       const isEndInTargetMonth =
-        requestEndDate >= requestWindow.targetStartDate &&
-        requestEndDate <= requestWindow.targetEndDate;
+        effectiveEndDate >= requestWindow.targetStartDate &&
+        effectiveEndDate <= requestWindow.targetEndDate;
 
       if (!isStartInTargetMonth || !isEndInTargetMonth) {
         setMessage(
@@ -489,7 +547,7 @@ export default function StaffingDayOffPage() {
       }
     }
 
-    const dates = buildDateRange(requestStartDate, requestEndDate);
+    const dates = buildDateRange(requestStartDate, effectiveEndDate);
 
     if (dates.length === 0) {
       setMessage('ไม่พบช่วงวันที่ที่ต้องการขอหยุด');
@@ -775,66 +833,124 @@ export default function StaffingDayOffPage() {
                 </select>
               </div>
 
-              <div className="xl:col-span-2">
+              <div className="xl:col-span-4 relative">
                 <label className="text-xs font-bold text-slate-600">
-                  จากวันที่
+                  วันที่ขอหยุด
                 </label>
 
-                <input
-                  type="date"
-                  value={requestStartDate}
-                  min={
-                    isStaffRole
-                      ? requestWindow.targetStartDate
-                      : undefined
-                  }
-                  max={
-                    isStaffRole
-                      ? requestWindow.targetEndDate
-                      : undefined
-                  }
-                  disabled={
-                    isStaffRole &&
-                    !requestWindow.isOpen
-                  }
-                  onChange={(e) => {
-                    const nextStart = e.target.value;
-                    setRequestStartDate(nextStart);
-
-                    if (requestEndDate && nextStart > requestEndDate) {
-                      setRequestEndDate(nextStart);
-                    }
+                <button
+                  type="button"
+                  disabled={isStaffRole && !requestWindow.isOpen}
+                  onClick={() => {
+                    const initialMonth =
+                      requestStartDate.slice(0, 7) ||
+                      (isStaffRole
+                        ? requestWindow.targetStartDate.slice(0, 7)
+                        : selectedMonth);
+                    setCalendarMonth(initialMonth);
+                    setIsCalendarOpen((open) => !open);
                   }}
-                  className="mt-1 w-full border border-slate-300 rounded-xl px-3 py-2 bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
-                />
-              </div>
+                  className="mt-1 w-full min-h-10 border border-slate-300 rounded-xl px-3 py-2 bg-white text-left disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
+                >
+                  {requestStartDate
+                    ? requestStartDate === requestEndDate
+                      ? formatThaiDate(requestStartDate)
+                      : `${formatThaiDate(requestStartDate)} – ${formatThaiDate(
+                          requestEndDate
+                        )}`
+                    : 'เลือกวันที่หรือช่วงวันที่'}
+                </button>
 
-              <div className="xl:col-span-2">
-                <label className="text-xs font-bold text-slate-600">
-                  ถึงวันที่
-                </label>
+                {isCalendarOpen && (
+                  <div className="absolute z-30 mt-2 w-full min-w-[320px] rounded-2xl border border-slate-200 bg-white p-4 shadow-xl">
+                    <div className="mb-3 flex items-center justify-between">
+                      <button
+                        type="button"
+                        onClick={() => changeCalendarMonth(-1)}
+                        className="rounded-lg px-3 py-1.5 text-slate-600 hover:bg-slate-100"
+                      >
+                        ‹
+                      </button>
+                      <div className="font-bold text-slate-800">
+                        {new Date(`${calendarMonth}-01T00:00:00`).toLocaleDateString(
+                          'th-TH',
+                          { month: 'long', year: 'numeric' }
+                        )}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => changeCalendarMonth(1)}
+                        className="rounded-lg px-3 py-1.5 text-slate-600 hover:bg-slate-100"
+                      >
+                        ›
+                      </button>
+                    </div>
 
-                <input
-                  type="date"
-                  value={requestEndDate}
-                  min={
-                    requestStartDate ||
-                    (isStaffRole
-                      ? requestWindow.targetStartDate
-                      : undefined)
-                  }
-                  max={
-                    isStaffRole
-                      ? requestWindow.targetEndDate
-                      : undefined
-                  }
-                  disabled={
-                    isStaffRole &&
-                    !requestWindow.isOpen
-                  }
-                  onChange={(e) => setRequestEndDate(e.target.value)}
-                  className="mt-1 w-full border border-slate-300 rounded-xl px-3 py-2 bg-white disabled:bg-slate-100 disabled:text-slate-400 disabled:cursor-not-allowed"
-                />
+                    <div className="grid grid-cols-7 gap-1 text-center text-xs font-bold text-slate-500">
+                      {['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'].map((day) => (
+                        <div key={day} className="py-1">
+                          {day}
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className="grid grid-cols-7 gap-1">
+                      {calendarDays.map((date, index) => {
+                        if (!date) return <div key={`blank-${index}`} />;
+
+                        const outsideStaffWindow =
+                          isStaffRole &&
+                          (date < requestWindow.targetStartDate ||
+                            date > requestWindow.targetEndDate);
+                        const inRange =
+                          Boolean(requestStartDate) &&
+                          date >= requestStartDate &&
+                          date <= requestEndDate;
+                        const isEdge =
+                          date === requestStartDate || date === requestEndDate;
+
+                        return (
+                          <button
+                            key={date}
+                            type="button"
+                            disabled={outsideStaffWindow}
+                            onClick={() => selectRequestDate(date)}
+                            className={`aspect-square rounded-lg text-sm transition-colors ${
+                              isEdge
+                                ? 'bg-emerald-700 font-bold text-white'
+                                : inRange
+                                ? 'bg-emerald-100 text-emerald-900'
+                                : 'text-slate-700 hover:bg-emerald-50'
+                            } disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-300`}
+                          >
+                            {Number(date.slice(-2))}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-3">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setRequestStartDate('');
+                          setRequestEndDate('');
+                        }}
+                        className="text-xs font-semibold text-slate-500 hover:text-slate-700"
+                      >
+                        ล้างวันที่
+                      </button>
+                      <button
+                        type="button"
+                        disabled={!requestStartDate}
+                        onClick={() => setIsCalendarOpen(false)}
+                        className="rounded-lg bg-emerald-700 px-4 py-2 text-xs font-bold text-white disabled:opacity-50"
+                      >
+                        ยืนยันวันที่
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
 
               <div className="xl:col-span-3">
@@ -862,7 +978,6 @@ export default function StaffingDayOffPage() {
                     saving ||
                     !selectedStaffId ||
                     !requestStartDate ||
-                    !requestEndDate ||
                     !canStaffSubmitRequest
                   }
                   className="w-full bg-emerald-700 hover:bg-emerald-800 text-white px-5 py-2 rounded-xl text-sm font-bold disabled:opacity-50"

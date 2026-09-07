@@ -1,6 +1,6 @@
 // src/app/(private)/dashboard/staffing/schedule/page.tsx
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { Sarabun } from 'next/font/google';
 import { createClient } from '@/utils/supabase/client';
 import { CheckCircleIcon, ArrowUpTrayIcon } from '@heroicons/react/24/solid';
@@ -79,6 +79,20 @@ export default function StaffingSchedulePage() {
   const [pdfExporting, setPdfExporting] = useState(false);
   const [selectedProblemDay, setSelectedProblemDay] = useState<string | null>(null);
   const [staffView, setStaffView] = useState<'all' | 'nurse' | 'support'>('all');
+  const [holidays, setHolidays] = useState<
+    Array<{ holiday_date: string; holiday_name: string }>
+  >([]);
+
+  const holidayMap = useMemo(
+    () =>
+      new Map(
+        holidays.map((holiday) => [
+          holiday.holiday_date,
+          holiday.holiday_name,
+        ])
+      ),
+    [holidays]
+  );
 
   // คำนวณจำนวนวันในเดือนที่เลือก
   const [yearStr, monthStr] = selectedMonth.split('-');
@@ -94,6 +108,43 @@ export default function StaffingSchedulePage() {
     const weekDay = dateObj.getDay();
     return weekDay === 0 || weekDay === 6; // 0 = อาทิตย์, 6 = เสาร์
   };
+
+  const getHolidayName = (dayStr: string) =>
+    holidayMap.get(`${selectedMonth}-${dayStr}`) || '';
+
+  const isSpecialHoliday = (dayStr: string) =>
+    Boolean(getHolidayName(dayStr));
+
+  // วันหยุดทั้งหมด = เสาร์-อาทิตย์ + วันหยุดพิเศษ
+  const isHoliday = (dayStr: string) =>
+    isWeekend(dayStr) || isSpecialHoliday(dayStr);
+
+  // โหลดวันหยุดส่วนกลางที่ Admin กำหนด ใช้ร่วมกันทุกหน่วยงาน
+  useEffect(() => {
+    async function loadHolidays() {
+      const startDate = `${selectedMonth}-01`;
+      const endDate = `${selectedMonth}-${String(daysInMonth).padStart(2, '0')}`;
+
+      const { data, error } = await supabase
+        .from('staffing_holidays')
+        .select('holiday_date, holiday_name')
+        .eq('active', true)
+        .is('department_id', null)
+        .gte('holiday_date', startDate)
+        .lte('holiday_date', endDate)
+        .order('holiday_date', { ascending: true });
+
+      if (error) {
+        console.warn('Load staffing holidays warning:', error.message);
+        setHolidays([]);
+        return;
+      }
+
+      setHolidays(data || []);
+    }
+
+    loadHolidays();
+  }, [daysInMonth, selectedMonth, supabase]);
 
   useEffect(() => {
   async function loadSessionUser() {
@@ -647,8 +698,54 @@ export default function StaffingSchedulePage() {
   preserveExisting: true,
 }); // ต้องมีบรรทัดนี้
 
-// 4. แสดง Preview
-setRosterData(result.roster);
+// 4. Fix HW ให้ขึ้นเวรเช้าทุกวันราชการ เว้นวันลา/คำขอหยุดที่อนุมัติแล้ว
+// วันเสาร์-อาทิตย์และวันหยุดพิเศษให้ลง 0
+const rosterWithFixedHw = { ...result.roster };
+
+if (staffView !== 'support') {
+  const hwStaff = staffList.filter(
+    (staff) =>
+      String(staff.position || '').trim().toUpperCase() === 'HW'
+  );
+
+  const isLeaveCode = (value: unknown) => {
+    const code = String(value || '').trim().toUpperCase();
+    return (
+      code.includes('ลา') ||
+      code.includes('ป่วย') ||
+      code.includes('คลอด') ||
+      code.includes('ฉพท') ||
+      code.includes('VAC')
+    );
+  };
+
+  hwStaff.forEach((staff) => {
+    daysArray.forEach((day) => {
+      const cellKey = `${staff.id}_${day}`;
+      const fullDate = `${selectedMonth}-${day}`;
+      const approvedOffKey = `${staff.id}_${fullDate}`;
+      const existingValue =
+        rosterData[cellKey] || rosterWithFixedHw[cellKey] || '';
+
+      // วันลาที่กรอกไว้เดิมต้องไม่ถูกระบบเขียนทับ
+      if (isLeaveCode(existingValue)) {
+        rosterWithFixedHw[cellKey] = existingValue;
+        return;
+      }
+
+      // คำขอหยุดที่อนุมัติแล้วถือเป็นวันหยุดของ HW
+      if (approvedDayOffKeys.has(approvedOffKey)) {
+        rosterWithFixedHw[cellKey] = '0';
+        return;
+      }
+
+      rosterWithFixedHw[cellKey] = isHoliday(day) ? '0' : 'ช';
+    });
+  });
+}
+
+// 5. แสดง Preview
+setRosterData(rosterWithFixedHw);
 
 setAutoScheduleWarnings(
   result.warnings
@@ -1162,7 +1259,7 @@ setHasValidated(false);
       const buddhistYear = selectedYear + 543;
 
       const workingDays = daysArray.filter(
-        (day) => !isWeekend(day)
+        (day) => !isHoliday(day)
       ).length;
 
       const escapeHtml = (value: unknown) =>
@@ -1342,12 +1439,15 @@ setHasValidated(false);
 
       const dayHeaders = daysArray
         .map((day) => {
-          const weekend = isWeekend(day);
+          const holiday = isHoliday(day);
+          const holidayTitle =
+            getHolidayName(day) ||
+            (isWeekend(day) ? 'วันหยุดเสาร์-อาทิตย์' : '');
 
           return `
             <th class="day-head ${
-              weekend ? 'weekend' : ''
-            }">${Number(day)}</th>
+              holiday ? 'weekend' : ''
+            }" title="${escapeHtml(holidayTitle)}">${Number(day)}</th>
           `;
         })
         .join('');
@@ -2346,6 +2446,15 @@ setHasValidated(false);
               >
                 ตั้งค่ากติกา
               </a>
+
+              {userProfile?.role === 'admin' && (
+                <a
+                  href="/dashboard/staffing/holidays"
+                  className="h-9 inline-flex items-center bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-300 px-3 rounded-xl text-[11px] font-bold transition"
+                >
+                  จัดการวันหยุด
+                </a>
+              )}
             </>
           )}
 
@@ -2591,6 +2700,7 @@ setHasValidated(false);
                 <th className="w-[70px] px-1 py-3 border-r border-slate-300 text-center bg-slate-100">ตำแหน่ง</th>
                 {daysArray.map((day) => {
                   const weekend = isWeekend(day);
+                  const holidayName = getHolidayName(day);
                   const hasProblem = visibleProblemDays.has(day);
                   const isSelected = selectedProblemDay === day;
 
@@ -2609,6 +2719,8 @@ setHasValidated(false);
                           ? isSelected
                             ? 'bg-rose-600 text-white cursor-pointer'
                             : 'bg-rose-100 text-rose-700 cursor-pointer hover:bg-rose-200'
+                          : holidayName
+                          ? 'bg-rose-100 text-rose-800'
                           : weekend
                           ? 'bg-amber-100 text-amber-900'
                           : 'bg-slate-100'
@@ -2617,13 +2729,22 @@ setHasValidated(false);
                         hasProblem
                           ? `วันที่ ${Number(day)} มีปัญหา — คลิกเพื่อดูรายละเอียด`
                           : `วันที่ ${Number(day)} ${
-                              weekend ? '(วันหยุดเสาร์-อาทิตย์)' : ''
+                              holidayName
+                                ? `(${holidayName})`
+                                : weekend
+                                ? '(วันหยุดเสาร์-อาทิตย์)'
+                                : ''
                             }`
                       }
                     >
                       <div className="leading-none font-extrabold">
                         {day}
                       </div>
+                      {!hasProblem && holidayName && (
+                        <div className="mt-1 text-[7px] font-bold text-rose-600">
+                          หยุด
+                        </div>
+                      )}
                       {hasProblem && (
                         <div
                           className={`text-[8px] mt-1 ${
@@ -2661,9 +2782,9 @@ setHasValidated(false);
                     {daysArray.map((day) => {
                       const cellKey = `${staff.id}_${day}`;
                       const currentShift = rosterData[cellKey] || '';
-                      const weekend = isWeekend(day);
+                      const holiday = isHoliday(day);
                       return (
-                        <td key={day} className={`px-0.5 py-1 border-r border-slate-200 ${weekend ? 'bg-amber-50/40' : ''}`}>
+                        <td key={day} className={`px-0.5 py-1 border-r border-slate-200 ${holiday ? 'bg-amber-50/40' : ''}`}>
                           <input
                             type="text"
                             maxLength={8}

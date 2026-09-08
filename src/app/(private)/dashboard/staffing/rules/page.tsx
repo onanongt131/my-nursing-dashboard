@@ -47,7 +47,10 @@ type DayOffCapacityRule = {
   department_id: number;
   start_date: string;
   end_date: string;
-  max_off_per_day: number;
+  max_nurse_off_per_day: number;
+  max_pn_off_per_day: number;
+  max_na_off_per_day: number;
+  max_employee_off_per_day: number;
   active: boolean;
 };
 
@@ -65,7 +68,10 @@ export default function StaffingRulesPage() {
   const [dayOffRules, setDayOffRules] = useState<DayOffCapacityRule[]>([]);
   const [dayOffStart, setDayOffStart] = useState('');
   const [dayOffEnd, setDayOffEnd] = useState('');
-  const [dayOffMaximum, setDayOffMaximum] = useState(1);
+  const [dayOffNurseMaximum, setDayOffNurseMaximum] = useState(2);
+  const [dayOffPnMaximum, setDayOffPnMaximum] = useState(1);
+  const [dayOffNaMaximum, setDayOffNaMaximum] = useState(1);
+  const [dayOffEmployeeMaximum, setDayOffEmployeeMaximum] = useState(1);
   const [dayOffSaving, setDayOffSaving] = useState(false);
 
   const [form, setForm] = useState<RuleForm>({
@@ -222,7 +228,9 @@ export default function StaffingRulesPage() {
 
     const { data, error } = await supabase
       .from('day_off_capacity_rules')
-      .select('id, department_id, start_date, end_date, max_off_per_day, active')
+      .select(
+        'id, department_id, start_date, end_date, max_nurse_off_per_day, max_pn_off_per_day, max_na_off_per_day, max_employee_off_per_day, active'
+      )
       .eq('department_id', Number(selectedDept))
       .order('start_date', { ascending: true });
 
@@ -252,7 +260,10 @@ export default function StaffingRulesPage() {
       department_id: Number(selectedDept),
       start_date: dayOffStart,
       end_date: dayOffEnd,
-      max_off_per_day: Math.max(0, dayOffMaximum),
+      max_nurse_off_per_day: Math.max(0, dayOffNurseMaximum),
+      max_pn_off_per_day: Math.max(0, dayOffPnMaximum),
+      max_na_off_per_day: Math.max(0, dayOffNaMaximum),
+      max_employee_off_per_day: Math.max(0, dayOffEmployeeMaximum),
       active: true,
     });
     setDayOffSaving(false);
@@ -265,7 +276,10 @@ export default function StaffingRulesPage() {
     setMessage('บันทึกช่วงการขอหยุดเรียบร้อยแล้ว');
     setDayOffStart('');
     setDayOffEnd('');
-    setDayOffMaximum(1);
+    setDayOffNurseMaximum(2);
+    setDayOffPnMaximum(1);
+    setDayOffNaMaximum(1);
+    setDayOffEmployeeMaximum(1);
     await loadDayOffRules();
   };
 
@@ -760,7 +774,7 @@ export default function StaffingRulesPage() {
           </div>
 
           <div className="p-3 space-y-2.5">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-2.5 items-end">
+            <div className="grid grid-cols-1 md:grid-cols-4 xl:grid-cols-7 gap-2.5 items-end">
               <label>
                 <span className="text-xs font-bold text-slate-600">ตั้งแต่วันที่</span>
                 <input
@@ -783,13 +797,46 @@ export default function StaffingRulesPage() {
                 />
               </label>
               <label>
-                <span className="text-xs font-bold text-slate-600">สูงสุดต่อวัน</span>
+                <span className="text-xs font-bold text-slate-600">พยาบาลสูงสุด/วัน</span>
                 <input
                   type="number"
                   min={0}
-                  value={dayOffMaximum}
+                  value={dayOffNurseMaximum}
                   disabled={!allowEdit}
-                  onChange={(e) => setDayOffMaximum(Math.max(0, Number(e.target.value)))}
+                  onChange={(e) => setDayOffNurseMaximum(Math.max(0, Number(e.target.value)))}
+                  className="mt-1 w-full border border-slate-300 rounded-lg px-3 py-1.5 text-center font-bold disabled:bg-slate-100"
+                />
+              </label>
+              <label>
+                <span className="text-xs font-bold text-slate-600">PN สูงสุด/วัน</span>
+                <input
+                  type="number"
+                  min={0}
+                  value={dayOffPnMaximum}
+                  disabled={!allowEdit}
+                  onChange={(e) => setDayOffPnMaximum(Math.max(0, Number(e.target.value)))}
+                  className="mt-1 w-full border border-slate-300 rounded-lg px-3 py-1.5 text-center font-bold disabled:bg-slate-100"
+                />
+              </label>
+              <label>
+                <span className="text-xs font-bold text-slate-600">NA สูงสุด/วัน</span>
+                <input
+                  type="number"
+                  min={0}
+                  value={dayOffNaMaximum}
+                  disabled={!allowEdit}
+                  onChange={(e) => setDayOffNaMaximum(Math.max(0, Number(e.target.value)))}
+                  className="mt-1 w-full border border-slate-300 rounded-lg px-3 py-1.5 text-center font-bold disabled:bg-slate-100"
+                />
+              </label>
+              <label>
+                <span className="text-xs font-bold text-slate-600">พนง. สูงสุด/วัน</span>
+                <input
+                  type="number"
+                  min={0}
+                  value={dayOffEmployeeMaximum}
+                  disabled={!allowEdit}
+                  onChange={(e) => setDayOffEmployeeMaximum(Math.max(0, Number(e.target.value)))}
                   className="mt-1 w-full border border-slate-300 rounded-lg px-3 py-1.5 text-center font-bold disabled:bg-slate-100"
                 />
               </label>
@@ -808,15 +855,18 @@ export default function StaffingRulesPage() {
                 <thead className="bg-slate-100 text-slate-600 text-xs">
                   <tr>
                     <th className="px-3 py-2 text-left">ช่วงวันที่</th>
-                    <th className="px-3 py-2 text-center">ขอหยุดได้</th>
+                    <th className="px-3 py-2 text-center">พยาบาล</th>
+                    <th className="px-3 py-2 text-center">PN</th>
+                    <th className="px-3 py-2 text-center">NA</th>
+                    <th className="px-3 py-2 text-center">พนง.</th>
                     <th className="px-3 py-2 text-right">จัดการ</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {dayOffRules.length === 0 ? (
                     <tr>
-                      <td colSpan={3} className="px-3 py-3 text-center text-slate-400">
-                        ยังไม่ได้กำหนดช่วง — ระบบจะใช้ค่าเริ่มต้น 1 คนต่อวัน
+                      <td colSpan={6} className="px-3 py-3 text-center text-slate-400">
+                        ยังไม่ได้กำหนดช่วง — ค่าเริ่มต้นพยาบาล 2 คน และ PN/NA/พนง. ตำแหน่งละ 1 คนต่อวัน
                       </td>
                     </tr>
                   ) : (
@@ -825,10 +875,25 @@ export default function StaffingRulesPage() {
                         <td className="px-3 py-2 text-slate-700">
                           {rule.start_date} ถึง {rule.end_date}
                         </td>
-                        <td className={`px-3 py-2 text-center font-bold ${rule.max_off_per_day === 0 ? 'text-rose-700' : 'text-emerald-700'}`}>
-                          {rule.max_off_per_day === 0
+                        <td className={`px-3 py-2 text-center font-bold ${rule.max_nurse_off_per_day === 0 ? 'text-rose-700' : 'text-emerald-700'}`}>
+                          {rule.max_nurse_off_per_day === 0
                             ? 'ปิดรับคำขอ'
-                            : `${rule.max_off_per_day} คน/วัน`}
+                            : `${rule.max_nurse_off_per_day} คน/วัน`}
+                        </td>
+                        <td className={`px-3 py-2 text-center font-bold ${rule.max_pn_off_per_day === 0 ? 'text-rose-700' : 'text-emerald-700'}`}>
+                          {rule.max_pn_off_per_day === 0
+                            ? 'ปิดรับคำขอ'
+                            : `${rule.max_pn_off_per_day} คน/วัน`}
+                        </td>
+                        <td className={`px-3 py-2 text-center font-bold ${rule.max_na_off_per_day === 0 ? 'text-rose-700' : 'text-emerald-700'}`}>
+                          {rule.max_na_off_per_day === 0
+                            ? 'ปิดรับคำขอ'
+                            : `${rule.max_na_off_per_day} คน/วัน`}
+                        </td>
+                        <td className={`px-3 py-2 text-center font-bold ${rule.max_employee_off_per_day === 0 ? 'text-rose-700' : 'text-emerald-700'}`}>
+                          {rule.max_employee_off_per_day === 0
+                            ? 'ปิดรับคำขอ'
+                            : `${rule.max_employee_off_per_day} คน/วัน`}
                         </td>
                         <td className="px-3 py-2 text-right">
                           <button

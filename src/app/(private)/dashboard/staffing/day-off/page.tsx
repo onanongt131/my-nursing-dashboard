@@ -37,6 +37,38 @@ type DayOffRequest = {
   updated_at?: string | null;
 };
 
+type DayOffCapacityRule = {
+  id: number;
+  start_date: string;
+  end_date: string;
+  max_nurse_off_per_day: number | null;
+  max_pn_off_per_day: number | null;
+  max_na_off_per_day: number | null;
+  max_employee_off_per_day: number | null;
+  active: boolean;
+};
+
+type DayOffStaffGroup = 'nurse' | 'pn' | 'na' | 'employee';
+type DayOffUsage = Record<string, Record<DayOffStaffGroup, number>>;
+
+const DEFAULT_MAX_OFF_PER_GROUP = 2;
+const NURSE_POSITIONS = new Set(['RN', 'HW', 'TN']);
+
+function getDayOffStaffGroup(position: string | null | undefined): DayOffStaffGroup {
+  const normalized = (position || '').trim().toUpperCase();
+  if (NURSE_POSITIONS.has(normalized)) return 'nurse';
+  if (normalized === 'PN') return 'pn';
+  if (normalized === 'NA') return 'na';
+  return 'employee';
+}
+
+function getDayOffGroupLabel(group: DayOffStaffGroup) {
+  if (group === 'nurse') return 'พยาบาล';
+  if (group === 'pn') return 'PN';
+  if (group === 'na') return 'NA';
+  return 'พนง.';
+}
+
 const statusLabel: Record<DayOffStatus, string> = {
   pending: 'รออนุมัติ',
   approved: 'อนุมัติ',
@@ -107,6 +139,8 @@ export default function StaffingDayOffPage() {
 
   const [staffList, setStaffList] = useState<Staff[]>([]);
   const [requests, setRequests] = useState<DayOffRequest[]>([]);
+  const [capacityRules, setCapacityRules] = useState<DayOffCapacityRule[]>([]);
+  const [calendarUsage, setCalendarUsage] = useState<DayOffUsage>({});
 
   const [selectedStaffId, setSelectedStaffId] = useState<number | string>('');
   const [requestStartDate, setRequestStartDate] = useState('');
@@ -120,13 +154,6 @@ export default function StaffingDayOffPage() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
-
-  type PositionConflict = {
-  id: number;
-  staff_id: number;
-  request_date: string;
-  status: DayOffStatus;
-};
 
   // อ่านผู้ใช้ปัจจุบันจาก NextAuth session API
   useEffect(() => {
@@ -326,6 +353,90 @@ export default function StaffingDayOffPage() {
     [calendarMonth]
   );
 
+  const getDayCapacity = (date: string, group: DayOffStaffGroup) => {
+    const matched = capacityRules
+      .filter(
+        (rule) =>
+          rule.active && date >= rule.start_date && date <= rule.end_date
+      )
+      .sort((a, b) => b.start_date.localeCompare(a.start_date))[0];
+
+    if (!matched) return DEFAULT_MAX_OFF_PER_GROUP;
+
+    if (group === 'nurse') {
+      return matched.max_nurse_off_per_day ?? DEFAULT_MAX_OFF_PER_GROUP;
+    }
+    if (group === 'pn') return matched.max_pn_off_per_day ?? 1;
+    if (group === 'na') return matched.max_na_off_per_day ?? 1;
+    return matched.max_employee_off_per_day ?? 1;
+  };
+
+  useEffect(() => {
+    async function loadCapacityAndUsage() {
+      if (!selectedDept || !calendarMonth) {
+        setCapacityRules([]);
+        setCalendarUsage({});
+        return;
+      }
+
+      const [year, month] = calendarMonth.split('-').map(Number);
+      const startDate = `${calendarMonth}-01`;
+      const endDate = `${calendarMonth}-${String(
+        new Date(year, month, 0).getDate()
+      ).padStart(2, '0')}`;
+
+      const [{ data: rules }, { data: usedRequests }] = await Promise.all([
+        supabase
+          .from('day_off_capacity_rules')
+          .select(
+            'id, start_date, end_date, max_nurse_off_per_day, max_pn_off_per_day, max_na_off_per_day, max_employee_off_per_day, active'
+          )
+          .eq('department_id', Number(selectedDept))
+          .eq('active', true)
+          .lte('start_date', endDate)
+          .gte('end_date', startDate),
+        supabase
+          .from('staff_requests')
+          .select('staff_id, request_date')
+          .eq('department_id', Number(selectedDept))
+          .eq('request_type', 'OFF')
+          .in('status', ['pending', 'approved'])
+          .gte('request_date', startDate)
+          .lte('request_date', endDate),
+      ]);
+
+      setCapacityRules((rules || []) as DayOffCapacityRule[]);
+
+      const staffById = new Map(
+        staffList.map((staff) => [Number(staff.id), staff])
+      );
+      const staffByDateAndGroup = new Map<string, Set<string>>();
+      (usedRequests || []).forEach((item: any) => {
+        const group = getDayOffStaffGroup(
+          staffById.get(Number(item.staff_id))?.position
+        );
+        const key = `${item.request_date}:${group}`;
+        if (!staffByDateAndGroup.has(key)) {
+          staffByDateAndGroup.set(key, new Set());
+        }
+        staffByDateAndGroup.get(key)?.add(String(item.staff_id));
+      });
+
+      const usage: DayOffUsage = {};
+      staffByDateAndGroup.forEach((staffIds, key) => {
+        const separator = key.lastIndexOf(':');
+        const date = key.slice(0, separator);
+        const group = key.slice(separator + 1) as DayOffStaffGroup;
+        usage[date] ||= { nurse: 0, pn: 0, na: 0, employee: 0 };
+        usage[date][group] = staffIds.size;
+      });
+      setCalendarUsage(usage);
+    }
+
+    loadCapacityAndUsage();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [calendarMonth, selectedDept, staffList]);
+
   const selectRequestDate = (date: string) => {
     // คลิกแรกเป็นคำขอ 1 วันทันที และคลิกวันที่ถัดไปเพื่อขยายเป็นช่วง
     if (!requestStartDate || requestEndDate !== requestStartDate) {
@@ -452,42 +563,67 @@ export default function StaffingDayOffPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDept, selectedMonth]);
 
-  const findPositionConflicts = async (
-  dates: string[]
-): Promise<PositionConflict[]> => {
-  if (!selectedStaff?.position || !selectedDept || dates.length === 0) {
-    return [];
-  }
+  const findCapacityConflicts = async (dates: string[], targetStaffId: number) => {
+    if (!selectedDept || dates.length === 0) return [] as string[];
 
-  const samePositionStaffIds = staffList
-    .filter(
-      (staff) =>
-        staff.position === selectedStaff.position &&
-        Number(staff.id) !== Number(selectedStaff.id)
-    )
-    .map((staff) => Number(staff.id));
+    const [{ data: rules, error: rulesError }, { data: used, error: usedError }] =
+      await Promise.all([
+        supabase
+          .from('day_off_capacity_rules')
+          .select(
+            'start_date, end_date, max_nurse_off_per_day, max_pn_off_per_day, max_na_off_per_day, max_employee_off_per_day, active'
+          )
+          .eq('department_id', Number(selectedDept))
+          .eq('active', true)
+          .lte('start_date', dates[dates.length - 1])
+          .gte('end_date', dates[0]),
+        supabase
+          .from('staff_requests')
+          .select('staff_id, request_date')
+          .eq('department_id', Number(selectedDept))
+          .eq('request_type', 'OFF')
+          .in('status', ['pending', 'approved'])
+          .in('request_date', dates),
+      ]);
 
-  if (samePositionStaffIds.length === 0) {
-    return [];
-  }
+    if (rulesError) throw new Error(`โหลดกติกาการขอหยุดไม่สำเร็จ: ${rulesError.message}`);
+    if (usedError) throw new Error(`ตรวจสอบจำนวนผู้ขอหยุดไม่สำเร็จ: ${usedError.message}`);
 
-  const { data, error } = await supabase
-    .from('staff_requests')
-    .select('id, staff_id, request_date, status')
-    .eq('department_id', Number(selectedDept))
-    .eq('request_type', 'OFF')
-    .in('status', ['pending', 'approved'])
-    .in('staff_id', samePositionStaffIds)
-    .in('request_date', dates);
+    const ruleRows = (rules || []) as DayOffCapacityRule[];
+    const targetStaff = staffMap.get(Number(targetStaffId));
+    const targetGroup = getDayOffStaffGroup(targetStaff?.position);
 
-  if (error) {
-    throw new Error(
-      `ตรวจสอบคำขอซ้ำไม่สำเร็จ: ${error.message}`
-    );
-  }
+    return dates.filter((date) => {
+      const matched = ruleRows
+        .filter((rule) => date >= rule.start_date && date <= rule.end_date)
+        .sort((a, b) => b.start_date.localeCompare(a.start_date))[0];
+      const maximum = matched
+        ? targetGroup === 'nurse'
+          ? matched.max_nurse_off_per_day ?? DEFAULT_MAX_OFF_PER_GROUP
+          : targetGroup === 'pn'
+          ? matched.max_pn_off_per_day ?? 1
+          : targetGroup === 'na'
+          ? matched.max_na_off_per_day ?? 1
+          : matched.max_employee_off_per_day ?? 1
+        : targetGroup === 'nurse'
+        ? DEFAULT_MAX_OFF_PER_GROUP
+        : 1;
+      const otherStaff = new Set(
+        (used || [])
+          .filter(
+            (item: any) =>
+              item.request_date === date &&
+              Number(item.staff_id) !== Number(targetStaffId) &&
+              getDayOffStaffGroup(
+                staffMap.get(Number(item.staff_id))?.position
+              ) === targetGroup
+          )
+          .map((item: any) => String(item.staff_id))
+      ).size;
 
-  return (data || []) as PositionConflict[];
-};
+      return maximum === 0 || otherStaff + 1 > maximum;
+    });
+  };
 
   const handleCreateRequest = async () => {
     if (!canCreateRequest) {
@@ -558,20 +694,17 @@ export default function StaffingDayOffPage() {
     setMessage('');
 
     try {
-      const conflicts = await findPositionConflicts(dates);
+      const fullDates = await findCapacityConflicts(
+        dates,
+        Number(selectedStaffId)
+      );
 
-      if (conflicts.length > 0) {
-        const conflictDates = Array.from(
-          new Set(conflicts.map((item) => item.request_date))
-        )
-          .sort()
-          .map(formatThaiDate)
-          .join(', ');
-
+      if (fullDates.length > 0) {
         setMessage(
-          `ไม่สามารถบันทึกได้: ตำแหน่ง ${selectedStaff.position} มีผู้ขอหยุดแล้วในวันที่ ${conflictDates}`
+          `ไม่สามารถบันทึกได้: วันที่ปิดรับหรือจำนวนผู้ขอหยุดเต็มแล้ว ${fullDates
+            .map(formatThaiDate)
+            .join(', ')}`
         );
-        setSaving(false);
         return;
       }
 
@@ -626,46 +759,26 @@ export default function StaffingDayOffPage() {
 
     if (!request) return;
 
-    // ก่อนอนุมัติ ตรวจตำแหน่งซ้ำอีกครั้ง
     if (status === 'approved') {
-      const requestStaff = staffMap.get(Number(request.staff_id));
-
-      if (requestStaff?.position) {
-        const samePositionStaffIds = staffList
-          .filter(
-            (staff) =>
-              staff.position === requestStaff.position &&
-              Number(staff.id) !== Number(request.staff_id)
-          )
-          .map((staff) => Number(staff.id));
-
-        if (samePositionStaffIds.length > 0) {
-          const { data: conflictData, error: conflictError } = await supabase
-            .from('staff_requests')
-            .select('id, staff_id, request_date, status')
-            .eq('department_id', Number(selectedDept))
-            .eq('request_type', 'OFF')
-            .in('status', ['pending', 'approved'])
-            .in('staff_id', samePositionStaffIds)
-            .eq('request_date', request.request_date)
-            .neq('id', requestId);
-
-          if (conflictError) {
-            setMessage(
-              `ตรวจสอบก่อนอนุมัติไม่สำเร็จ: ${conflictError.message}`
-            );
-            return;
-          }
-
-          if ((conflictData || []).length > 0) {
-            setMessage(
-              `ไม่สามารถอนุมัติได้: ตำแหน่ง ${requestStaff.position} มีผู้ขอหยุดแล้วในวันที่ ${formatThaiDate(
-                request.request_date
-              )}`
-            );
-            return;
-          }
+      try {
+        const fullDates = await findCapacityConflicts(
+          [request.request_date],
+          request.staff_id
+        );
+        if (fullDates.length > 0) {
+          const group = getDayOffStaffGroup(
+            staffMap.get(Number(request.staff_id))?.position
+          );
+          setMessage(
+            `อนุมัติไม่ได้: กลุ่ม${getDayOffGroupLabel(group)}ขอหยุดเต็มตามกติกาแล้วในวันที่ ${formatThaiDate(
+              request.request_date
+            )}`
+          );
+          return;
         }
+      } catch (error: any) {
+        setMessage(error?.message || 'ตรวจสอบจำนวนผู้ขอหยุดไม่สำเร็จ');
+        return;
       }
     }
 
@@ -737,7 +850,7 @@ export default function StaffingDayOffPage() {
               </div>
 
               <p className="text-xs text-slate-500 mt-1">
-                บันทึกและอนุมัติคำขอหยุดก่อนจัดตารางเวร กติกา: ในวันเดียวกัน ตำแหน่งเดียวกัน ขอหยุดได้ไม่เกิน 1 คนต่อหน่วยงาน
+                บันทึกและอนุมัติคำขอหยุดก่อนจัดตารางเวร โดยกำหนดโควตาตามหน่วยงานและช่วงวันที่
               </p>
 
               {userProfile && canCreateRequest && !canApproveRequest && (
@@ -902,6 +1015,12 @@ export default function StaffingDayOffPage() {
                           isStaffRole &&
                           (date < requestWindow.targetStartDate ||
                             date > requestWindow.targetEndDate);
+                        const selectedGroup = getDayOffStaffGroup(
+                          selectedStaff?.position
+                        );
+                        const capacity = getDayCapacity(date, selectedGroup);
+                        const used = calendarUsage[date]?.[selectedGroup] || 0;
+                        const isFull = capacity === 0 || used >= capacity;
                         const inRange =
                           Boolean(requestStartDate) &&
                           date >= requestStartDate &&
@@ -913,7 +1032,7 @@ export default function StaffingDayOffPage() {
                           <button
                             key={date}
                             type="button"
-                            disabled={outsideStaffWindow}
+                            disabled={outsideStaffWindow || isFull}
                             onClick={() => selectRequestDate(date)}
                             className={`aspect-square rounded-lg text-sm transition-colors ${
                               isEdge
@@ -924,6 +1043,15 @@ export default function StaffingDayOffPage() {
                             } disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-300`}
                           >
                             {Number(date.slice(-2))}
+                            {!outsideStaffWindow && (
+                              <span className="block text-[7px] leading-none">
+                                {capacity === 0
+                                  ? 'ปิด'
+                                  : isFull
+                                  ? 'เต็ม'
+                                  : `ว่าง ${capacity - used}`}
+                              </span>
+                            )}
                           </button>
                         );
                       })}

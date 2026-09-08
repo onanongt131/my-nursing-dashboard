@@ -2575,10 +2575,20 @@ setHasValidated(false);
 
               <a
                 href="/dashboard/staffing/rules"
-                className="h-9 inline-flex items-center bg-white hover:bg-slate-100 text-slate-700 border border-slate-300 px-3 rounded-xl text-[11px] font-bold transition"
+                className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-bold text-slate-700 hover:bg-slate-50"
               >
                 ตั้งค่ากติกา
               </a>
+
+              {/* แสดงเฉพาะ admin */}
+              {userProfile?.role === 'admin' && (
+                <a
+                  href="/dashboard/staffing/holidays"
+                  className="inline-flex items-center justify-center rounded-xl border border-rose-300 bg-rose-50 px-4 py-2 text-sm font-bold text-rose-700 transition-colors hover:bg-rose-100"
+                >
+                  จัดการวันหยุด
+                </a>
+              )}
             </>
           )}
 

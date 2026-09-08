@@ -135,6 +135,26 @@ type InternalStaffStat = {
 
 const SHIFT_ORDER: WorkShift[] = ['ด', 'บ', 'ช'];
 
+function staffRotationSeed(staff: SchedulerStaff) {
+  const source = `${staff.id}-${staff.full_name}`;
+  return Array.from(source).reduce(
+    (sum, character) => sum + character.charCodeAt(0),
+    0
+  );
+}
+
+function isPreferredRotatingOffDay(
+  staff: SchedulerStaff,
+  dayIndex: number
+) {
+  const seed = staffRotationSeed(staff);
+  const workBlockLength = 2 + (seed % 3); // 2, 3 หรือ 4 วัน
+  const cycleLength = workBlockLength + 1;
+  const phase = Math.floor(seed / 3) % cycleLength;
+
+  return (dayIndex + phase) % cycleLength === workBlockLength;
+}
+
 function rosterKey(staffId: number | string, day: string) {
   return `${staffId}_${day}`;
 }
@@ -216,6 +236,11 @@ function isPureOff(code: string | undefined) {
   return (code || '').trim().toUpperCase() === '0';
 }
 
+function isBlankRosterCode(code: string | undefined) {
+  const value = (code || '').trim();
+  return value === '' || value === '-';
+}
+
 function hasOffCredit(code: string | undefined) {
   const value = (code || '').trim().toUpperCase();
 
@@ -268,6 +293,37 @@ function wouldCreateNightToMorning(
   );
 
   return parseShift(previousShiftCode).includes('ด');
+}
+
+function getLastWorkedShiftsBefore(
+  staffId: number | string,
+  dayIndex: number,
+  daysArray: string[],
+  roster: Record<string, string>,
+  previousDayRoster: Record<string, string>
+) {
+  for (let i = dayIndex - 1; i >= 0; i--) {
+    const shifts = parseShift(
+      roster[rosterKey(staffId, daysArray[i])] || ''
+    );
+
+    if (shifts.length > 0) return shifts;
+  }
+
+  return parseShift(previousDayRoster[String(staffId)] || '');
+}
+
+function isStartingNewBlock(
+  staffId: number | string,
+  dayIndex: number,
+  daysArray: string[],
+  roster: Record<string, string>
+) {
+  if (dayIndex <= 0) return false;
+
+  return !hasWorkingShift(
+    roster[rosterKey(staffId, daysArray[dayIndex - 1])] || ''
+  );
 }
 
 function countConsecutiveWorkDaysBefore(
@@ -505,6 +561,12 @@ function candidateScore(args: {
 
   let score = stat.total * 100;
 
+  // กระจายรอบหยุดของแต่ละคนให้เหลื่อมกันตาม block 2–4 วัน
+  // เป็น Soft Rule เพื่อให้ยังเติมอัตรากำลังได้เมื่อจำเป็น
+  if (isPreferredRotatingOffDay(staff, dayIndex)) {
+    score += 1700;
+  }
+
   // Balance รายเวร
   if (shift === 'ช') {
     score += stat.morning * 20;
@@ -526,7 +588,7 @@ function candidateScore(args: {
 
   // พยายามจัด shift เดิมเป็น block ให้ครบขั้นต่ำก่อนเปลี่ยน
   if (sameShiftBlock > 0 && sameShiftBlock < blockMin) {
-    score -= 300;
+    score -= 2200;
   }
 
   // หลังถึง block max ไม่ควรต่อ shift เดิม
@@ -534,7 +596,22 @@ function candidateScore(args: {
     score += 900;
   }
 
-  // พยายามพักหลังทำงานติด 3–5 วัน
+  // หลังหยุดให้เริ่ม block ใหม่ด้วยเวรอื่น ไม่หมุนกลับเวรเดิมทันที
+  if (
+    isStartingNewBlock(staff.id, dayIndex, daysArray, roster) &&
+    getLastWorkedShiftsBefore(
+      staff.id,
+      dayIndex,
+      daysArray,
+      roster,
+      previousDayRoster
+    ).includes(shift)
+  ) {
+    score += 1800;
+  }
+
+  // อนุญาตให้แต่ละคนมี block ต่างกัน 2, 3 หรือ 4 วัน
+  // แล้วเพิ่มน้ำหนักให้พักตามภาระและความพร้อมของอัตรากำลัง
   if (consecutiveDays >= preferredRestAfterDays + 1) {
     score += 1600;
   } else if (consecutiveDays >= preferredRestAfterDays) {
@@ -599,7 +676,8 @@ function canAssignSingleShift(args: {
 
   if (
     preserveExisting &&
-    currentCode.trim() !== ''
+    !isBlankRosterCode(currentCode) &&
+    !isPureOff(currentCode)
   ) {
     return false;
   }
@@ -720,7 +798,17 @@ function addOffCredits(
 
   if (requiredOffDays <= 0) return;
 
-  rnStaff.forEach((staff) => {
+  const offLoadByDay = new Map<string, number>();
+  daysArray.forEach((day) => {
+    offLoadByDay.set(
+      day,
+      rnStaff.filter((staff) =>
+        hasOffCredit(roster[rosterKey(staff.id, day)])
+      ).length
+    );
+  });
+
+  rnStaff.forEach((staff, staffIndex) => {
     let actualOffDays = daysArray.filter((day) =>
       isPureOff(roster[rosterKey(staff.id, day)])
     ).length;
@@ -767,6 +855,22 @@ function addOffCredits(
       .filter(({ code }) => {
         const shifts = parseShift(code);
         return shifts.length === 1 && !hasOffCredit(code);
+      })
+      .sort((a, b) => {
+        const loadDifference =
+          (offLoadByDay.get(a.day) || 0) -
+          (offLoadByDay.get(b.day) || 0);
+
+        if (loadDifference !== 0) return loadDifference;
+
+        const aIndex = daysArray.indexOf(a.day);
+        const bIndex = daysArray.indexOf(b.day);
+        const rotationStart = staffIndex % Math.max(1, daysArray.length);
+
+        return (
+          ((aIndex - rotationStart + daysArray.length) % daysArray.length) -
+          ((bIndex - rotationStart + daysArray.length) % daysArray.length)
+        );
       });
 
     for (const item of candidates) {
@@ -778,6 +882,11 @@ function addOffCredits(
 
       const shift = shifts[0];
       roster[rosterKey(staff.id, item.day)] = `${shift}/0`;
+
+      offLoadByDay.set(
+        item.day,
+        (offLoadByDay.get(item.day) || 0) + 1
+      );
 
       needed -= 1;
       offCreditDays += 1;
@@ -886,24 +995,43 @@ function supportCandidateScore(args: {
     roster
   );
 
-  const preferredRestAfterDays =
-    requirements.preferredRestAfterDays ?? 3;
+  const preferredRestAfterDays = 3;
 
-  const blockMin = blockMinForShift(shift, requirements);
-  const blockMax = blockMaxForShift(shift, requirements);
+  // บุคลากรสนับสนุนตัดเวรชนิดเดิมเป็น block 2–4 วัน
+  const blockMin = 2;
+  const blockMax = 4;
 
   let score = stat.total * 100;
+
+  // ใช้รอบหยุด 2–4 วันคนละ phase เพื่อไม่ให้หยุดพร้อมกันทั้งกลุ่ม
+  if (isPreferredRotatingOffDay(staff, dayIndex)) {
+    score += 1700;
+  }
 
   if (shift === 'ช') score += stat.morning * 20;
   if (shift === 'บ') score += stat.evening * 25;
   if (shift === 'ด') score += stat.night * 30;
 
   if (sameShiftBlock > 0 && sameShiftBlock < blockMin) {
-    score -= 250;
+    score -= 1800;
   }
 
   if (sameShiftBlock >= blockMax) {
     score += 700;
+  }
+
+  // หลังหยุดให้หมุนไปเวรอื่นก่อน ลดการจัด block ซ้ำแบบเดิม
+  if (
+    isStartingNewBlock(staff.id, dayIndex, daysArray, roster) &&
+    getLastWorkedShiftsBefore(
+      staff.id,
+      dayIndex,
+      daysArray,
+      roster,
+      previousDayRoster
+    ).includes(shift)
+  ) {
+    score += 1500;
   }
 
   if (consecutiveDays >= preferredRestAfterDays + 1) {
@@ -958,7 +1086,8 @@ function canAssignSupportSingleShift(args: {
 
   if (
     preserveExisting &&
-    currentCode.trim() !== ''
+    !isBlankRosterCode(currentCode) &&
+    !isPureOff(currentCode)
   ) {
     return false;
   }
@@ -1080,7 +1209,7 @@ function scheduleSupportRole(args: {
       );
 
       while (staffInShift.length < required) {
-        const candidates = autoRoleStaff
+        let candidates = autoRoleStaff
           .filter((staff) =>
             canAssignSupportSingleShift({
               staff,
@@ -1095,8 +1224,35 @@ function scheduleSupportRole(args: {
               requirements,
               preserveExisting,
             })
-          )
-          .sort((a, b) => {
+          );
+
+        // รอบสำรองเพื่อเติมบุคลากรสนับสนุนให้ครบตามขั้นต่ำ
+        // แต่ยังคงเพดานทำงานไม่เกิน 4 วัน, OFF และดึกไม่เกิน 2 วัน
+        if (candidates.length === 0) {
+          candidates = autoRoleStaff.filter((staff) =>
+            canAssignSupportSingleShift({
+              staff,
+              shift,
+              day,
+              dayIndex,
+              daysArray,
+              roster,
+              previousDayRoster,
+              approvedDayOffKeys,
+              selectedMonth,
+              requirements: {
+                ...requirements,
+                maxConsecutiveWorkDays: Math.max(
+                  4,
+                  requirements.maxConsecutiveWorkDays ?? 3
+                ),
+              },
+              preserveExisting,
+            })
+          );
+        }
+
+        candidates.sort((a, b) => {
             const scoreA = supportCandidateScore({
               staff: a,
               shift,
@@ -1141,6 +1297,161 @@ function scheduleSupportRole(args: {
         );
       }
 
+    });
+  });
+
+  // รอบเวรควบสำหรับ PN / NA / พนง. ใช้กติกาเดียวกับพยาบาล
+  // อนุญาตเฉพาะ ช/บ และ ช/ด, ห้าม บ/ด
+  if (requirements.allowDoubleShift ?? true) {
+    daysArray.forEach((day, dayIndex) => {
+      SHIFT_ORDER.forEach((shift) => {
+        const required = supportRequirementForShift(
+          role,
+          shift,
+          requirements
+        );
+
+        if (required <= 0) return;
+
+        let staffInShift = getStaffInShift(
+          allRoleStaff,
+          roster,
+          day,
+          shift
+        );
+
+        while (staffInShift.length < required) {
+          const candidates = autoRoleStaff
+            .map((staff) => {
+              const key = rosterKey(staff.id, day);
+              const currentCode = roster[key] || '';
+
+              if (
+                approvedDayOffKeys.has(
+                  dayOffKey(staff.id, selectedMonth, day)
+                ) ||
+                isProtectedNonWorkCode(currentCode) ||
+                getShiftCount(currentCode) !== 1
+              ) {
+                return null;
+              }
+
+              const doubleCode = getAllowedDoubleCode(
+                currentCode,
+                shift
+              );
+
+              if (!doubleCode) return null;
+
+              // ช/บ ห้ามติดกันสองวัน
+              if (doubleCode === 'ช/บ' && dayIndex > 0) {
+                const previousShifts = parseShift(
+                  roster[
+                    rosterKey(staff.id, daysArray[dayIndex - 1])
+                  ] || ''
+                );
+
+                if (
+                  previousShifts.includes('ช') &&
+                  previousShifts.includes('บ')
+                ) {
+                  return null;
+                }
+              }
+
+              if (
+                wouldCreateNightToMorning(
+                  staff.id,
+                  dayIndex,
+                  shift,
+                  daysArray,
+                  roster,
+                  previousDayRoster
+                )
+              ) {
+                return null;
+              }
+
+              if (
+                shift === 'ด' &&
+                countConsecutiveNightBefore(
+                  staff.id,
+                  dayIndex,
+                  daysArray,
+                  roster,
+                  previousDayRoster
+                ) >= (requirements.maxConsecutiveNightShifts ?? 2)
+              ) {
+                return null;
+              }
+
+              const stat = stats.get(String(staff.id)) || {
+                total: 0,
+                morning: 0,
+                evening: 0,
+                night: 0,
+                doubleShiftDays: 0,
+              };
+
+              return {
+                staff,
+                doubleCode,
+                score:
+                  stat.total * 100 +
+                  stat.doubleShiftDays * 600 +
+                  (shift === 'บ' ? stat.evening * 30 : 0) +
+                  (shift === 'ด' ? stat.night * 35 : 0),
+              };
+            })
+            .filter(
+              (
+                item
+              ): item is {
+                staff: SchedulerStaff;
+                doubleCode: string;
+                score: number;
+              } => item !== null
+            )
+            .sort((a, b) => a.score - b.score);
+
+          const selected = candidates[0];
+          if (!selected) break;
+
+          const key = rosterKey(selected.staff.id, day);
+          roster[key] = selected.doubleCode;
+          addStat(selected.staff.id, shift, stats, true);
+
+          warnings.push({
+            day,
+            shift,
+            type: 'DOUBLE_SHIFT_USED',
+            message:
+              `วันที่ ${Number(day)} ${selected.staff.full_name}: ` +
+              `ใช้เวรควบ ${selected.doubleCode}`,
+          });
+
+          staffInShift = getStaffInShift(
+            allRoleStaff,
+            roster,
+            day,
+            shift
+          );
+        }
+      });
+    });
+  }
+
+  // ตรวจขาดหลังจบรอบ single shift และเวรควบแล้วเท่านั้น
+  daysArray.forEach((day) => {
+    SHIFT_ORDER.forEach((shift) => {
+      const required = supportRequirementForShift(
+        role,
+        shift,
+        requirements
+      );
+
+      if (required <= 0) return;
+
       const finalStaffInShift = getStaffInShift(
         allRoleStaff,
         roster,
@@ -1172,11 +1483,19 @@ function scheduleSupportRole(args: {
     daysArray.forEach((day) => {
       const key = rosterKey(staff.id, day);
 
-      if (!roster[key] || roster[key].trim() === '') {
+      if (isBlankRosterCode(roster[key])) {
         roster[key] = '0';
       }
     });
   });
+
+  addOffCredits(
+    autoRoleStaff,
+    daysArray,
+    roster,
+    requirements,
+    warnings
+  );
 }
 
 export function generateAutoSchedule(
@@ -1264,7 +1583,7 @@ export function generateAutoSchedule(
         const needsLeader =
           leaderCount < requirements.leaderPerShift;
 
-        const candidates = (shouldScheduleNurse ? autoRnStaff : [])
+        let candidates = (shouldScheduleNurse ? autoRnStaff : [])
           .filter((staff) =>
             canAssignSingleShift({
               staff,
@@ -1279,8 +1598,37 @@ export function generateAutoSchedule(
               requirements,
               preserveExisting,
             })
-          )
-          .sort((a, b) => {
+          );
+
+        // รอบสำรอง: หาก block 2–4 วันและการพักทำให้กำลังขาด
+        // ยังคงเพดานไม่เกิน 4 วัน, OFF, ดึกไม่เกิน 2 วัน
+        // และข้อห้ามดึกต่อเช้าทั้งหมดไว้
+        if (candidates.length === 0) {
+          candidates = (shouldScheduleNurse ? autoRnStaff : [])
+            .filter((staff) =>
+              canAssignSingleShift({
+                staff,
+                shift,
+                day,
+                dayIndex,
+                daysArray,
+                roster,
+                previousDayRoster,
+                approvedDayOffKeys,
+                selectedMonth,
+                requirements: {
+                  ...requirements,
+                  maxConsecutiveWorkDays: Math.max(
+                    4,
+                    requirements.maxConsecutiveWorkDays ?? 3
+                  ),
+                },
+                preserveExisting,
+              })
+            );
+        }
+
+        candidates.sort((a, b) => {
             const scoreA = candidateScore({
               staff: a,
               shift,
@@ -1385,6 +1733,25 @@ export function generateAutoSchedule(
                 getAllowedDoubleCode(currentCode, shift);
 
               if (!doubleCode) return null;
+
+              // ช/บ ห้ามจัดติดกันสองวันในบุคลากรคนเดียวกัน
+              if (doubleCode === 'ช/บ' && dayIndex > 0) {
+                const previousShifts = parseShift(
+                  roster[
+                    rosterKey(
+                      staff.id,
+                      daysArray[dayIndex - 1]
+                    )
+                  ] || ''
+                );
+
+                if (
+                  previousShifts.includes('ช') &&
+                  previousShifts.includes('บ')
+                ) {
+                  return null;
+                }
+              }
 
               // ไม่ให้สร้าง ด -> ช ผ่านเวรควบ
               if (
@@ -1507,7 +1874,7 @@ export function generateAutoSchedule(
       daysArray.forEach((day) => {
         const key = rosterKey(staff.id, day);
 
-        if (!roster[key] || roster[key].trim() === '') {
+        if (isBlankRosterCode(roster[key])) {
           roster[key] = '0';
         }
       });

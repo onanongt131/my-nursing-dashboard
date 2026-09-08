@@ -469,7 +469,8 @@ export default function StaffingSchedulePage() {
       ...prev,
       [`${staffId}_${day}`]: value,
     }));
-    setHasValidated(false);
+    // คงพื้นที่ผลตรวจไว้ระหว่าง debounce เพื่อไม่ให้ตารางเด้งขึ้น-ลง
+    // useEffect ด้านล่างจะคำนวณและแทนค่าผลตรวจใหม่ภายใน 120 ms
   };
 
   // ฟังก์ชันนำเข้า Excel ชีทเดียว กรองเฉพาะแถวข้อมูลพยาบาลตัวจริง
@@ -677,9 +678,20 @@ export default function StaffingSchedulePage() {
     seniorPerShift: requiredSenior,
     leaderPerShift: requiredLeader,
 
-    maxConsecutiveWorkDays: 5,
+    // ล็อกเวรแบบยืดหยุ่นรายคน 2–4 วัน แล้วพัก เพื่อเติมกำลังให้ครบมากขึ้น
+    maxConsecutiveWorkDays: 4,
     preferredRestAfterDays: 3,
     maxConsecutiveNightShifts: 2,
+    morningBlockMin: 2,
+    morningBlockMax: 4,
+    eveningBlockMin: 2,
+    eveningBlockMax: 4,
+    nightBlockMin: 1,
+    nightBlockMax: 2,
+    requiredOffDays: daysArray.filter((day) => isHoliday(day)).length,
+    minActualOffDays: 4,
+    allowDoubleShift: true,
+    allowShiftOffCredit: true,
 
     morningPn: pnStaffingRequirement.ช,
     eveningPn: pnStaffingRequirement.บ,
@@ -715,7 +727,8 @@ if (staffView !== 'support') {
       code.includes('ป่วย') ||
       code.includes('คลอด') ||
       code.includes('ฉพท') ||
-      code.includes('VAC')
+      code.includes('VAC') ||
+      code.includes('ปช')
     );
   };
 
@@ -744,7 +757,74 @@ if (staffView !== 'support') {
   });
 }
 
-// 5. แสดง Preview
+// 5. ปรับจำนวนสิทธิวันหยุด (0) ให้เท่าจำนวนวันหยุดจริงของเดือน
+// ไม่เติม 0 ให้ทุกวันหยุดซ้ำกับที่ autoScheduler จัดไว้แล้ว
+// คำขอหยุดที่อนุมัติจะถูกสงวนไว้เสมอ และเติม/ตัดเฉพาะส่วนที่เหลือ
+const requiredOffDays = daysArray.filter((day) => isHoliday(day)).length;
+
+staffList.forEach((staff) => {
+  const getTokens = (day: string) =>
+    String(rosterWithFixedHw[`${staff.id}_${day}`] || '')
+      .toUpperCase()
+      .replace(/\s+/g, '')
+      .split('/')
+      .filter(Boolean);
+
+  const approvedDays = new Set(
+    daysArray.filter((day) =>
+      approvedDayOffKeys.has(`${staff.id}_${selectedMonth}-${day}`)
+    )
+  );
+
+  let offDays = daysArray.filter((day) => getTokens(day).includes('0'));
+  const targetOffDays = Math.max(requiredOffDays, approvedDays.size);
+
+  // ตัด 0 ส่วนเกินจากช่องเวร/0 ก่อน เพื่อไม่ทำให้เวรที่จัดไว้หายไป
+  // จากนั้นจึงตัด 0 ที่ไม่ใช่คำขออนุมัติ หากยังเกินเป้าหมาย
+  if (offDays.length > targetOffDays) {
+    const removableDays = [...offDays]
+      .filter((day) => !approvedDays.has(day))
+      .sort((a, b) => {
+        const aHasWork = parseShift(rosterWithFixedHw[`${staff.id}_${a}`] || '').length > 0;
+        const bHasWork = parseShift(rosterWithFixedHw[`${staff.id}_${b}`] || '').length > 0;
+        return Number(bHasWork) - Number(aHasWork);
+      });
+
+    let excess = offDays.length - targetOffDays;
+    removableDays.forEach((day) => {
+      if (excess <= 0) return;
+
+      const cellKey = `${staff.id}_${day}`;
+      const remainingTokens = getTokens(day).filter((token) => token !== '0');
+      rosterWithFixedHw[cellKey] = remainingTokens.join('/');
+      excess -= 1;
+    });
+  }
+
+  offDays = daysArray.filter((day) => getTokens(day).includes('0'));
+
+  // เติมเฉพาะจำนวนที่ขาด โดยเลือกวันหยุดปฏิทินก่อน
+  if (offDays.length < targetOffDays) {
+    const candidateDays = [
+      ...daysArray.filter((day) => isHoliday(day) && !getTokens(day).includes('0')),
+      ...daysArray.filter((day) => !isHoliday(day) && !getTokens(day).includes('0')),
+    ];
+
+    let missing = targetOffDays - offDays.length;
+    candidateDays.forEach((day) => {
+      if (missing <= 0) return;
+
+      const cellKey = `${staff.id}_${day}`;
+      const currentValue = String(rosterWithFixedHw[cellKey] || '').trim();
+      rosterWithFixedHw[cellKey] = currentValue
+      ? `${currentValue}/0`
+      : '0';
+      missing -= 1;
+    });
+  }
+});
+
+// 6. แสดง Preview
 setRosterData(rosterWithFixedHw);
 
 setAutoScheduleWarnings(
@@ -2198,6 +2278,10 @@ setHasValidated(false);
         'รายชื่อบุคลากร',
         'ตำแหน่ง',
         ...daysArray,
+        'วันหยุด',
+        'บ',
+        'ด',
+        'OT',
       ],
       ...exportStaff.map((staff) => [
         staff.full_name || '',
@@ -2206,6 +2290,10 @@ setHasValidated(false);
           (day) =>
             rosterData[`${staff.id}_${day}`] || ''
         ),
+        countOffBalance(staff.id),
+        countShiftBalance(staff.id, 'บ'),
+        countShiftBalance(staff.id, 'ด'),
+        countOtBalance(staff.id),
       ]),
     ];
 
@@ -2216,6 +2304,10 @@ setHasValidated(false);
       { wch: 30 },
       { wch: 10 },
       ...daysArray.map(() => ({ wch: 5 })),
+      { wch: 9 },
+      { wch: 5 },
+      { wch: 5 },
+      { wch: 5 },
     ];
 
     // Freeze หัวตาราง/ชื่อบุคลากรไว้ (Excel ที่รองรับจะใช้งานได้)
@@ -2275,6 +2367,47 @@ setHasValidated(false);
   ).length;
 
   const supportCount = staffList.length - nurseCount;
+
+  const getRosterShifts = (staffId: number | string, day: string) =>
+    parseShift(rosterData[`${staffId}_${day}`] || '');
+
+  // วันหยุด = นับทุกวันที่รหัสเวรมี token 0 เช่น 0, ช/0, บ/0, ด/0
+  const countOffBalance = (staffId: number | string) =>
+    daysArray.reduce((total, day) => {
+      const tokens = String(rosterData[`${staffId}_${day}`] || '')
+        .trim()
+        .toUpperCase()
+        .replace(/\s+/g, '')
+        .split('/')
+        .filter(Boolean);
+
+      return total + (tokens.includes('0') ? 1 : 0);
+    }, 0);
+
+  // OT = นับวันที่มีรหัสควบทั้งหมด รวม ช/0, บ/0, ด/0
+  // ต้องมีเวรทำงานอย่างน้อย 1 เวร จึงไม่นับรหัสลา/0 หรือ F/0 เป็น OT
+  const countOtBalance = (staffId: number | string) =>
+    daysArray.reduce((total, day) => {
+      const rawCode = String(rosterData[`${staffId}_${day}`] || '')
+        .trim()
+        .toUpperCase()
+        .replace(/\s+/g, '');
+      const tokens = rawCode.split('/').filter(Boolean);
+      const hasWorkShift = getRosterShifts(staffId, day).length > 0;
+      const isCombinedDuty = tokens.length >= 2 && hasWorkShift;
+
+      return total + (isCombinedDuty ? 1 : 0);
+    }, 0);
+
+  const countShiftBalance = (
+    staffId: number | string,
+    shift: WorkShift
+  ) =>
+    daysArray.reduce(
+      (total, day) =>
+        total + (getRosterShifts(staffId, day).includes(shift) ? 1 : 0),
+      0
+    );
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 pt-0 px-4 pb-6 space-y-4 font-sans">
@@ -2446,15 +2579,6 @@ setHasValidated(false);
               >
                 ตั้งค่ากติกา
               </a>
-
-              {userProfile?.role === 'admin' && (
-                <a
-                  href="/dashboard/staffing/holidays"
-                  className="h-9 inline-flex items-center bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-300 px-3 rounded-xl text-[11px] font-bold transition"
-                >
-                  จัดการวันหยุด
-                </a>
-              )}
             </>
           )}
 
@@ -2693,11 +2817,32 @@ setHasValidated(false);
       {/* ตารางเมทริกซ์รายชื่อพยาบาลและวันในเดือน */}
       <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
         <div className="overflow-x-auto max-h-[700px]">
-          <table className="w-full border-collapse text-xs text-center table-fixed">
+          <table
+            className="border-collapse text-xs text-center table-fixed"
+            style={{
+              width: '100%',
+              minWidth: 0,
+              tableLayout: 'fixed',
+            }}
+          >
+            <colgroup>
+              <col style={{ width: '9%' }} />
+              <col style={{ width: '3%' }} />
+              {daysArray.map((day) => (
+                <col
+                  key={`day-col-${day}`}
+                  style={{ width: `${81 / daysInMonth}%` }}
+                />
+              ))}
+              <col style={{ width: '2%' }} />
+              <col style={{ width: '1.5%' }} />
+              <col style={{ width: '1.5%' }} />
+              <col style={{ width: '2%' }} />
+            </colgroup>
             <thead className="bg-slate-100 text-slate-800 font-extrabold uppercase text-[10px] sticky top-0 z-10 shadow-sm">
               <tr>
-                <th className="w-[160px] px-2 py-3 border-r border-slate-300 text-left bg-slate-100">รายชื่อบุคลากร</th>
-                <th className="w-[70px] px-1 py-3 border-r border-slate-300 text-center bg-slate-100">ตำแหน่ง</th>
+                <th className="px-1 py-1.5 border-r border-slate-300 text-left bg-slate-100 text-[9px] truncate">รายชื่อบุคลากร</th>
+                <th className="px-0 py-1.5 border-r border-slate-300 text-center bg-slate-100 text-[8px] truncate">ตำแหน่ง</th>
                 {daysArray.map((day) => {
                   const weekend = isWeekend(day);
                   const holidayName = getHolidayName(day);
@@ -2714,13 +2859,13 @@ setHasValidated(false);
                           );
                         }
                       }}
-                      className={`px-0 py-2.5 border-r border-slate-200 transition select-none ${
+                      className={`px-0 py-1.5 border-r border-slate-200 text-[9px] overflow-hidden transition select-none ${
                         hasProblem
                           ? isSelected
                             ? 'bg-rose-600 text-white cursor-pointer'
                             : 'bg-rose-100 text-rose-700 cursor-pointer hover:bg-rose-200'
                           : holidayName
-                          ? 'bg-rose-100 text-rose-800'
+                          ? 'bg-amber-100 text-amber-900'
                           : weekend
                           ? 'bg-amber-100 text-amber-900'
                           : 'bg-slate-100'
@@ -2757,26 +2902,38 @@ setHasValidated(false);
                     </th>
                   );
                 })}
+                <th title="จำนวนวันหยุด" className="overflow-hidden border-l-2 border-slate-300 bg-slate-200 px-0 py-1 text-[8px] text-slate-800">
+                  0
+                </th>
+                <th className="overflow-hidden border-l border-slate-200 bg-amber-100 px-0 py-1 text-[8px] text-amber-900">
+                  บ
+                </th>
+                <th className="overflow-hidden border-l border-slate-200 bg-purple-100 px-0 py-1 text-[8px] text-purple-900">
+                  ด
+                </th>
+                <th className="overflow-hidden border-l border-slate-200 bg-violet-100 px-0 py-1 text-[7px] text-violet-900">
+                  OT
+                </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-slate-200">
               {loading ? (
                 <tr>
-                  <td colSpan={daysInMonth + 2} className="py-12 text-slate-500 font-medium">กำลังโหลดข้อมูลตารางเวร...</td>
+                  <td colSpan={daysInMonth + 6} className="py-12 text-slate-500 font-medium">กำลังโหลดข้อมูลตารางเวร...</td>
                 </tr>
               ) : filteredStaffList.length === 0 ? (
                 <tr>
-                  <td colSpan={daysInMonth + 2} className="py-12 text-slate-400 font-medium">
+                  <td colSpan={daysInMonth + 6} className="py-12 text-slate-400 font-medium">
                     ไม่พบบุคลากรในกลุ่มที่เลือก
                   </td>
                 </tr>
               ) : (
                 filteredStaffList.map((staff) => (
                   <tr key={staff.id} className="hover:bg-slate-50/80 transition">
-                    <td className="px-2 py-2 border-r border-slate-200 text-left font-bold text-slate-700 truncate bg-slate-50/40">
+                    <td title={staff.full_name} className="px-1 py-1 border-r border-slate-200 text-left text-[9px] font-bold text-slate-700 truncate bg-slate-50/40">
                       {staff.full_name}
                     </td>
-                    <td className="px-1 py-2 border-r border-slate-200 text-center text-slate-500 font-semibold bg-slate-50/40 text-[11px]">
+                    <td className="px-0 py-1 border-r border-slate-200 text-center text-slate-500 font-semibold bg-slate-50/40 text-[8px] overflow-hidden">
                       {staff.position || '-'}
                     </td>
                     {daysArray.map((day) => {
@@ -2784,7 +2941,7 @@ setHasValidated(false);
                       const currentShift = rosterData[cellKey] || '';
                       const holiday = isHoliday(day);
                       return (
-                        <td key={day} className={`px-0.5 py-1 border-r border-slate-200 ${holiday ? 'bg-amber-50/40' : ''}`}>
+                        <td key={day} className={`min-w-0 overflow-hidden px-px py-0.5 border-r border-slate-200 ${holiday ? 'bg-amber-50/40' : ''}`}>
                           <input
                             type="text"
                             maxLength={8}
@@ -2796,7 +2953,7 @@ setHasValidated(false);
                               }
                             }}
                             placeholder="-"
-                            className={`w-full text-center py-1 text-[11px] rounded border uppercase focus:outline-none focus:ring-1 transition ${
+                            className={`w-full text-center px-0 py-0.5 text-[8px] leading-4 rounded border uppercase focus:outline-none focus:ring-1 transition ${
                               invalidSequenceCellKeys.has(cellKey)
                                 ? 'bg-rose-100 text-rose-900 border-rose-500 ring-1 ring-rose-400 font-extrabold'
                                 : getShiftBadgeStyle(currentShift)
@@ -2821,6 +2978,18 @@ setHasValidated(false);
                         </td>
                       );
                     })}
+                    <td title="จำนวนวันหยุด" className="overflow-hidden border-l-2 border-slate-300 bg-slate-100 px-0 py-1 text-center text-[8px] font-extrabold text-slate-700">
+                      {countOffBalance(staff.id)}
+                    </td>
+                    <td className="overflow-hidden border-l border-slate-200 bg-amber-50 px-0 py-1 text-center text-[8px] font-bold text-amber-800">
+                      {countShiftBalance(staff.id, 'บ')}
+                    </td>
+                    <td className="overflow-hidden border-l border-slate-200 bg-purple-50 px-0 py-1 text-center text-[8px] font-bold text-purple-800">
+                      {countShiftBalance(staff.id, 'ด')}
+                    </td>
+                    <td className="overflow-hidden border-l border-slate-200 bg-violet-50 px-0 py-1 text-center text-[8px] font-extrabold text-violet-800">
+                      {countOtBalance(staff.id)}
+                    </td>
                   </tr>
                 ))
               )}

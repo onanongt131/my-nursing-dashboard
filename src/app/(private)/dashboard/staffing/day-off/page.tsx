@@ -141,6 +141,9 @@ export default function StaffingDayOffPage() {
   const [requests, setRequests] = useState<DayOffRequest[]>([]);
   const [capacityRules, setCapacityRules] = useState<DayOffCapacityRule[]>([]);
   const [calendarUsage, setCalendarUsage] = useState<DayOffUsage>({});
+  const [officialHolidayDates, setOfficialHolidayDates] = useState<Set<string>>(
+    new Set()
+  );
 
   const [selectedStaffId, setSelectedStaffId] = useState<number | string>('');
   const [requestStartDate, setRequestStartDate] = useState('');
@@ -154,6 +157,8 @@ export default function StaffingDayOffPage() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
+  const [viewMode, setViewMode] = useState<'calendar' | 'list'>('calendar');
+  const [selectedCalendarDate, setSelectedCalendarDate] = useState<string | null>(null);
 
   // อ่านผู้ใช้ปัจจุบันจาก NextAuth session API
   useEffect(() => {
@@ -508,6 +513,88 @@ export default function StaffingDayOffPage() {
     return new Map(staffList.map((staff) => [Number(staff.id), staff]));
   }, [staffList]);
 
+  const sortedRequests = useMemo(() => {
+    const statusPriority: Record<DayOffStatus, number> = {
+      pending: 0,
+      approved: 1,
+      rejected: 2,
+    };
+
+    return [...requests].sort((a, b) => {
+      const statusDiff = statusPriority[a.status] - statusPriority[b.status];
+      if (statusDiff !== 0) return statusDiff;
+
+      const dateDiff = a.request_date.localeCompare(b.request_date);
+      if (dateDiff !== 0) return dateDiff;
+
+      return (a.created_at || '').localeCompare(b.created_at || '');
+    });
+  }, [requests]);
+
+  const requestsByDate = useMemo(() => {
+    const grouped = new Map<string, DayOffRequest[]>();
+    requests.forEach((request) => {
+      const current = grouped.get(request.request_date) || [];
+      current.push(request);
+      grouped.set(request.request_date, current);
+    });
+    grouped.forEach((items) => {
+      items.sort((a, b) => {
+        const priority: Record<DayOffStatus, number> = {
+          pending: 0,
+          approved: 1,
+          rejected: 2,
+        };
+        return priority[a.status] - priority[b.status];
+      });
+    });
+    return grouped;
+  }, [requests]);
+
+  const displayCalendarDays = useMemo(
+    () => getCalendarDays(selectedMonth),
+    [selectedMonth]
+  );
+
+  useEffect(() => {
+    async function loadOfficialHolidays() {
+      const { data, error } = await supabase
+        .from('staffing_holidays')
+        .select('*');
+
+      if (error) {
+        console.error('Load staffing holidays error:', error);
+        setOfficialHolidayDates(new Set());
+        return;
+      }
+
+      const dates = new Set<string>();
+      (data || []).forEach((item: any) => {
+        // รองรับทั้งชื่อคอลัมน์ holiday_date และ date
+        const holidayDate = item.holiday_date ?? item.date;
+        if (
+          typeof holidayDate === 'string' &&
+          holidayDate.slice(0, 7) === selectedMonth
+        ) {
+          dates.add(holidayDate.slice(0, 10));
+        }
+      });
+      setOfficialHolidayDates(dates);
+    }
+
+    loadOfficialHolidays();
+  }, [supabase, selectedMonth]);
+
+  const isOfficialDayOff = (date: string) => {
+    const dayOfWeek = new Date(`${date}T00:00:00`).getDay();
+    return dayOfWeek === 0 || dayOfWeek === 6 || officialHolidayDates.has(date);
+  };
+
+  const selectedDateRequests = useMemo(() => {
+    if (!selectedCalendarDate) return [];
+    return requestsByDate.get(selectedCalendarDate) || [];
+  }, [requestsByDate, selectedCalendarDate]);
+
   const selectedStaff = useMemo(
     () => staffList.find((staff) => Number(staff.id) === Number(selectedStaffId)),
     [staffList, selectedStaffId]
@@ -836,20 +923,18 @@ export default function StaffingDayOffPage() {
       <div className="max-w-6xl mx-auto space-y-4">
         {/* Header */}
         <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5">
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-3">
-                <h1 className="text-xl font-bold text-slate-900">ขอหยุด</h1>
+          <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+              <h1 className="text-xl font-bold text-slate-900">ขอหยุด</h1>
 
-                <a
-                  href="/dashboard/staffing/schedule"
-                  className="text-xs px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg"
-                >
-                  ← กลับหน้าตารางเวร
-                </a>
-              </div>
+              <a
+                href="/dashboard/staffing/schedule"
+                className="text-xs px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg"
+              >
+                ← กลับหน้าตารางเวร
+              </a>
 
-              <p className="text-xs text-slate-500 mt-1">
+              <p className="text-xs text-slate-500">
                 บันทึกและอนุมัติคำขอหยุดก่อนจัดตารางเวร โดยกำหนดโควตาตามหน่วยงานและช่วงวันที่
               </p>
 
@@ -910,8 +995,6 @@ export default function StaffingDayOffPage() {
         {/* Request form */}
         {canCreateRequest && (
           <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5">
-            <h2 className="font-bold text-slate-900 mb-4">เพิ่มคำขอหยุด</h2>
-
             {isStaffRole && (
               <div
                 className={`mb-4 rounded-xl border px-4 py-3 text-xs font-semibold ${
@@ -926,8 +1009,12 @@ export default function StaffingDayOffPage() {
               </div>
             )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-12 gap-4 items-end">
-              <div className="xl:col-span-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-[1.35fr_2.8fr_2.8fr_2.8fr_1.45fr] gap-4 items-end">
+              <div className="xl:self-center">
+                <h2 className="font-bold text-slate-900">เพิ่มคำขอหยุด</h2>
+              </div>
+
+              <div>
                 <label className="text-xs font-bold text-slate-600">
                   บุคลากร
                 </label>
@@ -946,7 +1033,7 @@ export default function StaffingDayOffPage() {
                 </select>
               </div>
 
-              <div className="xl:col-span-4 relative">
+              <div className="relative">
                 <label className="text-xs font-bold text-slate-600">
                   วันที่ขอหยุด
                 </label>
@@ -1081,7 +1168,7 @@ export default function StaffingDayOffPage() {
                 )}
               </div>
 
-              <div className="xl:col-span-3">
+              <div>
                 <label className="text-xs font-bold text-slate-600">
                   หมายเหตุ
                 </label>
@@ -1099,7 +1186,7 @@ export default function StaffingDayOffPage() {
                 />
               </div>
 
-              <div className="xl:col-span-2">
+              <div>
                 <button
                   onClick={handleCreateRequest}
                   disabled={
@@ -1108,7 +1195,7 @@ export default function StaffingDayOffPage() {
                     !requestStartDate ||
                     !canStaffSubmitRequest
                   }
-                  className="w-full bg-emerald-700 hover:bg-emerald-800 text-white px-5 py-2 rounded-xl text-sm font-bold disabled:opacity-50"
+                  className="w-full min-h-10 whitespace-nowrap bg-emerald-700 hover:bg-emerald-800 text-white px-3 py-2 rounded-xl text-xs font-bold disabled:opacity-50"
                 >
                   {saving
                     ? 'กำลังบันทึก...'
@@ -1121,23 +1208,165 @@ export default function StaffingDayOffPage() {
           </div>
         )}
 
-        {/* Requests list */}
+        {/* Calendar / Requests list */}
         <div className="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
-          <div className="px-5 py-4 border-b border-slate-200 flex items-center justify-between gap-3">
+          <div className="px-5 py-4 border-b border-slate-200 grid grid-cols-1 xl:grid-cols-[1fr_auto_1fr] xl:items-center gap-4">
             <div>
               <h2 className="font-bold text-slate-900">รายการคำขอหยุด</h2>
               <p className="text-xs text-slate-500 mt-1">
-                ทั้งหมด {requests.length} รายการ
+                ทั้งหมด {requests.length} รายการ • รออนุมัติ{' '}
+                {requests.filter((item) => item.status === 'pending').length} รายการ
               </p>
             </div>
 
-            {!canApproveRequest && (
-              <span className="text-xs px-3 py-1.5 rounded-lg bg-blue-50 text-blue-700 border border-blue-200 font-semibold">
-                เพิ่มคำขอได้ • รอหัวหน้าอนุมัติ
+            <div className="flex flex-wrap items-center justify-center gap-2 text-[11px] font-semibold">
+              <span className="rounded-full bg-amber-50 px-2.5 py-1 text-amber-700">● รออนุมัติ</span>
+              <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-emerald-700">● อนุมัติ</span>
+              <span className="rounded-full bg-rose-50 px-2.5 py-1 text-rose-700">● ไม่อนุมัติ</span>
+              <span className="inline-flex items-center gap-1 rounded-full bg-slate-50 px-2.5 py-1 text-slate-600">
+                <span className="inline-block h-3 w-3 rounded-full border-2 border-rose-500" />
+                วันหยุดราชการ/เสาร์–อาทิตย์
               </span>
-            )}
+            </div>
+
+            <div className="inline-flex justify-self-start rounded-xl border border-slate-200 bg-slate-100 p-1 xl:justify-self-end">
+              <button
+                type="button"
+                onClick={() => setViewMode('calendar')}
+                className={`rounded-lg px-4 py-2 text-xs font-bold transition ${
+                  viewMode === 'calendar'
+                    ? 'bg-white text-emerald-700 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                ปฏิทิน
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectedCalendarDate(null);
+                  setViewMode('list');
+                }}
+                className={`rounded-lg px-4 py-2 text-xs font-bold transition ${
+                  viewMode === 'list'
+                    ? 'bg-white text-emerald-700 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
+              >
+                รายการ
+              </button>
+            </div>
           </div>
 
+          {viewMode === 'calendar' ? (
+            <div className="p-3 sm:p-5">
+              <div className="grid grid-cols-7 border-l border-t border-slate-200 text-center text-xs font-bold text-slate-500">
+                {['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'].map((day) => (
+                  <div key={day} className="border-b border-r border-slate-200 bg-slate-50 py-2">
+                    {day}
+                  </div>
+                ))}
+              </div>
+
+              <div className="grid grid-cols-7 border-l border-slate-200">
+                {displayCalendarDays.map((date, index) => {
+                  if (!date) {
+                    return <div key={`blank-${index}`} className="min-h-24 border-b border-r border-slate-200 bg-slate-50/60" />;
+                  }
+
+                  const dayRequests = requestsByDate.get(date) || [];
+                  const pendingCount = dayRequests.filter((item) => item.status === 'pending').length;
+                  const isSelected = selectedCalendarDate === date;
+                  const isHoliday = isOfficialDayOff(date);
+
+                  return (
+                    <button
+                      key={date}
+                      type="button"
+                      onClick={() => setSelectedCalendarDate(date)}
+                      className={`min-h-24 border-b border-r border-slate-200 p-1.5 text-left align-top transition hover:bg-emerald-50/50 ${
+                        isSelected ? 'bg-emerald-50 ring-2 ring-inset ring-emerald-500' : 'bg-white'
+                      }`}
+                    >
+                      <div className="mb-1 flex items-center justify-between">
+                        <span
+                          className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${
+                            isHoliday
+                              ? 'border-2 border-rose-500 bg-rose-50 text-rose-700'
+                              : 'text-slate-700'
+                          }`}
+                        >
+                          {Number(date.slice(-2))}
+                        </span>
+                        {pendingCount > 0 && (
+                          <span className="rounded-full bg-amber-500 px-1.5 py-0.5 text-[9px] font-bold text-white">
+                            รอ {pendingCount}
+                          </span>
+                        )}
+                      </div>
+                      <div className="space-y-1">
+                        {dayRequests.slice(0, 3).map((request) => {
+                          const staff = staffMap.get(Number(request.staff_id));
+                          return (
+                            <div
+                              key={request.id}
+                              className={`truncate rounded px-1.5 py-1 text-[9px] font-semibold ${
+                                request.status === 'approved'
+                                  ? 'bg-emerald-100 text-emerald-800'
+                                  : request.status === 'rejected'
+                                  ? 'bg-rose-100 text-rose-700'
+                                  : 'bg-amber-100 text-amber-800'
+                              }`}
+                            >
+                              {staff?.full_name || `ID ${request.staff_id}`}{staff?.position ? ` (${staff.position})` : ''}
+                            </div>
+                          );
+                        })}
+                        {dayRequests.length > 3 && (
+                          <div className="px-1 text-[9px] font-bold text-slate-500">+{dayRequests.length - 3} รายการ</div>
+                        )}
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {selectedCalendarDate && (
+                <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <h3 className="font-bold text-slate-900">
+                      {formatThaiDate(selectedCalendarDate)} • {selectedDateRequests.length} รายการ
+                    </h3>
+                    <button type="button" onClick={() => setSelectedCalendarDate(null)} className="text-xs font-semibold text-slate-500">ปิด</button>
+                  </div>
+                  {selectedDateRequests.length === 0 ? (
+                    <p className="py-4 text-center text-sm text-slate-400">ไม่มีผู้ขอหยุดในวันนี้</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {selectedDateRequests.map((request) => {
+                        const staff = staffMap.get(Number(request.staff_id));
+                        return (
+                          <div key={request.id} className="flex flex-col gap-3 rounded-xl border border-slate-200 bg-white p-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                              <p className="text-sm font-bold text-slate-800">{staff?.full_name || `Staff ID ${request.staff_id}`} <span className="font-normal text-slate-500">({staff?.position || '-'})</span></p>
+                              <p className="mt-0.5 text-xs text-slate-500">{request.note || 'ไม่มีหมายเหตุ'} • {statusLabel[request.status]}</p>
+                            </div>
+                            {(canApproveRequest || canDeleteRequest) && (
+                              <div className="flex flex-wrap gap-2">
+                                {canApproveRequest && <button onClick={() => handleUpdateStatus(request.id, 'approved')} disabled={request.status === 'approved'} className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-700 disabled:opacity-40">อนุมัติ</button>}
+                                {canApproveRequest && <button onClick={() => handleUpdateStatus(request.id, 'rejected')} disabled={request.status === 'rejected'} className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-1.5 text-xs font-bold text-rose-700 disabled:opacity-40">ไม่อนุมัติ</button>}
+                                {canDeleteRequest && <button onClick={() => handleDeleteRequest(request.id)} className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-bold text-slate-600">ลบ</button>}
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-slate-100 text-slate-700">
@@ -1171,7 +1400,7 @@ export default function StaffingDayOffPage() {
                     </td>
                   </tr>
                 ) : (
-                  requests.map((request) => {
+                  sortedRequests.map((request) => {
                     const staff = staffMap.get(Number(request.staff_id));
 
                     return (
@@ -1254,6 +1483,7 @@ export default function StaffingDayOffPage() {
               </tbody>
             </table>
           </div>
+          )}
         </div>
       </div>
     </div>

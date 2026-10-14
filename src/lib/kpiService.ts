@@ -87,9 +87,9 @@ export const getProductivityData = async (year: string) => {
   }
 
   // 3. เชื่อมข้อมูล (Client-side Join)
-  const combinedData = kpiData?.map((kpi) => {
+  const combinedData = kpiData?.map((kpi: any) => {
     // หาชื่อหน่วยงานจาก id ที่ตรงกัน
-    const dept = deptData?.find((d) => d.id === kpi.department_id);
+    const dept = deptData?.find((d: any) => d.id === kpi.department_id);
     return {
       ...kpi,
       department_name: dept ? dept.Department : 'ไม่ระบุหน่วยงาน'

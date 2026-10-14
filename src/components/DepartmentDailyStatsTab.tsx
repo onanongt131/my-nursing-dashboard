@@ -1,4 +1,3 @@
-// src/components/DepartmentDailyStatsTab.tsx
 'use client';
 import { useState, useEffect, useCallback } from 'react';
 import { createClient } from '@/utils/supabase/client';
@@ -31,8 +30,7 @@ export default function DepartmentDailyStatsTab({ departmentId }: { departmentId
         .eq('department_id', departmentId)
         .gte('date', startDate)
         .lte('date', endDate)
-        .order('date', { ascending: true })
-        .order('shift', { ascending: true }),
+        .order('date', { ascending: true }),
       supabase
         .from('departments')
         .select('*')
@@ -44,12 +42,29 @@ export default function DepartmentDailyStatsTab({ departmentId }: { departmentId
       console.error('Error fetching daily_staffing:', statsRes.error);
       setStatsData([]);
     } else {
-      setStatsData(statsRes.data || []);
+      const shiftPriority: { [key: string]: number } = {
+        'เวรดึก': 1,
+        'ดึก': 1,
+        'เวรเช้า': 2,
+        'เช้า': 2,
+        'เวรบ่าย': 3,
+        'บ่าย': 3,
+      };
+
+      const sortedData = (statsRes.data || []).sort((a: any, b: any) => {
+        // เรียงตามวันที่ก่อน (น้อยไปมาก)
+        if (a.date !== b.date) {
+          return a.date.localeCompare(b.date);
+        }
+        // ถ้าวันเดียวกัน ให้เรียงตามลำดับเวร: ดึก -> เช้า -> บ่าย
+        const pA = shiftPriority[a.shift?.trim()] || 99;
+        const pB = shiftPriority[b.shift?.trim()] || 99;
+        return pA - pB;
+      });
+
+      setStatsData(sortedData);
     }
 
-    if (deptRes.data) {
-      setDepartmentName(deptRes.data.name || deptRes.data.Department || '');
-    }
 
     setLoading(false);
   }, [supabase, departmentId, selectedMonth]);
@@ -94,7 +109,6 @@ export default function DepartmentDailyStatsTab({ departmentId }: { departmentId
   const firstDate = daysArray[0];
   const lastDate = daysArray[daysArray.length - 1];
 
-  // 2. คำนวณผลรวมตามเงื่อนไข
   const totals = statsData.reduce((acc, row) => {
     if (row.date === firstDate && (row.shift === 'เวรดึก' || row.shift?.includes('ดึก'))) {
       acc.carry_forward += Number(row.carry_forward || 0);
@@ -109,7 +123,10 @@ export default function DepartmentDailyStatsTab({ departmentId }: { departmentId
     acc.dead += Number(row.dead || 0);
     acc.high_flow += Number(row.high_flow || 0);
     acc.ventilator += Number(row.ventilator || 0);
-    acc.score_5 += Number(row.score_gt_5 ?? row.score_5 ?? 0);
+    
+    // 🔍 ปรับแก้ตรงนี้ (ให้เอา score_5 ขึ้นก่อน)
+    acc.score_5 += Number(row.score_5 ?? row.score_gt_5 ?? 0);
+    
     acc.score_4 += Number(row.score_4 || 0);
     acc.score_3 += Number(row.score_3 || 0);
     acc.score_2 += Number(row.score_2 || 0);
@@ -135,7 +152,7 @@ export default function DepartmentDailyStatsTab({ departmentId }: { departmentId
     return `${monthName} ${thaiYear}`;
   };
 
-  // ฟังก์ชันพิมพ์ผ่านหน้าต่างแยกอิสระ (ปรับลดระยะเพื่อให้พอดีใน 1 หน้ากระดาษ)
+  // ฟังก์ชันพิมพ์ผ่านหน้าต่างแยกอิสระ
   const handleDirectPrint = () => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) return;
@@ -167,7 +184,7 @@ export default function DepartmentDailyStatsTab({ departmentId }: { departmentId
             <td style="font-weight: bold; background-color: #ecfdf5;">${row.nursing_count ?? 0}</td>
             <td>${row.high_flow ?? 0}</td>
             <td>${row.ventilator ?? 0}</td>
-            <td>${row.score_gt_5 ?? row.score_5 ?? 0}</td>
+            <td>${row.score_5 ?? row.score_gt_5 ?? 0}</td>
             <td>${row.score_4 ?? 0}</td>
             <td>${row.score_3 ?? 0}</td>
             <td>${row.score_2 ?? 0}</td>
@@ -374,7 +391,8 @@ export default function DepartmentDailyStatsTab({ departmentId }: { departmentId
                       </td>
                       <td className="px-0.1 py-2 border-r border-slate-200">{row.high_flow ?? 0}</td>
                       <td className="px-0.1 py-2 border-r border-slate-200">{row.ventilator ?? 0}</td>
-                      <td className="px-0.1 py-2 border-r border-slate-200">{row.score_gt_5 ?? row.score_5 ?? 0}</td>
+                      {/* แก้ไขให้ประเภท 5 ดึงค่าจาก score_gt_5 หรือ score_5 */}
+                      <td className="px-0.1 py-2 border-r border-slate-200">{row.score_5 ?? row.score_gt_5 ?? 0}</td>
                       <td className="px-0.1 py-2 border-r border-slate-200">{row.score_4 ?? 0}</td>
                       <td className="px-0.1 py-2 border-r border-slate-200">{row.score_3 ?? 0}</td>
                       <td className="px-0.1 py-2 border-r border-slate-200">{row.score_2 ?? 0}</td>
@@ -457,7 +475,7 @@ export default function DepartmentDailyStatsTab({ departmentId }: { departmentId
               </div>
             </div>
 
-            {/* ส่วนพรีวิวบนหน้าจอ (แก้ไขการประกาศตัวแปรเช็ควันใหม่ให้ถูกต้อง) */}
+            {/* ส่วนพรีวิวบนหน้าจอ */}
             <div className="p-6 bg-slate-100 overflow-y-auto max-h-[80vh] flex justify-center">
               <div className="bg-white p-6 shadow-md rounded-xl w-full max-w-[1200px] space-y-4">
                 
@@ -517,7 +535,7 @@ export default function DepartmentDailyStatsTab({ departmentId }: { departmentId
                             <td className="px-0.1 py-1.5 border border-slate-300 font-bold bg-emerald-50/50">{row.nursing_count ?? 0}</td>
                             <td className="px-0.1 py-1.5 border border-slate-300">{row.high_flow ?? 0}</td>
                             <td className="px-0.1 py-1.5 border border-slate-300">{row.ventilator ?? 0}</td>
-                            <td className="px-0.1 py-1.5 border border-slate-300">{row.score_gt_5 ?? row.score_5 ?? 0}</td>
+                            <td className="px-0.1 py-2 border-r border-slate-200">{row.score_5 ?? row.score_gt_5 ?? 0}</td>
                             <td className="px-0.1 py-1.5 border border-slate-300">{row.score_4 ?? 0}</td>
                             <td className="px-0.1 py-1.5 border border-slate-300">{row.score_3 ?? 0}</td>
                             <td className="px-0.1 py-1.5 border border-slate-300">{row.score_2 ?? 0}</td>

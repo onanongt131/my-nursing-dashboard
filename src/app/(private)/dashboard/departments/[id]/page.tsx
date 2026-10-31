@@ -7,8 +7,8 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, Res
 import { getButtonStyle } from '@/utils/kpiCalculations';
 import { ClipboardDocumentCheckIcon, ExclamationTriangleIcon, CheckCircleIcon, EyeIcon, ShieldCheckIcon, PrinterIcon, PlusCircleIcon, DocumentCheckIcon, ArrowTrendingUpIcon, ArrowTrendingDownIcon, MinusIcon } from '@heroicons/react/24/solid';
 import { useParams } from 'next/navigation';
-import AuditChartModal from '@/components/AuditChartModal';
-import WpQaModal from '@/components/WpQaModal'; 
+import UnitAuditChartModal from '@/components/UnitAuditChartModal';
+import UnitWpQaModal from '@/components/UnitWpQaModal';
 import IvCareModal from '@/components/IvCareModal';
 import FallCareModal from '@/components/FallCareModal';
 import ReadmitModal from '@/components/ReadmitModal';
@@ -16,6 +16,7 @@ import AgainstMedicalAdviceModal from '@/components/AgainstMedicalAdviceModal';
 import BatchDetailModal from '@/components/BatchDetailModal';
 import DepartmentEditor from '@/components/DepartmentEditor';
 import DepartmentDailyStatsTab from '@/components/DepartmentDailyStatsTab';
+
 
 const YEARS = [2565, 2566, 2567, 2568, 2569] as const;
 
@@ -40,10 +41,10 @@ export default function SingleDepartmentPage() {
   const [activeKpi, setActiveKpi] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeModal, setActiveModal] = useState<'wp_qa' | 'iv_care' | 'fall' | 'audit' | 'readmit' | 'ama' | null>(null);
-  
+
   // เพิ่ม State สำหรับจัดการสลับ Tab (ระหว่าง KPI เดิม กับ สถิติหอผู้ป่วย)
   const [activeTab, setActiveTab] = useState<'kpi' | 'daily_stats'>('kpi');
-  
+
   const [userRole, setUserRole] = useState<string>('admin');
   const [canApprove, setCanApprove] = useState<boolean>(true);
   const [userDepartmentId, setUserDepartmentId] = useState<number | string>(1);
@@ -51,13 +52,13 @@ export default function SingleDepartmentPage() {
   const [pendingLoading, setPendingLoading] = useState(false);
   const [showPendingTable, setShowPendingTable] = useState(false);
   const [showEditorModal, setShowEditorModal] = useState(false);
-  
+
   const [detailModalData, setDetailModalData] = useState<{
     kpi: any;
     year: number;
     entries: any[];
   } | null>(null);
-  
+
   const [monthlyRecords, setMonthlyRecords] = useState<Record<string, any[]>>({
     audit: [],
     wp_qa: [],
@@ -66,10 +67,10 @@ export default function SingleDepartmentPage() {
     readmit: [],
     ama: []
   });
-  
-  const [viewingBatchGroup, setViewingBatchGroup] = useState<{ 
-    type: string; 
-    audit_month: string; 
+
+  const [viewingBatchGroup, setViewingBatchGroup] = useState<{
+    type: string;
+    audit_month: string;
     items: any[];
     auditor_name?: string;
     status?: string;
@@ -90,7 +91,7 @@ export default function SingleDepartmentPage() {
         const role = profile.role || 'admin';
         setUserRole(role);
         setUserDepartmentId(profile.department_id || 1);
-        
+
         const privilegedRoles = ['approver', 'supervisor', 'head_nurse'];
         setCanApprove(role === 'admin' || privilegedRoles.includes(role));
       }
@@ -129,7 +130,7 @@ export default function SingleDepartmentPage() {
           })
           .filter(Boolean)
       };
-      
+
       setDepartmentData(formattedDept);
     } catch (err) {
       console.error("Unexpected Error:", err);
@@ -180,7 +181,7 @@ export default function SingleDepartmentPage() {
               const monthStr = typeof rawMonth === 'string' ? rawMonth : String(rawMonth || '');
               const month = monthStr.substring(0, 7) || 'ไม่ระบุเดือน';
               const groupKey = `${t.key}_${month}`;
-              
+
               if (!acc[groupKey]) {
                 acc[groupKey] = {
                   type: t.key,
@@ -216,7 +217,7 @@ export default function SingleDepartmentPage() {
       fetchMonthlyRecords(deptId);
     }
   }, [deptId, fetchPendingApproval, fetchMonthlyRecords]);
-  
+
   const hasSubmittedPreviousMonth = (records: any[]) => {
     if (!Array.isArray(records)) return false;
     const now = new Date();
@@ -274,9 +275,9 @@ export default function SingleDepartmentPage() {
             size: A4 portrait;
             margin: 10mm;
           }
-          header, 
-          nav, 
-          aside, 
+          header,
+          nav,
+          aside,
           footer,
           .print\\:hidden,
           button,
@@ -336,17 +337,17 @@ export default function SingleDepartmentPage() {
             </span>
           </div>
           <div className="flex flex-wrap items-center gap-2 shrink-0">
-            <button 
+            <button
               onClick={() => window.print()}
               className="px-4 py-2 rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm transition-all bg-emerald-600 hover:bg-emerald-500 text-white cursor-pointer"
             >
               <PrinterIcon className="w-4 h-4" /> พิมพ์รายงาน
             </button>
-            <button 
-              onClick={() => totalPendingCount > 0 && setShowPendingTable(!showPendingTable)} 
+            <button
+              onClick={() => totalPendingCount > 0 && setShowPendingTable(!showPendingTable)}
               className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all ${
-                totalPendingCount > 0 
-                  ? 'bg-red-500 text-white hover:bg-red-600 cursor-pointer animate-bounce' 
+                totalPendingCount > 0
+                  ? 'bg-red-500 text-white hover:bg-red-600 cursor-pointer animate-bounce'
                   : 'bg-slate-800 text-slate-400 cursor-not-allowed opacity-60'
               }`}
               disabled={totalPendingCount === 0}
@@ -359,9 +360,9 @@ export default function SingleDepartmentPage() {
         {/* แถบปุ่มลงข้อมูลระบบงานต่างๆ */}
         <div className="pt-3 border-t border-emerald-800/60 flex flex-wrap items-center gap-2">
           <span className="text-xs font-bold text-emerald-300 mr-2 uppercase tracking-wide">ลงข้อมูลระบบ:</span>
-          
-          <button 
-            onClick={() => setActiveModal('audit')} 
+
+          <button
+            onClick={() => setActiveModal('audit')}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer ${
               hasSubmittedPreviousMonth(monthlyRecords.audit) ? 'bg-emerald-700/80 text-white hover:bg-emerald-700' : 'bg-amber-500 text-slate-950 hover:bg-amber-400'
             }`}
@@ -369,8 +370,8 @@ export default function SingleDepartmentPage() {
             <DocumentCheckIcon className="w-4 h-4" />
             <span>Audit เวชระเบียน</span>
           </button>
-          <button 
-            onClick={() => setActiveModal('wp_qa')} 
+          <button
+            onClick={() => setActiveModal('wp_qa')}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer ${
               hasSubmittedPreviousMonth(monthlyRecords.wp_qa) ? 'bg-emerald-700/80 text-white hover:bg-emerald-700' : 'bg-amber-500 text-slate-950 hover:bg-amber-400'
             }`}
@@ -378,8 +379,8 @@ export default function SingleDepartmentPage() {
             <PlusCircleIcon className="w-4 h-4" />
             <span>แนวปฏิบัติ (WP QA)</span>
           </button>
-          <button 
-            onClick={() => setActiveModal('iv_care')} 
+          <button
+            onClick={() => setActiveModal('iv_care')}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer ${
               hasSubmittedPreviousMonth(monthlyRecords.iv_care) ? 'bg-emerald-700/80 text-white hover:bg-emerald-700' : 'bg-amber-500 text-slate-950 hover:bg-amber-400'
             }`}
@@ -387,8 +388,8 @@ export default function SingleDepartmentPage() {
             <PlusCircleIcon className="w-4 h-4" />
             <span>ภาวะแทรกซ้อน IV</span>
           </button>
-          <button 
-            onClick={() => setActiveModal('fall')} 
+          <button
+            onClick={() => setActiveModal('fall')}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer ${
               hasSubmittedPreviousMonth(monthlyRecords.fall) ? 'bg-emerald-700/80 text-white hover:bg-emerald-700' : 'bg-amber-500 text-slate-950 hover:bg-amber-400'
             }`}
@@ -396,8 +397,8 @@ export default function SingleDepartmentPage() {
             <PlusCircleIcon className="w-4 h-4" />
             <span>พลัดตกหกล้ม</span>
           </button>
-          <button 
-            onClick={() => setActiveModal('readmit')} 
+          <button
+            onClick={() => setActiveModal('readmit')}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer ${
               hasSubmittedPreviousMonth(monthlyRecords.readmit) ? 'bg-emerald-700/80 text-white hover:bg-emerald-700' : 'bg-amber-500 text-slate-950 hover:bg-amber-400'
             }`}
@@ -405,8 +406,8 @@ export default function SingleDepartmentPage() {
             <PlusCircleIcon className="w-4 h-4" />
             <span>Readmit</span>
           </button>
-          <button 
-            onClick={() => setActiveModal('ama')} 
+          <button
+            onClick={() => setActiveModal('ama')}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer ${
               hasSubmittedPreviousMonth(monthlyRecords.ama) ? 'bg-emerald-700/80 text-white hover:bg-emerald-700' : 'bg-amber-500 text-slate-950 hover:bg-amber-400'
             }`}
@@ -457,7 +458,7 @@ export default function SingleDepartmentPage() {
               <h1 className="text-2xl font-extrabold text-black mt-1">{departmentData.Department}</h1>
               <p className="text-xs text-slate-700 mt-1">รายงานสรุปตัวชี้วัดและผลการดำเนินงานคุณภาพทางการพยาบาล</p>
             </div>
-            
+
             {showPendingTable && totalPendingCount > 0 && (
               <div className="border rounded-2xl p-4 space-y-3 bg-red-50/80 border-red-200 shadow-sm print:hidden">
                 <div className="flex justify-between items-center">
@@ -494,14 +495,14 @@ export default function SingleDepartmentPage() {
                             </span>
                           </td>
                           <td className="p-3 text-center">
-                            <button 
+                            <button
                               onClick={() => setViewingBatchGroup({
                                 type: batch.type,
                                 audit_month: batch.audit_month,
                                 items: batch.items,
                                 auditor_name: batch.auditor_name,
                                 status: batch.items?.[0]?.status || 'pending'
-                              })} 
+                              })}
                               className="px-2.5 py-1 bg-sky-600 hover:bg-sky-700 text-white rounded-lg font-bold shadow-sm transition inline-flex items-center gap-1 cursor-pointer"
                             >
                               <EyeIcon className="w-3.5 h-3.5" />
@@ -563,7 +564,7 @@ export default function SingleDepartmentPage() {
                                   return (
                                     <td key={year} className="px-1 py-2.5 text-center text-slate-600 print:text-black">
                                       {entry ? (
-                                        <span 
+                                        <span
                                           onClick={() => {
                                             if (isRatioOrPercent) {
                                               setDetailModalData({ kpi, year, entries: kpi.entries || [] });
@@ -599,8 +600,8 @@ export default function SingleDepartmentPage() {
                                   {!trend && <span className="text-slate-300">-</span>}
                                 </td>
                                 <td className="px-2 py-2.5 text-center print:hidden">
-                                  <button 
-                                    onClick={() => setActiveKpi(kpi)} 
+                                  <button
+                                    onClick={() => setActiveKpi(kpi)}
                                     className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-md text-[11px] font-bold shadow-sm transition cursor-pointer"
                                   >
                                     บันทึก
@@ -617,13 +618,13 @@ export default function SingleDepartmentPage() {
               </div>
             ) : (
               <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-6">
-                <button 
-                  onClick={() => setActiveKpi(null)} 
+                <button
+                  onClick={() => setActiveKpi(null)}
                   className="text-emerald-700 font-bold hover:underline text-xs flex items-center gap-1 cursor-pointer"
                 >
                   ← กลับสู่ตารางภาพรวมตัวชี้วัด
                 </button>
-                
+
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
                   <div className="space-y-4 bg-slate-50 p-4 rounded-xl border border-slate-100">
                     <h3 className="text-sm font-bold text-slate-800 leading-snug">{activeKpi.name}</h3>
@@ -638,24 +639,24 @@ export default function SingleDepartmentPage() {
                           <YAxis axisLine={false} tickLine={false} tick={{fontSize: 11}} />
                           <Tooltip cursor={{fill: '#f1f5f9'}} />
                           <Bar dataKey="value" fill="#0d9488" radius={[4, 4, 0, 0]} barSize={32} />
-                          <ReferenceLine 
-                            y={activeKpi.target_value} 
-                            stroke="#ef4444" 
-                            strokeDasharray="3 3" 
-                            label={{ value: 'Target', position: 'insideTopRight', fill: '#ef4444', fontSize: 10 }} 
+                          <ReferenceLine
+                            y={activeKpi.target_value}
+                            stroke="#ef4444"
+                            strokeDasharray="3 3"
+                            label={{ value: 'Target', position: 'insideTopRight', fill: '#ef4444', fontSize: 10 }}
                           />
                         </BarChart>
                       </ResponsiveContainer>
                     </div>
                   </div>
-                  
+
                   <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm">
                     <h4 className="text-xs font-bold mb-4 text-slate-700 uppercase tracking-wider">บันทึกข้อมูลผลงานย้อนหลัง / รายปี</h4>
-                    <AddEntryForm 
-                      kpiId={activeKpi.id} 
-                      type={activeKpi.type?.toLowerCase() || activeKpi.Type?.toLowerCase() || 'count'} 
+                    <AddEntryForm
+                      kpiId={activeKpi.id}
+                      type={activeKpi.type?.toLowerCase() || activeKpi.Type?.toLowerCase() || 'count'}
                       deptId={String(departmentData.id)}
-                      onSuccess={() => { setActiveKpi(null); fetchDepartmentData(); }} 
+                      onSuccess={() => { setActiveKpi(null); fetchDepartmentData(); }}
                     />
                   </div>
                 </div>
@@ -678,8 +679,8 @@ export default function SingleDepartmentPage() {
                   ประจำปีพุทธศักราช {detailModalData.year} (ชนิด KPI: {detailModalData.kpi.type || detailModalData.kpi.Type || 'percent'})
                 </p>
               </div>
-              <button 
-                onClick={() => setDetailModalData(null)} 
+              <button
+                onClick={() => setDetailModalData(null)}
                 className="text-slate-400 hover:text-slate-600 bg-slate-100 hover:bg-slate-200 p-2 rounded-full transition cursor-pointer"
               >
                 ✕
@@ -714,7 +715,7 @@ export default function SingleDepartmentPage() {
                           {entry.value ?? '-'}
                         </td>
                         <td className="p-3.5 text-center">
-                          <button 
+                          <button
                             onClick={async () => {
                               if (confirm('คุณต้องการลบข้อมูลรายการนี้ใช่หรือไม่?')) {
                                 const { error } = await supabase
@@ -748,7 +749,7 @@ export default function SingleDepartmentPage() {
               </table>
             </div>
             <div className="flex justify-end pt-2">
-              <button 
+              <button
                 onClick={() => setDetailModalData(null)}
                 className="px-5 py-2.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold transition shadow-sm cursor-pointer"
               >
@@ -787,22 +788,27 @@ export default function SingleDepartmentPage() {
         />
       )}
 
-      {activeModal === 'audit' && (
-        <AuditChartModal 
-          isOpen={true} 
-          onClose={() => setActiveModal(null)} 
-          departmentName={departmentData?.Department || 'ไม่ระบุหน่วยงาน'} 
-          departmentId={String(deptId)} 
-          supabase={supabase} 
-          onSuccess={() => { setActiveModal(null); fetchPendingApproval(deptId); fetchMonthlyRecords(deptId); }} 
+
+{activeModal === 'audit' && (
+        <UnitAuditChartModal
+          isOpen={true}
+          onClose={() => setActiveModal(null)}
+          departmentName={departmentData?.Department || 'ไม่ระบุหน่วยงาน'}
+          departmentId={String(deptId)}
+          supabase={supabase}
+          onSuccess={() => {
+            setActiveModal(null);
+            fetchPendingApproval(deptId);
+            fetchMonthlyRecords(deptId);
+          }}
         />
       )}
 
-      <WpQaModal isOpen={activeModal === 'wp_qa'} onClose={() => setActiveModal(null)} departmentId={deptId} departmentName={departmentData?.Department} supabase={supabase} onSuccess={() => { fetchDepartmentData(); fetchPendingApproval(deptId); fetchMonthlyRecords(deptId); }} />
+      <UnitWpQaModal isOpen={activeModal === 'wp_qa'} onClose={() => setActiveModal(null)} departmentId={deptId} departmentName={departmentData?.Department} supabase={supabase} onSuccess={() => { fetchDepartmentData(); fetchPendingApproval(deptId); fetchMonthlyRecords(deptId); }} />
       <IvCareModal isOpen={activeModal === 'iv_care'} onClose={() => setActiveModal(null)} departmentId={deptId} departmentName={departmentData?.Department} supabase={supabase} onSuccess={() => { fetchDepartmentData(); fetchPendingApproval(deptId); fetchMonthlyRecords(deptId); }} />
       <FallCareModal isOpen={activeModal === 'fall'} onClose={() => setActiveModal(null)} departmentId={deptId} departmentName={departmentData?.Department} supabase={supabase} onSuccess={() => { fetchDepartmentData(); fetchPendingApproval(deptId); fetchMonthlyRecords(deptId); }} />
-      <ReadmitModal isOpen={activeModal === 'readmit'} onClose={() => setActiveModal(null)} departmentId={deptId} departmentName={departmentData?.Department} supabase={supabase} onSuccess={() => { fetchDepartmentData(); fetchPendingApproval(deptId); fetchMonthlyRecords(deptId); }} /> 
-      <AgainstMedicalAdviceModal isOpen={activeModal === 'ama'} onClose={() => setActiveModal(null)} departmentId={deptId} departmentName={departmentData?.Department} supabase={supabase} onSuccess={() => { fetchDepartmentData(); fetchPendingApproval(deptId); fetchMonthlyRecords(deptId); }} /> 
+      <ReadmitModal isOpen={activeModal === 'readmit'} onClose={() => setActiveModal(null)} departmentId={deptId} departmentName={departmentData?.Department} supabase={supabase} onSuccess={() => { fetchDepartmentData(); fetchPendingApproval(deptId); fetchMonthlyRecords(deptId); }} />
+      <AgainstMedicalAdviceModal isOpen={activeModal === 'ama'} onClose={() => setActiveModal(null)} departmentId={deptId} departmentName={departmentData?.Department} supabase={supabase} onSuccess={() => { fetchDepartmentData(); fetchPendingApproval(deptId); fetchMonthlyRecords(deptId); }} />
     </div>
   );
 }

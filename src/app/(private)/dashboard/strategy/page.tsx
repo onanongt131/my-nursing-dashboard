@@ -6,7 +6,7 @@ import AddEntryForm from '@/components/AddEntryForm';
 import { calculateYearlySummary, checkStatus, getYearlyTrend, getButtonStyle } from '@/utils/kpiCalculations';
 
 export default function Strategic() {
-  const supabase = createClient();
+  const [supabase] = useState(() => createClient());
   const [selectedStrategic, setSelectedStrategic] = useState<string | null>('1');
   const [selectedDisease, setSelectedDisease] = useState("ทั้งหมด");
   const [selectedKpi, setSelectedKpi] = useState<any>(null);
@@ -82,7 +82,7 @@ export default function Strategic() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [supabase]);
 
   useEffect(() => {
     fetchData();
@@ -103,9 +103,9 @@ export default function Strategic() {
   if (loading) return <div className="p-8 text-center">กำลังโหลดข้อมูล...</div>;
 
   return (
-    <div className="space-y-6 mt-6 animate-in fade-in duration-500">
+    <div className="w-full min-w-0 max-w-full space-y-5 overflow-x-clip animate-in fade-in duration-500">
       {/* แถบเลือกยุทธศาสตร์: จัดกลุ่มอยู่ตรงกลาง */}
-<div className="flex flex-wrap items-center justify-center gap-3 w-full">
+<div className="flex w-full min-w-0 gap-2 overflow-x-auto overscroll-x-contain pb-2">
   {strategicGoals.map((goal) => (
     <button
       key={goal.id}
@@ -114,7 +114,7 @@ export default function Strategic() {
         setSelectedDisease("ทั้งหมด"); 
         setSelectedKpi(null); 
       }}
-      className={`px-5 py-3 rounded-xl border font-bold text-center transition-all shrink-0 ${
+      className={`min-w-[156px] max-w-[260px] shrink-0 rounded-xl border px-4 py-3 text-center text-sm font-semibold whitespace-normal transition-all ${
         selectedStrategic === goal.id 
           ? "bg-purple-400 text-white border-purple-600 shadow-md" 
           : "bg-white text-gray-700 hover:bg-purple-50 border-gray-200"
@@ -127,21 +127,21 @@ export default function Strategic() {
 
       {/* 2. เนื้อหาหลัก (แสดงเมื่อไม่ได้เลือก KPI) */}
       {!selectedKpi && (
-        <div className="space-y-4">
-          <div className="bg-purple-50/80 p-4 rounded-2xl border border-purple-100">
-            <p className="text-purple-600 font-bold text-lg">
+        <div className="min-w-0 space-y-4">
+          <div className="min-w-0 rounded-2xl border border-purple-100 bg-purple-50/80 p-4">
+            <p className="break-words text-base font-bold leading-relaxed text-purple-700 sm:text-lg">
               {currentStrategic?.description}
             </p>
           </div>
 
           {/* โครงสร้างแบบ 2 ฝั่ง ( ปรับฝั่งซ้ายให้แคบลงเหลือ lg:w-56 ) */}
-          <div className="flex flex-col lg:flex-row gap-6 items-start">
+          <div className="flex min-w-0 flex-col items-stretch gap-4 2xl:flex-row 2xl:items-start">
             
             {/* ฝั่งซ้าย: เมนูรายชื่อโรค */}
             {isDiseaseStrategy && (
-              <div className="w-full lg:w-56 bg-white rounded-3xl border border-gray-100 shadow-sm p-4 shrink-0">
+              <div className="w-full min-w-0 shrink-0 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm 2xl:w-48">
                 <h2 className="text-sm font-bold text-gray-400 uppercase tracking-wider mb-3 px-3">กลุ่มโรคสำคัญ</h2>
-                <div className="flex flex-col space-y-1">
+                <div className="flex max-h-36 flex-wrap gap-2 overflow-y-auto 2xl:max-h-[65vh] 2xl:flex-col 2xl:flex-nowrap">
                   {diseaseList.map((disease) => {
                     const isActive = selectedDisease === disease;
                     return (
@@ -151,7 +151,7 @@ export default function Strategic() {
                           setSelectedDisease(disease);
                           setSelectedKpi(null); 
                         }} 
-                        className={`w-full px-3.5 py-2 rounded-xl text-sm font-medium transition-all text-left flex items-center justify-between ${
+                        className={`w-auto rounded-xl px-3 py-2 text-left text-sm font-medium transition-all flex items-center justify-between 2xl:w-full ${
                           isActive 
                             ? "bg-purple-600 text-white shadow-md shadow-purple-200" 
                             : "text-gray-600 hover:bg-gray-50 hover:text-gray-900"
@@ -167,9 +167,9 @@ export default function Strategic() {
             )}
 
             {/* ฝั่งขวา: ตารางแสดงตัวชี้วัด (KPI) */}
-            <div className="flex-1 w-full bg-white p-6 rounded-3xl border border-gray-100 shadow-sm overflow-hidden">
-              <div className="flex justify-between items-center mb-4 pb-3 border-b border-gray-100">
-                <h2 className="font-bold text-gray-800 text-base">
+            <div className="w-full min-w-0 max-w-full flex-1 overflow-hidden rounded-2xl border border-gray-100 bg-white p-3 shadow-sm sm:p-5">
+              <div className="mb-4 flex min-w-0 flex-wrap items-center justify-between gap-2 border-b border-gray-100 pb-3">
+                <h2 className="min-w-0 break-words text-base font-bold text-gray-800">
                   {isDiseaseStrategy ? (
                     <>รายการตัวชี้วัด: <span className="text-purple-600">{selectedDisease}</span></>
                   ) : (
@@ -178,16 +178,16 @@ export default function Strategic() {
                 </h2>
               </div>
 
-              <div className="overflow-x-auto">
-                <table className="w-full text-left border-collapse">
+              <div className="w-full min-w-0 max-w-full overflow-x-auto overscroll-x-contain rounded-xl border border-slate-100">
+                <table className="w-full min-w-[1040px] border-collapse text-left">
                   <thead>
                     <tr className="border-b bg-gray-50 text-xs text-gray-500 uppercase tracking-wider">
-                      {showDiseaseColumn && <th className="p-4">โรค</th>}
-                      <th className="p-4">ตัวชี้วัด (KPI)</th>
-                      <th className="p-4 text-center">Goal</th>
-                      {[2565, 2566, 2567, 2568, 2569].map(y => <th key={y} className="p-4 text-center">{y}</th>)}
-                      <th className="p-4 text-center">Trend</th>
-                      <th className="p-4 text-center">Action</th>
+                      {showDiseaseColumn && <th className="whitespace-nowrap px-3 py-3">โรค</th>}
+                      <th className="whitespace-nowrap px-3 py-3">ตัวชี้วัด (KPI)</th>
+                      <th className="whitespace-nowrap px-3 py-3 text-center">Goal</th>
+                      {[2565, 2566, 2567, 2568, 2569].map(y => <th key={y} className="whitespace-nowrap px-3 py-3 text-center">{y}</th>)}
+                      <th className="whitespace-nowrap px-3 py-3 text-center">Trend</th>
+                      <th className="whitespace-nowrap px-3 py-3 text-center">Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -199,16 +199,16 @@ export default function Strategic() {
                       })
                       .map((kpi: any) => (
                         <tr key={kpi.id} className="hover:bg-gray-50 transition-colors text-sm">
-                          {showDiseaseColumn && <td className="p-4 text-gray-600 font-medium">{kpi.disease_name || "-"}</td>}
-                          <td className="p-4 font-medium text-gray-900">{kpi.name}</td>
-                          <td className="p-4 text-center font-bold text-gray-700">{kpi.operator} {kpi.target_value}</td>
+                          {showDiseaseColumn && <td className="min-w-[110px] px-3 py-3 font-medium text-gray-600">{kpi.disease_name || "-"}</td>}
+                          <td className="min-w-[260px] max-w-[390px] break-words px-3 py-3 font-medium leading-relaxed text-gray-900">{kpi.name}</td>
+                          <td className="whitespace-nowrap px-3 py-3 text-center font-bold text-gray-700">{kpi.operator} {kpi.target_value}</td>
                           {[2565, 2566, 2567, 2568, 2569].map((year) => {
                             const avg = calculateYearlySummary(kpi.kpi_entries || [], year, kpi.Type);
                             const hasData = avg !== null && avg !== "-" && avg !== ""; 
                             const pass = hasData ? checkStatus(Number(avg), kpi.target_value, kpi.operator) : false;
 
                             return (
-                              <td key={year} className="p-4 text-center">
+                              <td key={year} className="whitespace-nowrap px-3 py-3 text-center">
                                 {hasData ? (
                                   <span 
                                     onClick={() => handleOpenDetail(kpi, year)}
@@ -225,8 +225,8 @@ export default function Strategic() {
                               </td>
                             );
                           })}
-                          <td className="p-4 text-center text-sm text-gray-600">{getYearlyTrend(kpi.kpi_entries || [], kpi.Type, kpi.operator || '<')}</td>
-                          <td className="p-4 text-center">
+                          <td className="whitespace-nowrap px-3 py-3 text-center text-sm text-gray-600">{getYearlyTrend(kpi.kpi_entries || [], kpi.Type, kpi.operator || '<')}</td>
+                          <td className="whitespace-nowrap px-3 py-3 text-center">
                             <button onClick={() => setSelectedKpi(kpi)} className={getButtonStyle(kpi.kpi_entries || [], 'monthly')}>เพิ่ม</button>
                           </td>
                         </tr>
@@ -242,16 +242,16 @@ export default function Strategic() {
 
       {/* 2.2 หน้ากราฟและฟอร์ม (แสดงเมื่อเลือก KPI แล้ว) */}
       {selectedKpi && (
-        <div className="space-y-8">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <div className="bg-white p-6 rounded-2xl border relative">
+        <div className="min-w-0 space-y-6">
+          <div className="grid min-w-0 grid-cols-1 gap-4 2xl:grid-cols-2">
+            <div className="relative min-w-0 overflow-hidden rounded-2xl border bg-white p-4 sm:p-6">
               <button onClick={() => setSelectedKpi(null)} className="mb-4 text-purple-600 font-bold text-sm">← ย้อนกลับ</button>
               <div className="absolute top-4 right-4 bg-red-50 border border-red-100 p-2 rounded-xl">
                 <span className="text-[10px] text-red-600 font-bold uppercase">Goal</span>
                 <span className="text-[10px] font-black text-red-700">{selectedKpi.operator} {selectedKpi.target_value}</span>
               </div>
-              <h3 className="font-bold text-lg mb-6">{selectedKpi.name}</h3>
-              <ResponsiveContainer height={250} width="100%">
+              <h3 className="mb-6 max-w-full break-words pr-24 text-lg font-bold">{selectedKpi.name}</h3>
+              <ResponsiveContainer height={250} width="100%" minWidth={0}>
                 <BarChart data={[2565, 2566, 2567, 2568, 2569].map(y => ({ 
                   year: y, 
                   v: Number(calculateYearlySummary(selectedKpi.kpi_entries || [], y, selectedKpi.Type)) || 0 
@@ -266,7 +266,7 @@ export default function Strategic() {
               </ResponsiveContainer>
             </div>
             
-            <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+            <div className="min-w-0 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm sm:p-6">
               <h3 className="font-bold text-gray-800 mb-6">บันทึกผลการดำเนินงาน</h3>
               <AddEntryForm kpiId={selectedKpi.id} type={selectedKpi.Type} onSuccess={() => { setSelectedKpi(null); fetchData(); }} />
             </div>
@@ -276,9 +276,9 @@ export default function Strategic() {
 
       {/* 📌 ส่วน Modal สำหรับแสดงรายละเอียดรายเดือน */}
       {isDetailModalOpen && modalData && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-3xl shadow-xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-            <div className="p-6 border-b bg-gray-50 flex justify-between items-center">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-2 backdrop-blur-sm sm:p-4">
+          <div className="flex max-h-[92vh] w-full max-w-2xl min-w-0 flex-col overflow-hidden rounded-2xl bg-white shadow-xl animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex shrink-0 items-start justify-between gap-3 border-b bg-gray-50 p-4 sm:p-6">
               <div>
                 <h3 className="font-bold text-gray-900 text-lg">{modalData.kpi.name}</h3>
                 <p className="text-xs text-gray-500 mt-1">ประจำปีพุทธศักราช {modalData.year} (ชนิด KPI: {modalData.kpi.Type})</p>
@@ -291,8 +291,8 @@ export default function Strategic() {
               </button>
             </div>
             
-            <div className="p-6 max-h-[60vh] overflow-y-auto">
-              <table className="w-full text-left border-collapse text-sm">
+            <div className="min-h-0 flex-1 overflow-auto p-3 sm:p-6">
+              <table className="w-full min-w-[560px] border-collapse text-left text-sm">
                 <thead>
                   <tr className="border-b text-xs text-gray-500 uppercase bg-gray-50/50">
                     <th className="p-3">เดือน</th>
@@ -321,7 +321,7 @@ export default function Strategic() {
                     ))
                   ) : (
                     <tr>
-                      <td colSpan={4} className="p-8 text-center text-gray-400 italic">
+                      <td colSpan={modalData.kpi.Type === 'count' ? 2 : 4} className="p-8 text-center text-gray-400 italic">
                         ยังไม่มีข้อมูลการบันทึกในรายเดือนของปีนี้
                       </td>
                     </tr>

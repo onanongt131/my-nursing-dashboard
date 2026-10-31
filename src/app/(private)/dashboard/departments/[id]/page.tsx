@@ -1,4 +1,6 @@
 'use client';
+import SpecialAuditApprovalPanel from '@/components/SpecialAuditApprovalPanel';
+
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import AddEntryForm from '@/components/AddEntryForm';
@@ -49,6 +51,7 @@ export default function SingleDepartmentPage() {
   const [canApprove, setCanApprove] = useState<boolean>(true);
   const [userDepartmentId, setUserDepartmentId] = useState<number | string>(1);
   const [allPendingRows, setAllPendingRows] = useState<any[]>([]);
+  const [specialAuditCounts, setSpecialAuditCounts] = useState({pending:0,total:0});
   const [pendingLoading, setPendingLoading] = useState(false);
   const [showPendingTable, setShowPendingTable] = useState(false);
   const [showEditorModal, setShowEditorModal] = useState(false);
@@ -245,7 +248,7 @@ export default function SingleDepartmentPage() {
     return 'stable';
   };
 
-  const totalPendingCount = allPendingRows.reduce((sum, batch: any) => sum + (batch.items?.length || 0), 0);
+  const totalPendingCount = allPendingRows.reduce((sum, batch: any) => sum + (batch.items?.length || 0), 0) + specialAuditCounts.pending;
 
   const canAccessDepartment = () => {
     if (userRole === 'admin') return true;
@@ -344,13 +347,13 @@ export default function SingleDepartmentPage() {
               <PrinterIcon className="w-4 h-4" /> พิมพ์รายงาน
             </button>
             <button
-              onClick={() => totalPendingCount > 0 && setShowPendingTable(!showPendingTable)}
+              onClick={() => (totalPendingCount > 0 || specialAuditCounts.total > 0) && setShowPendingTable(!showPendingTable)}
               className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all ${
-                totalPendingCount > 0
+                (totalPendingCount > 0 || specialAuditCounts.total > 0)
                   ? 'bg-red-500 text-white hover:bg-red-600 cursor-pointer animate-bounce'
                   : 'bg-slate-800 text-slate-400 cursor-not-allowed opacity-60'
               }`}
-              disabled={totalPendingCount === 0}
+              disabled={totalPendingCount === 0 && specialAuditCounts.total === 0}
             >
               <span>รออนุมัติ ({totalPendingCount})</span>
             </button>
@@ -459,8 +462,8 @@ export default function SingleDepartmentPage() {
               <p className="text-xs text-slate-700 mt-1">รายงานสรุปตัวชี้วัดและผลการดำเนินงานคุณภาพทางการพยาบาล</p>
             </div>
 
-            {showPendingTable && totalPendingCount > 0 && (
-              <div className="border rounded-2xl p-4 space-y-3 bg-red-50/80 border-red-200 shadow-sm print:hidden">
+            {(
+              <div hidden={!showPendingTable} className="border rounded-2xl p-4 space-y-3 bg-red-50/80 border-red-200 shadow-sm print:hidden">
                 <div className="flex justify-between items-center">
                   <h3 className="text-xs font-bold text-red-900 flex items-center gap-2 uppercase tracking-wider">
                     <ExclamationTriangleIcon className="w-4 h-4 text-red-600 animate-pulse" />
@@ -511,7 +514,8 @@ export default function SingleDepartmentPage() {
                           </td>
                         </tr>
                       ))}
-                    </tbody>
+                    <SpecialAuditApprovalPanel departmentId={deptId} onCountsChange={setSpecialAuditCounts} />
+</tbody>
                   </table>
                 </div>
               </div>
@@ -787,6 +791,7 @@ export default function SingleDepartmentPage() {
           supabase={supabase}
         />
       )}
+
 
 
 {activeModal === 'audit' && (

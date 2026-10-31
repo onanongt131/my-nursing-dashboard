@@ -1,6 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
+import { lrAuditGroups } from '@/lib/lrAuditCriteria';
+import { specialUnitAuditForms, isSpecialUnitForm, groupSection } from '@/lib/specialUnitAuditForms';
 import { CheckCircleIcon, XMarkIcon } from '@heroicons/react/24/solid';
 
 interface BatchItem {
@@ -88,6 +91,10 @@ export default function BatchDetailModal({
   const [selectedAuditItem, setSelectedAuditItem] = useState<BatchItem | null>(null);
 
   if (!isOpen || !batchGroup) return null;
+
+  if (batchGroup.items.some(item => item.source_table === 'nso_special_audits') || batchGroup.type.toLowerCase() === 'audit_lr') {
+    return <SpecialLRBatchReview batchGroup={batchGroup} departmentName={departmentName} canApprove={canApprove} onClose={onClose} onApprove={onApprove} />;
+  }
 
   const typeLower = batchGroup.type.toLowerCase();
   const isNursingChartAudit = typeLower.includes('audit') || typeLower.includes('nursing_chart');
@@ -788,4 +795,86 @@ export default function BatchDetailModal({
       )}
     </div>
   );
+}
+
+// Special Audit records have JSON answers and must use the authorized server API.
+function SpecialLRBatchReview({batchGroup,departmentName,canApprove,onClose,onApprove}: {
+ batchGroup:BatchGroup;departmentName:string;canApprove:boolean;onClose:()=>void;
+ onApprove:(type:string,month:string)=>void;
+}) {
+ const [busy,setBusy]=useState(false),[message,setMessage]=useState('');
+ const busyRef=React.useRef(false);
+ const [selectedId,setSelectedId]=useState(()=>String(batchGroup.items[0]?.id||''));
+ const item=batchGroup.items.find(entry=>String(entry.id)===selectedId)||batchGroup.items[0];
+ React.useEffect(()=>{
+  const before=document.body.style.overflow;document.body.style.overflow='hidden';
+  return()=>{document.body.style.overflow=before;};
+ },[]);
+ async function action(item:BatchItem) {
+  if(busyRef.current || !item.id)return;
+  const endpoint=item.status==='draft'?'submit':'approve';
+  if(endpoint==='approve'&&!canApprove)return;
+  busyRef.current=true;setBusy(true);setMessage('');
+  try {
+   const response=await fetch(`/api/audits/${encodeURIComponent(String(item.id))}/${endpoint}`,{method:'POST',credentials:'same-origin'});
+   const result=await response.json().catch(()=>null);
+   if(!response.ok)throw new Error(result?.error||`HTTP ${response.status}`);
+   window.alert(endpoint==='approve'?'อนุมัติรายการสำเร็จ':'ส่งรายการแล้ว — รออนุมัติ');
+   window.dispatchEvent(new Event('audit-records-updated'));
+   onApprove(batchGroup.type,batchGroup.audit_month);onClose();
+  }catch(error){setMessage(error instanceof Error?error.message:'ดำเนินการไม่สำเร็จ');}
+  finally{busyRef.current=false;setBusy(false);}
+ }
+ if(!item || typeof document==='undefined')return null;
+ const answers=(item.answers||{}) as Record<string,{score?:number;na?:boolean;note?:string}>;
+ const config=isSpecialUnitForm(item.form_type)?specialUnitAuditForms[item.form_type]:null;
+ const reviewGroups=config?.groups||lrAuditGroups;
+ const headings=config?config.headings.map(h=>({id:h.id,label:h.title})):[{id:'1',label:'1. ระยะก่อนคลอด/ก่อนผ่าตัด'},{id:'2',label:'2. การพยาบาลระยะคลอด/ผ่าตัด'},{id:'3',label:'3. การส่งต่อ'}];
+ const sectionId=groupSection;
+ const statusText=item.status==='pending'?'รออนุมัติ':item.status==='approved'?'อนุมัติแล้ว':item.status==='draft'?'ฉบับร่าง':item.status||'-';
+ return createPortal(<div role="dialog" aria-modal="true" aria-label="รายละเอียดคะแนนประเมิน" className="fixed inset-0 z-[2147483647] flex items-center justify-center bg-slate-950/60 p-2 sm:p-5">
+  <div className="flex max-h-[94dvh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl bg-white px-4 shadow-2xl sm:px-6">
+   <header className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-700 py-5">
+    <h3 className="text-base font-extrabold text-slate-800 sm:text-xl">📝 ฟอร์มรายละเอียดคะแนนประเมิน ({item.hn ? `HN: ${item.hn}` : `AN: ${item.reference_number||item.an||'-'}`})</h3>
+    <button type="button" aria-label="ปิดหน้าต่าง" disabled={busy} onClick={onClose} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-400 hover:bg-slate-200 disabled:opacity-50"><XMarkIcon className="h-6 w-6" /></button>
+   </header>
+   <div className="min-h-0 flex-1 overflow-y-auto py-5 pr-2 sm:pr-4">
+    {batchGroup.items.length>1&&<label className="mb-4 block text-sm font-semibold">เลือกรายการ<select disabled={busy} value={String(item.id)} onChange={event=>{setSelectedId(event.target.value);setMessage('');}} className="ml-3 rounded-lg border p-2">{batchGroup.items.map((entry,index)=><option key={String(entry.id||index)} value={String(entry.id)}>AN: {entry.reference_number||entry.an||'-'} · {entry.auditor_name||'-'}</option>)}</select></label>}
+    <div className="mb-7 grid grid-cols-1 gap-x-6 gap-y-2 rounded-xl border border-blue-100 bg-blue-50 p-4 text-sm text-slate-700 sm:grid-cols-2">
+     <p><strong>ผู้ประเมิน:</strong> {item.auditor_name||batchGroup.auditor_name||'-'}</p>
+     <p><strong>วันที่ประเมิน:</strong> {item.audit_date||'-'}</p>
+     <p><strong>งวดประจำเดือน:</strong> {item.audit_month||batchGroup.audit_month}</p>
+     <p><strong>สถานะรายการ:</strong> <span className={item.status==='approved'?'font-bold text-emerald-700':'font-bold text-amber-600'}>{statusText}</span></p>
+     <p className="sm:col-span-2"><strong>หน่วยงาน:</strong> {departmentName}</p>
+    </div>
+    {headings.map(heading=>{
+     const groups=reviewGroups.filter(group=>sectionId(group.title)===heading.id);
+     if(!groups.length)return null;
+     return <section key={heading.id} className="mb-7">
+      <h4 className="mb-5 flex items-center gap-3 border-b border-emerald-500 pb-3 font-bold text-slate-900"><span className="h-3 w-3 rounded-full bg-emerald-600" />{heading.label}</h4>
+      {groups.map(group=><div key={group.title} className="mb-5 pl-2 sm:pl-3">
+       <h5 className="mb-3 border-l-4 border-emerald-500 pl-3 text-sm font-bold text-emerald-800">{group.title}</h5>
+       <div className="space-y-2 pl-1 sm:pl-3">{group.items.map((criterion,index)=>{
+        const answer=answers[criterion.id];
+        const number=group.title.split(' ')[0];
+        return <div key={criterion.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+         <div className="flex items-center justify-between gap-4"><p className="min-w-0 text-sm leading-6 text-slate-800">{!config&&sectionId(group.title)!=='3'&&<strong className="mr-1">{number}.{index+1}</strong>}{criterion.label}</p><span className="inline-flex min-h-10 min-w-16 shrink-0 items-center justify-center rounded-xl border border-slate-300 bg-slate-50 px-3 text-sm font-bold text-slate-800">{answer?.na?'NA':answer?.score??'—'}</span></div>
+         {answer?.note&&<p className="mt-3 whitespace-pre-wrap border-t border-amber-100 pt-2 text-sm text-amber-800"><strong>ข้อบกพร่อง/หมายเหตุ:</strong> {answer.note}</p>}
+        </div>;
+       })}</div>
+      </div>)}
+     </section>;
+    })}
+    {item.notes&&<div className="rounded-xl bg-slate-50 p-4 text-sm text-slate-700"><strong>โรค / หมายเหตุ</strong><p className="mt-1 whitespace-pre-wrap">{String(item.notes).replace(/^\[(?:LR|DIALYSIS|ER|ANESTHESIA|HBOT)_DISEASE\]\s*/, 'โรค: ')}</p></div>}
+   </div>
+   <footer className="shrink-0 border-t border-slate-700 py-4">
+    <p role="status" aria-live="polite" className="mb-2 text-sm text-red-700">{message}</p>
+    {item.status==='pending'&&!canApprove&&<p className="mb-3 text-sm text-amber-700">รอหัวหน้าผู้มีสิทธิ์อนุมัติ ผู้บันทึกอนุมัติรายการตนเองไม่ได้</p>}
+    <div className="flex flex-wrap items-center justify-end gap-3">
+     <button type="button" disabled={busy} onClick={onClose} className="rounded-2xl bg-slate-100 px-5 py-3 text-sm font-bold text-slate-700 hover:bg-slate-200 disabled:opacity-50">ปิดหน้าต่างนี้</button>
+     {(item.status==='draft'||(item.status==='pending'&&canApprove))&&<button type="button" disabled={busy} onClick={()=>void action(item)} className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"><CheckCircleIcon className="h-5 w-5" />{busy?'กำลังดำเนินการ…':item.status==='draft'?'ส่งรออนุมัติ':'อนุมัติรายการนี้'}</button>}
+    </div>
+   </footer>
+  </div>
+ </div>,document.body);
 }

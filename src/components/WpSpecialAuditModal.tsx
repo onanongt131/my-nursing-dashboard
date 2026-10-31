@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useState, useEffect } from "react";
+import React, { useMemo, useState, useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { wpSpecialCriteria, wpUnitNames, type WpFormType } from "@/lib/wpSpecialCriteria";
 
@@ -13,7 +13,24 @@ const currentMonth = () => {
 const validNonnegativeInteger = (v: string) => v === "" || /^(0|[1-9]\d*)$/.test(v);
 
 export default function WpSpecialAuditModal({ isOpen, onClose, formType, departmentName, departmentId, onSuccess }: Props) {
+  const formRef=useRef<HTMLDivElement>(null);
   const sections = wpSpecialCriteria[formType];
+  const showFieldError=(key:string,message:string)=>{
+    const id=key.replace(/^(assessed|performed|note):/,'');
+    const sectionIndex=sections.findIndex(section=>section.items.some(item=>item.id===id));
+    if(sectionIndex>=0)setExpanded(previous=>({...previous,[sectionIndex]:true}));
+    requestAnimationFrame(()=>{
+      const field=Array.from(formRef.current?.querySelectorAll<HTMLInputElement|HTMLTextAreaElement>('[data-wp-field]')||[]).find(element=>element.dataset.wpField===key);
+      if(!field)return;
+      field.setCustomValidity(message);field.setAttribute('aria-invalid','true');
+      field.classList.add('ring-2','ring-red-400');field.scrollIntoView({block:'center',behavior:'auto'});
+      field.focus({preventScroll:true});field.reportValidity();
+    });
+  };
+  const clearFieldError=(event:React.FormEvent<HTMLDivElement>)=>{
+    const field=event.target;
+    if(field instanceof HTMLInputElement||field instanceof HTMLTextAreaElement){field.setCustomValidity('');field.removeAttribute('aria-invalid');field.classList.remove('ring-2','ring-red-400');}
+  };
   const allItems = useMemo(() => sections.flatMap(s => s.items), [sections]);
   const [month, setMonth] = useState(currentMonth);
   const [reference, setReference] = useState("");
@@ -35,18 +52,7 @@ export default function WpSpecialAuditModal({ isOpen, onClose, formType, departm
     if (field !== "note" && !validNonnegativeInteger(value)) return;
     setPreview(false);
     setAnswers(prev => {
-
-const current: WpRecord = prev[id] ?? {
-  assessed: "",
-  performed: "",
-  note: "",
-};
-
-const next: WpRecord = {
-  ...current,
-  [field]: value,
-};
-
+      const next = { assessed: "", performed: "", note: "", ...prev[id], [field]: value };
       if (field !== "note" && next.assessed !== "" && next.performed !== "" && Number(next.assessed) === Number(next.performed)) next.note = "";
       return { ...prev, [id]: next };
     });
@@ -68,18 +74,20 @@ const next: WpRecord = {
   };
   const handleSave = async () => {
     if (saving) return;
-    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) { window.alert("กรุณาระบุเดือนประเมิน"); return; }
-    if (!auditor.trim()) { window.alert("กรุณาระบุชื่อผู้ประเมิน / ผู้บันทึก"); return; }
+    formRef.current?.querySelectorAll<HTMLInputElement|HTMLTextAreaElement>('[data-wp-field]').forEach(field=>{field.setCustomValidity('');field.removeAttribute('aria-invalid');field.classList.remove('ring-2','ring-red-400');});
+    if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) { showFieldError("month","กรุณาระบุเดือนประเมิน"); return; }
+    if (!auditor.trim()) { showFieldError("auditor","กรุณาระบุชื่อผู้ประเมิน / ผู้บันทึก"); return; }
     const dept = Number(departmentId);
     if (!Number.isSafeInteger(dept) || dept < 1) { window.alert("รหัสหน่วยงานไม่ถูกต้อง"); return; }
     const packed: Record<string, { total_evaluated: number; total_practiced: number; unpracticed_reasons: string | null }> = {};
     for (const item of allItems) {
       const v = answers[item.id];
-      if (!v || v.assessed === "" || v.performed === "") { window.alert(`กรุณากรอกจำนวนประเมินและจำนวนปฏิบัติ ข้อ ${item.number}`); return; }
+      if(!v||v.assessed===''){showFieldError(`assessed:${item.id}`,`กรุณากรอกจำนวนประเมิน ข้อ ${item.number}`);return;}
+      if(v.performed===''){showFieldError(`performed:${item.id}`,`กรุณากรอกจำนวนปฏิบัติ ข้อ ${item.number}`);return;}
       const a = Number(v.assessed), b = Number(v.performed);
-      if (!Number.isSafeInteger(a) || a <= 0) { window.alert(`ข้อ ${item.number}: จำนวนประเมินต้องมากกว่า 0`); return; }
-      if (!Number.isSafeInteger(b) || b < 0 || b > a) { window.alert(`ข้อ ${item.number}: จำนวนปฏิบัติต้องอยู่ระหว่าง 0 ถึงจำนวนประเมิน`); return; }
-      if (b !== a && !v.note.trim()) { window.alert(`ข้อ ${item.number}: กรุณาระบุสิ่งที่ไม่ได้ปฏิบัติ / หมายเหตุ`); return; }
+      if (!Number.isSafeInteger(a) || a <= 0) { showFieldError(`assessed:${item.id}`,`ข้อ ${item.number}: จำนวนประเมินต้องมากกว่า 0`); return; }
+      if (!Number.isSafeInteger(b) || b < 0 || b > a) { showFieldError(`performed:${item.id}`,`ข้อ ${item.number}: จำนวนปฏิบัติต้องอยู่ระหว่าง 0 ถึงจำนวนประเมิน`); return; }
+      if (b !== a && !v.note.trim()) { showFieldError(`note:${item.id}`,`ข้อ ${item.number}: กรุณาระบุสิ่งที่ไม่ได้ปฏิบัติ / หมายเหตุ`); return; }
       packed[item.id] = { total_evaluated: a, total_practiced: b, unpracticed_reasons: a !== b ? v.note.trim() : null };
     }
     setSaving(true);
@@ -101,7 +109,7 @@ const next: WpRecord = {
   };
   if (!isOpen || typeof document === "undefined") return null;
   return createPortal(
-    <div className="fixed inset-0 z-[2147483647] isolate flex items-center justify-center bg-slate-950/70 p-2 backdrop-blur-sm sm:p-4" role="dialog" aria-modal="true" aria-label="ประเมิน WP เฉพาะหน่วยงาน">
+    <div ref={formRef} onInputCapture={clearFieldError} className="fixed inset-0 z-[2147483647] isolate flex items-center justify-center bg-slate-950/70 p-2 backdrop-blur-sm sm:p-4" role="dialog" aria-modal="true" aria-label="ประเมิน WP เฉพาะหน่วยงาน">
       <div className="flex max-h-[calc(100dvh-1rem)] w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
         <header className="flex shrink-0 items-center justify-between gap-3 border-b border-emerald-100 bg-white px-4 py-3 sm:px-6">
           <div><h2 className="text-base font-bold text-emerald-900 sm:text-lg">ประเมินแนวปฏิบัติ WP — {departmentName || wpUnitNames[formType]}</h2>
@@ -110,9 +118,9 @@ const next: WpRecord = {
         </header>
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 sm:p-6">
           <div className="grid grid-cols-1 gap-3 rounded-xl border border-emerald-100 bg-emerald-50/60 p-4 sm:grid-cols-3">
-            <label className="text-sm font-semibold text-emerald-900">ประจำเดือน (Month)<input type="month" value={month} onChange={e => setMonth(e.target.value)} className="mt-1 block w-full rounded-lg border border-slate-300 bg-white p-2.5 text-sm" /></label>
+            <label className="text-sm font-semibold text-emerald-900">ประจำเดือน (Month)<input data-wp-field="month" required type="month" value={month} onChange={e => setMonth(e.target.value)} className="mt-1 block w-full rounded-lg border border-slate-300 bg-white p-2.5 text-sm" /></label>
             <label className="text-sm font-semibold text-emerald-900">รหัสอ้างอิง (ถ้ามี)<input value={reference} onChange={e => setReference(e.target.value)} placeholder="รหัสอ้างอิงการประเมิน" className="mt-1 block w-full rounded-lg border border-slate-300 bg-white p-2.5 text-sm" /></label>
-            <label className="text-sm font-semibold text-emerald-900">ชื่อผู้ประเมิน / ผู้บันทึก<input value={auditor} onChange={e => setAuditor(e.target.value)} placeholder="ระบุชื่อ-นามสกุลผู้ประเมิน" className="mt-1 block w-full rounded-lg border border-slate-300 bg-white p-2.5 text-sm" /></label>
+            <label className="text-sm font-semibold text-emerald-900">ชื่อผู้ประเมิน / ผู้บันทึก<input data-wp-field="auditor" required value={auditor} onChange={e => setAuditor(e.target.value)} placeholder="ระบุชื่อ-นามสกุลผู้ประเมิน" className="mt-1 block w-full rounded-lg border border-slate-300 bg-white p-2.5 text-sm" /></label>
           </div>
           <div className="grid grid-cols-2 gap-2 text-center sm:grid-cols-4">
             <div className="rounded-lg bg-slate-50 p-2"><p className="text-xs">ข้อเกณฑ์ทั้งหมด</p><strong>{stats.total}</strong></div>
@@ -138,9 +146,9 @@ const next: WpRecord = {
                       const needsNote = v.assessed !== "" && v.performed !== "" && Number(v.performed) !== Number(v.assessed);
                       return <tr key={item.id} className="align-top hover:bg-emerald-50/30">
                         <td className="px-3 py-3 leading-6 text-slate-800"><span className="mr-2 font-semibold text-emerald-900">{item.number}</span>{item.label}</td>
-                        <td className="px-3 py-3"><input aria-label={`จำนวนประเมิน ${item.number}`} inputMode="numeric" pattern="[0-9]*" value={v.assessed} onChange={e => setField(item.id,"assessed",e.target.value)} placeholder="กรอก > 0" className="w-full max-w-32 rounded-lg border border-slate-300 px-2 py-2 text-center outline-emerald-500" /></td>
-                        <td className="px-3 py-3"><input aria-label={`จำนวนปฏิบัติ ${item.number}`} inputMode="numeric" pattern="[0-9]*" value={v.performed} onChange={e => setField(item.id,"performed",e.target.value)} placeholder="กรอก > 0" className={`w-full max-w-32 rounded-lg border px-2 py-2 text-center outline-emerald-500 ${isInvalid ? "border-rose-500 bg-rose-50" : "border-slate-300"}`} />{isInvalid && <p className="mt-1 text-xs text-rose-600">ต้องไม่เกินจำนวนประเมิน</p>}</td>
-                        <td className="px-3 py-3">{needsNote ? <input aria-label={`สิ่งที่ไม่ได้ปฏิบัติหรือหมายเหตุ ${item.number}`} value={v.note} onChange={e => setField(item.id,"note",e.target.value)} placeholder="ระบุเหตุผล/สิ่งที่ไม่ได้ปฏิบัติ..." className="w-full rounded-lg border border-amber-300 px-2 py-2 outline-amber-400" /> : <span className="text-xs italic text-slate-400">- ครบถ้วน / ปกติ -</span>}</td>
+                        <td className="px-3 py-3"><input data-wp-field={`assessed:${item.id}`} required aria-label={`จำนวนประเมิน ${item.number}`} inputMode="numeric" pattern="[0-9]*" value={v.assessed} onChange={e => setField(item.id,"assessed",e.target.value)} placeholder="กรอก > 0" className="w-full max-w-32 rounded-lg border border-slate-300 px-2 py-2 text-center outline-emerald-500" /></td>
+                        <td className="px-3 py-3"><input data-wp-field={`performed:${item.id}`} required aria-label={`จำนวนปฏิบัติ ${item.number}`} inputMode="numeric" pattern="[0-9]*" value={v.performed} onChange={e => setField(item.id,"performed",e.target.value)} placeholder="กรอก > 0" className={`w-full max-w-32 rounded-lg border px-2 py-2 text-center outline-emerald-500 ${isInvalid ? "border-rose-500 bg-rose-50" : "border-slate-300"}`} />{isInvalid && <p className="mt-1 text-xs text-rose-600">ต้องไม่เกินจำนวนประเมิน</p>}</td>
+                        <td className="px-3 py-3">{needsNote ? <input data-wp-field={`note:${item.id}`} required aria-label={`สิ่งที่ไม่ได้ปฏิบัติหรือหมายเหตุ ${item.number}`} value={v.note} onChange={e => setField(item.id,"note",e.target.value)} placeholder="ระบุเหตุผล/สิ่งที่ไม่ได้ปฏิบัติ..." className="w-full rounded-lg border border-amber-300 px-2 py-2 outline-amber-400" /> : <span className="text-xs italic text-slate-400">- ครบถ้วน / ปกติ -</span>}</td>
                       </tr>;
                     })}</tbody>
                   </table>

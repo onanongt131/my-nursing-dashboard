@@ -241,11 +241,11 @@ export default function CategoryPage() {
   };
   
   return (
-    <div className="space-y-6">
+    <div className="w-full min-w-0 max-w-full space-y-5 overflow-x-hidden">
       {/* แถบหัวข้อและปุ่มพิมพ์ด้านบนสุด */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-5 rounded-2xl border border-slate-200/80 shadow-sm">
+      <div className="flex min-w-0 flex-col gap-4 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm sm:p-5 xl:flex-row xl:items-center xl:justify-between">
         <div>
-          <h1 className="text-xl font-extrabold text-slate-800 tracking-tight flex items-center gap-2">
+          <h1 className="flex items-center gap-2 text-lg font-extrabold leading-snug tracking-tight text-slate-800 sm:text-xl">
             <span>📊</span> ภาพรวมตัวชี้วัดตามหมวดหมู่ (NQA)
           </h1>
           <p className="text-xs text-slate-500 mt-1">
@@ -254,71 +254,51 @@ export default function CategoryPage() {
         </div>
         <button
           onClick={() => setShowReportModal(true)}
-          className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl text-sm font-bold shadow-sm transition-all flex items-center gap-2 cursor-pointer shrink-0"
+          className="px-5 py-2.5 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl text-sm font-bold shadow-sm transition-all flex items-center gap-2 cursor-pointer w-full justify-center sm:w-auto shrink-0"
         >
           <span>📄</span> ดูและพิมพ์รายงานภาพรวม
         </button>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* ฝั่งซ้าย: แผงควบคุมสรุปภาพรวม (ปรับให้กะทัดรัดขึ้นเป็น 3 คอลัมน์) */}
-        <div className="lg:col-span-3 flex flex-col space-y-4 sticky top-6">
-          <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-200/80 space-y-4 relative overflow-hidden">
-            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-500 via-amber-500 to-purple-600"></div>
-            
-            <div className="flex items-center justify-between border-b border-slate-100 pb-2.5">
-              <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wider">
-                {selectedCategory ? "สรุปผลหมวดนี้" : "สรุปภาพรวมทั้งหมด"}
-              </span>
-              <span className="text-xs px-2 py-0.5 bg-purple-50 text-purple-700 font-bold rounded-full">
-                {stats.total} ตัวชี้วัด
-              </span>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2.5">
-              <div className="bg-emerald-50/60 p-2.5 rounded-xl border border-emerald-100 flex flex-col">
-                <span className="text-emerald-700 font-semibold text-[10px] flex items-center gap-1">
-                  <span className="w-5 h-5 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[8px]">✓</span> ผ่าน
-                </span>
-                <span className="text-2xl font-black text-emerald-700 mt-0.5">{stats.passed}</span>
-              </div>
-
-              <div className="bg-rose-50/60 p-2.5 rounded-xl border border-rose-100 flex flex-col">
-                <span className="text-rose-700 font-semibold text-[10px] flex items-center gap-1">
-                  <span className="w-4 h-4 rounded-full bg-rose-500 text-white flex items-center justify-center text-[8px]">✕</span> ไม่ผ่าน
-                </span>
-                <span className="text-xl font-black text-rose-600 mt-0.5">{stats.failed}</span>
-              </div>
-            </div>
-
-            <div className="space-y-1.5 pt-1">
-              <div className="flex justify-between items-center text-xs">
-                <span className="text-slate-500 font-medium text-[11px]">อัตราความสำเร็จ</span>
-                <span className="font-extrabold text-slate-800">{stats.percent}%</span>
-              </div>
-              <div className="w-full bg-slate-100 h-2 rounded-full overflow-hidden">
-                <div 
-                  className="bg-gradient-to-r from-emerald-500 to-teal-500 h-full rounded-full transition-all duration-500"
-                  style={{ width: `${Math.min(stats.percent, 100)}%` }}
-                ></div>
-              </div>
-            </div>
-
-            {selectedCategory && (
-              <button 
-                onClick={() => setSelectedCategory(null)} 
-                className="w-full py-2 px-2 bg-purple-50 text-purple-700 hover:bg-purple-100 font-bold text-[11px] rounded-xl border border-purple-200 transition-all text-center shadow-sm cursor-pointer"
-              >
-                ← ดูภาพรวมทุกหมวด
-              </button>
-            )}
+      {/* สรุปทั้ง 4 ค่าอยู่ด้านบน เพื่อให้เหลือความกว้างสำหรับหมวด KPI */}
+      <div className="grid min-w-0 grid-cols-2 gap-3 xl:grid-cols-4">
+        <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <div className="text-xs font-semibold text-slate-500">{selectedCategory ? "ตัวชี้วัดในหมวด" : "ตัวชี้วัดทั้งหมด"}</div>
+          <div className="mt-2 text-3xl font-black tabular-nums text-slate-800">{stats.total}</div>
+        </div>
+        <div className="rounded-2xl border border-emerald-100 bg-emerald-50/70 p-4 shadow-sm">
+          <div className="text-xs font-semibold text-emerald-700">✓ ผ่านเป้าหมาย</div>
+          <div className="mt-2 text-3xl font-black tabular-nums text-emerald-700">{stats.passed}</div>
+        </div>
+        <div className="rounded-2xl border border-rose-100 bg-rose-50/70 p-4 shadow-sm">
+          <div className="text-xs font-semibold text-rose-700">✕ ไม่ผ่านเป้าหมาย*</div>
+          <div className="mt-2 text-3xl font-black tabular-nums text-rose-700">{stats.failed}</div>
+        </div>
+        <div className="rounded-2xl border border-teal-100 bg-teal-50/70 p-4 shadow-sm">
+          <div className="flex items-center justify-between gap-2 text-xs font-semibold text-teal-800">
+            <span>อัตราความสำเร็จ</span><span>{stats.percent}%</span>
+          </div>
+          <div className="mt-3 text-3xl font-black tabular-nums text-teal-800">{stats.percent}%</div>
+          <div className="mt-2 h-2 w-full overflow-hidden rounded-full bg-teal-100">
+            <div className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-teal-500" style={{ width: `${Math.min(stats.percent, 100)}%` }} />
           </div>
         </div>
+      </div>
+      <p className="text-[11px] text-slate-500">*สถานะสรุปใช้เกณฑ์เดิมของระบบ ซึ่งรวมรายการที่ไม่มีผลล่าสุดไว้ในจำนวนไม่ผ่าน</p>
 
-        {/* ฝั่งขวา: การ์ดหมวดหมู่ (ปรับเป็น 3 คอลัมน์) / เนื้อหา */}
-        <div className="lg:col-span-9 flex flex-col">
-          {!selectedCategory ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      {selectedCategory && (
+        <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <p className="min-w-0 break-words text-sm font-semibold text-slate-700">กำลังดู: {selectedCategory}</p>
+          <button onClick={() => setSelectedCategory(null)} className="shrink-0 self-start rounded-xl border border-purple-200 bg-purple-50 px-4 py-2 text-sm font-semibold text-purple-700 hover:bg-purple-100">← ดูภาพรวมทุกหมวด</button>
+        </div>
+      )}
+
+      {!selectedCategory ? (
+        <section className="min-w-0">
+          <h2 className="mb-3 text-base font-bold text-slate-800">ผลลัพธ์ตามหมวด NQA</h2>
+          {/* ใช้ container queries: จำนวนคอลัมน์อิงพื้นที่จริงหลังหัก Sidebar */}
+          <div className="@container w-full min-w-0">
+            <div className="grid grid-cols-1 gap-4 @[660px]:grid-cols-2 @[1150px]:grid-cols-3">
               {categories.map((cat, index) => {
                 const summaryData = totalCategoriesSummary[index];
                 const total = summaryData.total;
@@ -326,84 +306,56 @@ export default function CategoryPage() {
                 const failed = summaryData.failed;
                 const fullName = `${cat.prefix} ${cat.name}`;
                 const catPercent = total > 0 ? Math.round((passed / total) * 100) : 0;
-
                 return (
-                  <div 
-                    key={cat.id} 
-                    onClick={() => setSelectedCategory(fullName)} 
-                    className={`bg-white p-5 rounded-2xl border-2 border-slate-200/80 ${cat.borderColor} shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 cursor-pointer flex flex-col justify-between group relative overflow-hidden`}
+                  <button
+                    type="button"
+                    key={cat.id}
+                    onClick={() => setSelectedCategory(fullName)}
+                    className={`group relative flex min-w-0 flex-col justify-between overflow-hidden rounded-2xl border-2 border-slate-200/80 bg-white p-4 text-left shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-600 ${cat.borderColor}`}
                   >
-                    <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-500/40 via-indigo-500/40 to-blue-500/40 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-
-                    <div>
-                      <div className="flex items-center gap-3.5 mb-3">
-                        <span className="text-3xl p-2.5 bg-slate-50 rounded-2xl group-hover:scale-110 group-hover:bg-white group-hover:shadow-sm transition-all shrink-0">{cat.icon}</span>
-                        <div>
-                          <span className="text-xs font-extrabold text-purple-600 uppercase tracking-wider block mb-0.5">{cat.prefix}</span>
-                          <h3 className="font-bold text-sm text-slate-800 leading-snug line-clamp-1 group-hover:text-purple-950 transition-colors">{cat.name}</h3>
-                        </div>
-                      </div>
-                      <div className="border-t border-slate-100 my-3"></div>
-                    </div>
-                    
-                    <div className="space-y-3">
-                      <div className="flex justify-between items-end">
-                        <div className="flex flex-col">
-                            <span className="text-slate-400 text-[11px] font-medium">ตัวชี้วัดทั้งหมด</span>
-                            <span className="text-lg font-extrabold text-slate-700">{total}</span>
-                        </div>
-                        <div className="flex gap-4">
-                          <div className="flex flex-col items-end">
-                            <span className="text-emerald-600 text-[11px] font-medium">ผ่าน</span>
-                            <span className="text-lg font-extrabold text-emerald-600">{passed}</span>
-                          </div>
-                          <div className="flex flex-col items-end">
-                            <span className="text-rose-600 text-[11px] font-medium">ไม่ผ่าน</span>
-                            <span className="text-lg font-extrabold text-rose-600">{failed}</span>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      <div className="w-full bg-slate-100 h-1.5 rounded-full overflow-hidden">
-                        <div 
-                          className="bg-gradient-to-r from-purple-600 to-indigo-600 h-full rounded-full transition-all duration-500"
-                          style={{ width: `${catPercent}%` }}
-                        ></div>
+                    <div className="flex min-w-0 items-start gap-3">
+                      <span className="shrink-0 rounded-xl bg-slate-50 p-2 text-2xl" aria-hidden="true">{cat.icon}</span>
+                      <div className="min-w-0 flex-1">
+                        <span className="text-xs font-bold text-purple-600">{cat.prefix}</span>
+                        <h3 className="mt-1 break-words text-sm font-bold leading-relaxed text-slate-800 group-hover:text-purple-950">{cat.name}</h3>
                       </div>
                     </div>
-                  </div>
+                    <div className="mt-4 border-t border-slate-100 pt-3">
+                      <div className="grid grid-cols-3 gap-2 text-center">
+                        <div><div className="text-[11px] text-slate-500">ทั้งหมด</div><div className="text-xl font-extrabold tabular-nums text-slate-700">{total}</div></div>
+                        <div><div className="text-[11px] text-emerald-600">ผ่าน</div><div className="text-xl font-extrabold tabular-nums text-emerald-600">{passed}</div></div>
+                        <div><div className="text-[11px] text-rose-600">ไม่ผ่าน</div><div className="text-xl font-extrabold tabular-nums text-rose-600">{failed}</div></div>
+                      </div>
+                      <div className="mt-3 h-2 w-full overflow-hidden rounded-full bg-slate-100">
+                        <div className="h-full rounded-full bg-gradient-to-r from-purple-600 to-indigo-600" style={{ width: `${catPercent}%` }} />
+                      </div>
+                    </div>
+                  </button>
                 );
               })}
             </div>
-          ) : (
-            <div className="bg-white p-6 rounded-2xl border border-slate-200/80 shadow-sm space-y-4 animate-in slide-in-from-right-4 duration-300 flex flex-col">
-              <div className="flex items-center justify-between border-b pb-4">
-                <h2 className="text-base font-bold text-slate-800 flex items-center gap-2">
-                  <span>{categories.find(c => `${c.prefix} ${c.name}` === selectedCategory)?.icon}</span>
-                  <span>{selectedCategory}</span>
-                </h2>
-                <button 
-                  onClick={() => setSelectedCategory(null)}
-                  className="text-xs px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold rounded-lg transition-all cursor-pointer"
-                >
-                  ✕ ปิดมุมมองนี้
-                </button>
-              </div>
-              <div className="flex-1">
-                <CategoryClient category={selectedCategory} />
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
+          </div>
+        </section>
+      ) : (
+        <section className="min-w-0 max-w-full overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-3 shadow-sm sm:p-5">
+          <div className="mb-4 flex min-w-0 flex-wrap items-center justify-between gap-3 border-b pb-4">
+            <h2 className="min-w-0 break-words text-base font-bold text-slate-800">{categories.find(c => `${c.prefix} ${c.name}` === selectedCategory)?.icon} {selectedCategory}</h2>
+            <button type="button" onClick={() => setSelectedCategory(null)} className="shrink-0 rounded-lg bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-200">✕ ปิดมุมมองนี้</button>
+          </div>
+          {/* รายละเอียดอาจมีตารางกว้าง: เลื่อนเฉพาะบริเวณรายละเอียด */}
+          <div className="w-full min-w-0 max-w-full overflow-x-auto overscroll-x-contain">
+            <CategoryClient category={selectedCategory} />
+          </div>
+        </section>
+      )}
 
       {showReportModal && (
         <div className="fixed inset-0 z-50 bg-black/70 flex items-center justify-center p-2 sm:p-6 overflow-y-auto">
           <div className="bg-white rounded-2xl w-full max-w-[95vw] h-[92vh] flex flex-col shadow-2xl overflow-hidden">
             
-            <div className="px-6 py-4 border-b flex justify-between items-center bg-slate-50 shrink-0">
+            <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-b bg-slate-50 px-4 py-3 sm:px-6 sm:py-4">
               <h3 className="font-bold text-lg text-slate-800">พรีวิวรายงานตัวชี้วัด กลุ่มภารกิจด้านการพยาบาล</h3>
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <button 
                   onClick={handlePrintReport}
                   className="px-4 py-2 bg-purple-600 text-white rounded-xl text-sm font-bold hover:bg-purple-700 cursor-pointer flex items-center gap-1.5 shadow-sm"
@@ -419,13 +371,13 @@ export default function CategoryPage() {
               </div>
             </div>
 
-            <div className="p-6 sm:p-10 overflow-y-auto space-y-6 flex-1 bg-white text-xs">
+            <div className="min-h-0 flex-1 space-y-6 overflow-y-auto bg-white p-3 text-xs sm:p-6">
               <div className="text-center mb-6">
                 <h2 className="text-xl font-bold text-slate-800">สรุปผลการดำเนินงานตัวชี้วัด กลุ่มภารกิจด้านการพยาบาล</h2>
                 <p className="text-sm text-slate-500 mt-1">ประจำปีงบประมาณ 2569</p>
               </div>
 
-              <div className="w-full overflow-x-auto">
+              <div className="w-full min-w-0 max-w-full overflow-x-auto overscroll-x-contain">
                 <table className="w-full min-w-[850px] border-collapse text-left text-xs">
                   <thead>
                     <tr className="bg-slate-100 text-slate-800">

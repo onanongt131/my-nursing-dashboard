@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { canCreate, currentUser, db } from "@/lib/audits/server";
+import { canCreate, currentUser, db } from "@/lib/audits/chartServer";
 import { wpSpecialCriteria, type WpFormType } from "@/lib/wpSpecialCriteria";
 
 export const runtime = "nodejs";

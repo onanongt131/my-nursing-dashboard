@@ -38,21 +38,51 @@ export default function WpQaDashboard() {
   const fetchDepartmentsAndAllData = async () => {
     setLoading(true);
     try {
-      const deptRes = await supabase.from('departments').select('id, Department');
-      if (deptRes.error) {
-        console.warn("Could not fetch departments table:", deptRes.error.message);
-      } else if (deptRes.data) {
-        const excludedDepts = ["IC", "ฝ่ายการพยาบาล", "MICU 3", "ห้องคลอด", "ห้องผ่าตัด", "วิสัญญี", "OPD"];
-        const filteredData = deptRes.data.filter(item => !excludedDepts.includes(item.Department));
 
-        const formattedDepts = filteredData.map(item => ({
-          id: item.id,
-          name: item.Department 
-        }));
-        setDepartments(formattedDepts);
-      }
+const deptRes = await supabase
+  .from("departments")
+  .select("id, Department");
 
-      let allWpData: WpRecord[] = [];
+if (deptRes.error) {
+  console.warn(
+    "Could not fetch departments table:",
+    deptRes.error.message
+  );
+} else if (deptRes.data) {
+  const excludedDepts = [
+    "IC",
+    "ฝ่ายการพยาบาล",
+    "MICU 3",
+    "ห้องคลอด",
+    "ห้องผ่าตัด",
+    "วิสัญญี",
+    "OPD",
+  ];
+
+  type DeptRow = {
+    id: number | string;
+    Department: string;
+  };
+
+  const deptData = deptRes.data as DeptRow[];
+
+  const filteredData = deptData.filter(
+    (item: DeptRow) =>
+      !excludedDepts.includes(item.Department)
+  );
+
+  const formattedDepts = filteredData.map(
+    (item: DeptRow) => ({
+      id: item.id,
+      name: item.Department,
+    })
+  );
+
+  setDepartments(formattedDepts);
+}
+
+// โค้ดดึงข้อมูล WP/QA เดิมต่อจากตรงนี้
+let allWpData: WpRecord[] = [];
       let page = 0;
       const pageSize = 1000;
       let hasMore = true;
@@ -293,7 +323,7 @@ export default function WpQaDashboard() {
     <div className="p-6 bg-white rounded-xl shadow-xs space-y-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <h2 className="text-xl font-bold text-gray-800">ผลการประเมินแนวทางปฏิบัติ WP/QA</h2>
-        
+
         <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center space-x-2 bg-gray-50/80 px-3 py-2 rounded-xl border border-purple-100/60 shadow-xs">
             <label className="text-sm font-bold text-gray-700 whitespace-nowrap pl-2">📅 ปีงบประมาณ:</label>
@@ -333,8 +363,8 @@ export default function WpQaDashboard() {
 
         <div className="text-sm font-medium text-gray-600 bg-white/60 px-4 py-1.5 rounded-lg border border-purple-100/60 shadow-2xs">
           <span>
-            ผ่าน <strong className="text-emerald-700">{passCount}</strong> {selectedDept === '' ? 'หน่วยงาน' : 'ตัวชี้วัด'} / 
-            ไม่ผ่าน <strong className="text-rose-600">{failCount}</strong> {selectedDept === '' ? 'หน่วยงาน' : 'ตัวชี้วัด'} 
+            ผ่าน <strong className="text-emerald-700">{passCount}</strong> {selectedDept === '' ? 'หน่วยงาน' : 'ตัวชี้วัด'} /
+            ไม่ผ่าน <strong className="text-rose-600">{failCount}</strong> {selectedDept === '' ? 'หน่วยงาน' : 'ตัวชี้วัด'}
             <span className="text-gray-400 text-xs ml-1">(จากทั้งหมด {totalItemsCount})</span>
           </span>
         </div>
@@ -380,12 +410,12 @@ export default function WpQaDashboard() {
                     <td className="p-3.5 px-6 text-left border-r border-purple-100/60 font-medium text-gray-800 break-words leading-relaxed w-auto">
                       {row.labelName}
                     </td>
-                    
+
                     {row.months.map((val, idx) => {
                       let badgeStyle = "bg-gray-50/60 text-gray-400 border-gray-200/50 text-[10px] px-1 py-0.5 tracking-tighter";
                       if (val !== "ไม่มีข้อมูล") {
-                        badgeStyle = Number(val) >= 90 
-                          ? "bg-emerald-50 text-emerald-700 border-emerald-200/80 shadow-2xs text-xs px-1.5 py-0.5 font-semibold" 
+                        badgeStyle = Number(val) >= 90
+                          ? "bg-emerald-50 text-emerald-700 border-emerald-200/80 shadow-2xs text-xs px-1.5 py-0.5 font-semibold"
                           : "bg-rose-50 text-rose-700 border-rose-200/80 shadow-2xs text-xs px-1.5 py-0.5 font-semibold";
                       }
                       return (

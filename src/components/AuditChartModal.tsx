@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { ClipboardDocumentCheckIcon } from '@heroicons/react/24/outline';
 
 interface AuditChartModalProps {
@@ -65,7 +66,15 @@ export default function AuditChartModal({
     setLoadingList(false);
   };
 
-  if (!isOpen) return null;
+  // Lock background scrolling while the audit is open.
+  useEffect(() => {
+    if (!isOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = previousOverflow; };
+  }, [isOpen]);
+
+  if (!isOpen || typeof document === 'undefined') return null;
 
   const handleApprove = async (id?: string) => {
     const targetId = id || auditData.id;
@@ -185,10 +194,10 @@ export default function AuditChartModal({
 
   // --- ส่วนที่ 1: แสดงรายการรอตรวจสอบ (Pending View) ---
   if (currentMode === 'pending') {
-    return (
-      <div className="fixed inset-0 bg-emerald-950/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-2xl max-w-5xl w-full p-6 shadow-xl border border-emerald-100 space-y-6 max-h-[90vh] overflow-y-auto">
-          <div className="flex justify-between items-center border-b pb-3">
+    return createPortal(
+      <div role="dialog" aria-modal="true" aria-label="รายการ Audit Chart รอตรวจสอบ" className="fixed inset-0 bg-emerald-950/60 backdrop-blur-xs flex items-center justify-center z-[99999] p-2 sm:p-4">
+        <div className="bg-white rounded-2xl max-w-5xl w-full p-4 sm:p-6 shadow-xl border border-emerald-100 max-h-[95dvh] flex min-h-0 flex-col overflow-hidden gap-4">
+          <div className="flex shrink-0 justify-between items-center border-b pb-3">
             <h3 className="text-lg font-extrabold text-emerald-950 flex items-center gap-2">
               <ClipboardDocumentCheckIcon className="w-6 h-6 text-emerald-700" />
               รายการ Audit Chart รอตรวจสอบ ({departmentName || 'ไม่ระบุหน่วยงาน'})
@@ -196,7 +205,7 @@ export default function AuditChartModal({
             <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 font-bold text-lg">✕</button>
           </div>
 
-          <div className="space-y-4">
+          <div className="min-h-0 flex-1 space-y-4 overflow-y-auto">
             {loadingList ? (
               <p className="text-center py-8 text-gray-500">กำลังโหลดข้อมูล...</p>
             ) : pendingList.length === 0 ? (
@@ -257,16 +266,17 @@ export default function AuditChartModal({
             </div>
           </div>
         </div>
-      </div>
+      </div>,
+      document.body
     );
   }
 
   // --- ส่วนที่ 2: ฟอร์มกรอกข้อมูล / ตรวจสอบและอนุมัติ (Form View) ---
-  return (
-    <div className="fixed inset-0 bg-emerald-950/60 backdrop-blur-xs flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-2xl max-w-3xl w-full p-6 shadow-xl border border-emerald-100 space-y-6 max-h-[90vh] overflow-y-auto">
+  return createPortal(
+    <div role="dialog" aria-modal="true" aria-label="บันทึกผล Audit Chart" className="fixed inset-0 bg-emerald-950/60 backdrop-blur-xs flex items-center justify-center z-[99999] p-2 sm:p-4">
+      <div className="bg-white rounded-2xl max-w-5xl w-full p-4 sm:p-6 shadow-xl border border-emerald-100 max-h-[95dvh] flex min-h-0 flex-col overflow-hidden gap-4">
         
-        <div className="flex justify-between items-center border-b pb-3">
+        <div className="flex shrink-0 justify-between items-center border-b pb-3">
           <h3 className="text-lg font-extrabold text-emerald-950 flex items-center gap-2">
             <ClipboardDocumentCheckIcon className="w-6 h-6 text-emerald-700" />
             {isViewingExisting ? 'ตรวจสอบรายละเอียดและอนุมัติ Audit Chart' : 'บันทึกผล Audit Chart'} ({departmentName || 'ไม่ระบุหน่วยงาน'})
@@ -285,7 +295,7 @@ export default function AuditChartModal({
           </div>
         </div>
         
-        <form onSubmit={isViewingExisting ? (e) => { e.preventDefault(); handleApprove(); } : handleSave} className="space-y-6">
+        <form onSubmit={isViewingExisting ? (e) => { e.preventDefault(); handleApprove(); } : handleSave} className="min-h-0 flex-1 space-y-6 overflow-y-auto pr-1">
           
           {/* ข้อมูลทั่วไป */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-gray-50 p-4 rounded-xl border">
@@ -475,7 +485,7 @@ export default function AuditChartModal({
           </div>
 
           {/* ส่วนล่างสุด: ชื่อพยาบาล และปุ่มจัดการ */}
-          <div className="pt-2 flex flex-col md:flex-row justify-between items-end gap-4">
+          <div className="sticky bottom-0 z-10 -mx-1 flex flex-col md:flex-row justify-between items-end gap-4 border-t bg-white px-2 py-3 shadow-[0_-6px_12px_-12px_rgba(0,0,0,0.3)]">
             <div className="w-full md:w-1/2">
               <label className="block text-sm font-semibold text-emerald-900 mb-1">พยาบาลผู้ตรวจประเมิน (Auditor)</label>
               <input 
@@ -522,5 +532,6 @@ export default function AuditChartModal({
         </form>
       </div>
     </div>
+  , document.body
   );
 }

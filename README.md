@@ -1,37 +1,18 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# WP/QA เฉพาะหน่วยงาน พร้อมบันทึกจริง
 
-## Getting Started
+ติดตั้งจาก ZIP โดยคัดลอกไฟล์ `src/` ทั้งหมดเข้าตำแหน่งเดียวกันในโปรเจกต์ `nursing-dashboard-recovered` (สำรองของเดิมก่อน)
 
-First, run the development server:
+- `src/components/WpSpecialAuditModal.tsx` ฟอร์ม OR/OPD/ER/วิสัญญี/ห้องคลอด จำนวนประเมิน > 0, จำนวนปฏิบัติ 0..จำนวนประเมิน, หมายเหตุบังคับเมื่อทำไม่ครบ, ปุ่มบันทึกจริง
+- `src/components/UnitWpQaModal.tsx` เลือกฟอร์มตามหน่วยงาน และส่ง departmentId/onSuccess
+- `src/lib/wpSpecialCriteria.ts` เกณฑ์ทั้ง 5 หน่วยงานจากเอกสาร
+- `src/app/api/wp-special/route.ts` API ตรวจสอบ NextAuth, สิทธิ์, เกณฑ์และบันทึกข้อมูลแบบ pending ใน `nso_special_wp_records`
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
+**สำคัญ** ต้องมี `src/lib/audits/server.ts` จากชุดเชื่อม NSO Special Audit API ก่อนหน้านี้ และมี `src/auth.ts` ทำงานด้วย NextAuth, ENV `NEXT_PUBLIC_SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (server only). ตาราง `nso_special_wp_records` ต้องรัน SQL ก่อน
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+IPD `WpQaModal.tsx` ไม่เปลี่ยน ใช้ `wp_qa_records` เดิม
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+ปุ่ม WP QA ใน page.tsx จะทำงานกับ UnitWpQaModal เดิมทันที ไม่ต้องแก้ page.tsx ซ้ำ
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+**ยังไม่ได้รวมหน้ารายการ/หน้าสำหรับอนุมัติ WP เฉพาะ**: บันทึกสถานะ pending สำเร็จ แต่ badge รออนุมัติเดิมอ่านจาก wp_qa_records เท่านั้น ยังไม่รวม nso_special_wp_records; ห้ามนำ rows ของตารางใหม่ไปใช้ BatchDetailModal เดิมโดยไม่มีตัวแสดงรายละเอียดเฉพาะ
 
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+ตรวจ `npx tsc --noEmit`, `npm run build` กับโปรเจกต์จริงก่อนเปิดใช้

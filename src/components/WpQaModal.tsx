@@ -1,6 +1,7 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 
 interface WpQaModalProps {
   isOpen: boolean;
@@ -45,13 +46,30 @@ export default function WpQaModal({
   onSuccess,
 }: WpQaModalProps) {
   const [saving, setSaving] = useState(false);
+  const [portalReady, setPortalReady] = useState(false);
+
+  useEffect(() => { setPortalReady(true); }, []);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !saving) onClose();
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [isOpen, onClose, saving]);
   const [auditMonth, setAuditMonth] = useState(new Date().toISOString().slice(0, 7)); // รูปแบบ YYYY-MM
   const [auditorName, setAuditorName] = useState('');
   
   // เก็บข้อมูลแต่ละหัวข้อ
   const [formData, setFormData] = useState<Record<string, { total_evaluated: string; total_practiced: string; unpracticed_reasons: string }>>({});
 
-  if (!isOpen) return null;
+  if (!isOpen || !portalReady) return null;
 
   const handleChange = (id: string, field: string, value: string) => {
     setFormData(prev => {
@@ -144,12 +162,12 @@ export default function WpQaModal({
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-y-auto">
-      <div className="bg-white rounded-2xl shadow-xl max-w-5xl w-full max-h-[90vh] flex flex-col overflow-hidden">
+  return createPortal(
+    <div role="presentation" className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/65 p-2 sm:p-4">
+      <div role="dialog" aria-modal="true" aria-label={`บันทึกการประเมิน WP/QA ${departmentName}`} className="bg-white rounded-2xl shadow-2xl max-w-6xl w-full h-[min(92dvh,1000px)] flex flex-col min-h-0 overflow-hidden">
         
         {/* Header */}
-        <div className="bg-emerald-900 text-white px-6 py-4 flex justify-between items-center">
+        <div className="bg-emerald-900 text-white px-5 py-3 flex shrink-0 justify-between items-center">
           <div>
             <h2 className="text-lg font-bold">บันทึกการประเมิน WP/QA</h2>
             <p className="text-xs text-emerald-200">หน่วยงาน: {departmentName}</p>
@@ -158,7 +176,7 @@ export default function WpQaModal({
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSave} className="flex-1 overflow-y-auto p-6 space-y-6">
+        <form onSubmit={handleSave} className="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 sm:p-6 space-y-6">
           
           {/* ข้อมูลส่วนหัว: เดือนและชื่อผู้ประเมิน */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-emerald-50/50 p-4 rounded-xl border border-emerald-100">
@@ -186,8 +204,8 @@ export default function WpQaModal({
           </div>
 
           {/* ตารางหัวข้อ WP/QA */}
-          <div className="border border-emerald-100 rounded-xl overflow-hidden shadow-sm">
-            <table className="w-full text-left border-collapse text-sm">
+          <div className="border border-emerald-100 rounded-xl overflow-x-auto shadow-sm">
+            <table className="w-full min-w-[850px] text-left border-collapse text-sm">
               <thead>
                 <tr className="bg-emerald-100/70 text-emerald-950 font-bold border-b border-emerald-200">
                   <th className="p-3 w-[40%]">หัวข้อ WP / QA</th>
@@ -251,7 +269,7 @@ export default function WpQaModal({
           </div>
 
           {/* Footer Actions */}
-          <div className="flex justify-end gap-3 pt-4 border-t border-gray-100">
+          <div className="sticky bottom-0 z-10 -mx-4 sm:-mx-6 -mb-4 sm:-mb-6 bg-white border-t border-gray-200 p-3 sm:p-4 flex justify-end gap-3 shadow-[0_-5px_14px_rgba(0,0,0,0.06)]">
             <button 
               type="button" 
               onClick={onClose}
@@ -271,5 +289,5 @@ export default function WpQaModal({
         </form>
       </div>
     </div>
-  );
+  , document.body);
 }

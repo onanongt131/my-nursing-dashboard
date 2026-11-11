@@ -3,12 +3,15 @@ import Credentials from "next-auth/providers/credentials";
 import { createClient } from "@supabase/supabase-js";
 import { NextResponse } from "next/server";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+function serverAuthClient() {
+  return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+    auth: {persistSession:false,autoRefreshToken:false,detectSessionInUrl:false},
+  });
+}
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
+  pages: { signIn: "/login" },
+  session: { strategy: "jwt" },
   providers: [
     Credentials({
       async authorize(credentials) {
@@ -18,7 +21,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         const password = credentials.password as string;
 
         // 1. ตรวจสอบรหัสผ่านและตัวตนผ่าน Supabase Auth โดยตรง (เช็คใน auth.users ให้อัตโนมัติ)
-        const { data, error } = await supabase.auth.signInWithPassword({
+        const { data, error } = await serverAuthClient().auth.signInWithPassword({
           email,
           password,
         });
@@ -28,7 +31,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         }
 
         // 2. ดึงข้อมูล profile มาเช็คสถานะการอนุมัติ (status)
-        const { data: profile, error: profileError } = await supabase
+        const { data: profile, error: profileError } = await serverAuthClient()
           .from("profiles")
           .select("*")
           .eq("id", data.user.id)
@@ -64,7 +67,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
     },
     async session({ session, token }) {
       if (session.user) {
-        (session.user as any).id = token.id;
+        (session.user as any).id = token.id || token.sub;
         (session.user as any).role = token.role;
       }
       return session;

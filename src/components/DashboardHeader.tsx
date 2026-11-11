@@ -1,17 +1,18 @@
  'use client';
 
 import Link from 'next/link';
+import MemberApprovalLink from '@/components/MemberApprovalLink';
 import LogoutButton from '@/components/LogoutButton';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createClient } from '@/utils/supabase/client';
 
 type Department = { id?: string | number; Department?: string; department_name?: string; name?: string; group?: string; group_name?: string };
-type Props = { title?: string; activeTab?: string; onTabChange?: (tab: string) => void; departments?: Department[]; userName?: string; userRole?: string; userGroup?: string; selectedSidebar?: string | null; onSidebarSelect?: (section: string | null) => void };
+type Props = { departmentId?:string|number|null;onNavigate?:(section:string,href:string)=>void; title?: string; activeTab?: string; onTabChange?: (tab: string) => void; departments?: Department[]; userName?: string; userRole?: string; userGroup?: string; selectedSidebar?: string | null; onSidebarSelect?: (section: string | null) => void };
 type NavItem = { label: string; href?: string; tab?: string; desc?: string };
 type NavSection = { title: string; items: NavItem[] };
 
-export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [], userName, userRole, userGroup, selectedSidebar, onSidebarSelect }: Props) => {
+export const DashboardHeader = ({ departmentId,onNavigate,title, activeTab, onTabChange, departments = [], userName, userRole, userGroup, selectedSidebar, onSidebarSelect }: Props) => {
   const pathname = usePathname();
   const router = useRouter();
   const [supabase] = useState(() => createClient());
@@ -78,6 +79,10 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
     { name: 'wp-qa', label: 'WP/QA', path: '/dashboard/wp-qa' },
     { name: 'iv-care', label: 'IV care', path: '/dashboard/iv-care' },
     { name: 'audit-chart', label: 'Audit chart', path: '/dashboard/audit-chart' },
+    { name: 'fall-report', label: 'Fall', path: '/dashboard/fall-report' },
+    { name: 'pressure-sore-report', label: 'Pressure sore', path: '/dashboard/pressure-sore-report' },
+    { name: 'readmit-report', label: 'Re-admit', path: '/dashboard/readmit-report' },
+    { name: 'ama-report', label: 'จำหน่ายไม่สมัครใจ (AMA)', path: '/dashboard/ama-report' },
   ];
 
 
@@ -157,16 +162,17 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
   const sectionLandingRoutes: Record<string, string> = {
     dashboard: '/dashboard/nursing-dashboard/executive',
     nso: '/dashboard/nso-strategy',
-    work: '/dashboard/departments',
+    work: departmentId?'/dashboard/departments/'+encodeURIComponent(String(departmentId)):'/dashboard/departments',
     report: '/dashboard/category',
   };
   const selectTopSection = (section: string) => {
-    onSidebarSelect?.(section);
     close();
-    const destination = sectionLandingRoutes[section];
-    if (destination && pathname !== destination) router.push(destination);
+    const destination=sectionLandingRoutes[section];
+    if(destination&&onNavigate){onNavigate(section,destination);return;}
+    onSidebarSelect?.(section);
+    if(destination&&pathname!==destination)router.push(destination);
   };
-  const active = (id:string) => id==='dashboard' ? pathname.startsWith('/dashboard/nursing-dashboard') : id==='nso' ? pathname.startsWith('/dashboard/nso-strategy') : id==='work' ? ['/dashboard/departments','/dashboard/nursing/','/dashboard/committee','/dashboard/staffing'].some(p=>pathname.startsWith(p)) : false;
+  const active = (id:string) => id==='dashboard' ? pathname.startsWith('/dashboard/nursing-dashboard') : id==='nso' ? pathname.startsWith('/dashboard/nso-strategy') : id==='work' ? ['/dashboard/departments','/dashboard/nursing/','/dashboard/committee','/dashboard/staffing','/dashboard/p4p'].some(p=>pathname.startsWith(p)) : false;
   const cls = 'inline-flex items-center justify-center rounded-xl px-3 py-2.5 text-sm font-semibold whitespace-nowrap transition-colors min-w-0';
   return <div ref={containerRef} className="relative z-40 w-full rounded-xl border border-emerald-100 bg-white shadow-sm">
     <header className="flex items-center justify-between gap-3 border-b border-gray-100 px-3 py-3 sm:px-6">
@@ -176,7 +182,7 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
         <div className="min-w-0"><h1 className="truncate text-base font-bold text-emerald-950 sm:text-xl">{title || 'กลุ่มภารกิจด้านการพยาบาล'}</h1><p className="text-xs text-gray-500">โรงพยาบาลวชิระภูเก็ต</p></div>
       </Link>
       <div className="hidden items-center gap-3 md:flex">
-        {userRole?.toLowerCase()==='admin' && <Link href="/dashboard/admin/approve-members" className="rounded-xl border border-emerald-200 px-3 py-2 text-sm font-semibold text-emerald-900">อนุมัติสมาชิก</Link>}
+        {userRole?.toLowerCase()==='admin' && <MemberApprovalLink/>}
         <span className="text-sm font-semibold text-emerald-900">{displayUserName}<span className="ml-2 text-xs font-normal text-emerald-600">{userRole} {userGroup ? `(${userGroup})` : ''}</span></span>
         <LogoutButton />
       </div>

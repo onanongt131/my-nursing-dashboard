@@ -185,7 +185,7 @@ export default function Strategic() {
                       {showDiseaseColumn && <th className="whitespace-nowrap px-3 py-3">โรค</th>}
                       <th className="whitespace-nowrap px-3 py-3">ตัวชี้วัด (KPI)</th>
                       <th className="whitespace-nowrap px-3 py-3 text-center">Goal</th>
-                      {[2565, 2566, 2567, 2568, 2569].map(y => <th key={y} className="whitespace-nowrap px-3 py-3 text-center">{y}</th>)}
+                      {[2565, 2566, 2567, 2568, 2569, 2570].map(y => <th key={y} className="whitespace-nowrap px-3 py-3 text-center">{y}</th>)}
                       <th className="whitespace-nowrap px-3 py-3 text-center">Trend</th>
                       <th className="whitespace-nowrap px-3 py-3 text-center">Action</th>
                     </tr>
@@ -202,7 +202,7 @@ export default function Strategic() {
                           {showDiseaseColumn && <td className="min-w-[110px] px-3 py-3 font-medium text-gray-600">{kpi.disease_name || "-"}</td>}
                           <td className="min-w-[260px] max-w-[390px] break-words px-3 py-3 font-medium leading-relaxed text-gray-900">{kpi.name}</td>
                           <td className="whitespace-nowrap px-3 py-3 text-center font-bold text-gray-700">{kpi.operator} {kpi.target_value}</td>
-                          {[2565, 2566, 2567, 2568, 2569].map((year) => {
+                          {[2565, 2566, 2567, 2568, 2569, 2570].map((year) => {
                             const avg = calculateYearlySummary(kpi.kpi_entries || [], year, kpi.Type);
                             const hasData = avg !== null && avg !== "-" && avg !== ""; 
                             const pass = hasData ? checkStatus(Number(avg), kpi.target_value, kpi.operator) : false;
@@ -252,7 +252,7 @@ export default function Strategic() {
               </div>
               <h3 className="mb-6 max-w-full break-words pr-24 text-lg font-bold">{selectedKpi.name}</h3>
               <ResponsiveContainer height={250} width="100%" minWidth={0}>
-                <BarChart data={[2565, 2566, 2567, 2568, 2569].map(y => ({ 
+                <BarChart data={[2565, 2566, 2567, 2568, 2569, 2570].map(y => ({ 
                   year: y, 
                   v: Number(calculateYearlySummary(selectedKpi.kpi_entries || [], y, selectedKpi.Type)) || 0 
                 }))}>

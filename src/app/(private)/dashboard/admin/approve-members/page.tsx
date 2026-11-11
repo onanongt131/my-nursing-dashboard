@@ -1,113 +1,33 @@
 "use client";
-import { useEffect, useState } from 'react';
-import { createClient } from '@/utils/supabase/client';
-
-export default function ApproveMembersPage() {
-  const [users, setUsers] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const supabase = createClient();
-
-  useEffect(() => {
-    fetchPendingUsers();
-  }, []);
-
-  const fetchPendingUsers = async () => {
-    setLoading(true);
-    // ดึงเฉพาะคนที่สถานะเป็น NULL หรือ pending
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .or('status.is.null,status.eq.pending'); 
-    
-    if (data) setUsers(data);
-    setLoading(false);
-  };
-
-  const approveUser = async (id: string) => {
-    const { error } = await supabase
-      .from('profiles')
-      .update({ status: 'approved' })
-      .eq('id', id);
-
-    if (!error) {
-      alert("อนุมัติสมาชิกเรียบร้อยแล้ว");
-      fetchPendingUsers(); // รีเฟรชรายชื่อ
-    } else {
-      alert("เกิดข้อผิดพลาดในการอนุมัติ");
-    }
-  };
-
-  return (
-    <div className="space-y-6">
-      {/* Header หัวข้อหน้า */}
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 flex items-center justify-between">
-        <div>
-          <h1 className="text-xl font-bold text-emerald-950">อนุมัติสมาชิกใหม่</h1>
-          <p className="text-sm text-gray-500 mt-1">จัดการรายชื่อบุคลากรที่ลงทะเบียนและรอการอนุมัติสิทธิ์เข้าใช้งานระบบ</p>
-        </div>
-        <div className="bg-emerald-50 text-emerald-800 text-xs font-semibold px-3 py-1.5 rounded-xl border border-emerald-200">
-          รออนุมัติ: {users.length} รายการ
-        </div>
-      </div>
-
-      {/* ตารางแสดงข้อมูล */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
-            <thead>
-              <tr className="bg-emerald-900 text-white text-sm">
-                <th className="p-4 font-semibold">ชื่อ-นามสกุล</th>
-                <th className="p-4 font-semibold">อีเมล</th>
-                <th className="p-4 font-semibold">สถานะ</th>
-                <th className="p-4 font-semibold text-center">จัดการ</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100 text-sm">
-              {loading ? (
-                <tr>
-                  <td colSpan={4} className="p-8 text-center text-gray-400">
-                    กำลังโหลดข้อมูล...
-                  </td>
-                </tr>
-              ) : users.length === 0 ? (
-                <tr>
-                  <td colSpan={4} className="p-12 text-center text-gray-400">
-                    <div className="flex flex-col items-center justify-center space-y-2">
-                      <svg className="w-10 h-10 text-emerald-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      <p className="font-medium text-gray-600">ไม่มีรายชื่อที่รอการอนุมัติในขณะนี้</p>
-                    </div>
-                  </td>
-                </tr>
-              ) : (
-                users.map((user) => (
-                  <tr key={user.id} className="hover:bg-gray-50/60 transition-colors">
-                    <td className="p-4 font-medium text-gray-800">{user.full_name || '-'}</td>
-                    <td className="p-4 text-gray-600">{user.email || '-'}</td>
-                    <td className="p-4">
-                      <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
-                        {user.status || 'รออนุมัติ'}
-                      </span>
-                    </td>
-                    <td className="p-4 text-center">
-                      <button 
-                        onClick={() => approveUser(user.id)}
-                        className="bg-emerald-800 hover:bg-emerald-900 text-amber-300 font-semibold px-4 py-2 rounded-xl transition-all shadow-sm cursor-pointer text-xs flex items-center justify-center gap-1.5 mx-auto"
-                      >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                        </svg>
-                        อนุมัติสิทธิ์
-                      </button>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  );
+import {useEffect,useState} from 'react';
+type Member={id:string;full_name:string|null;email:string|null;status:string|null;role:string|null;department_id:number|null};
+export default function ApproveMembersPage(){
+ const [users,setUsers]=useState<Member[]>([]),[loading,setLoading]=useState(true),[busy,setBusy]=useState<{id:string;remove:boolean}|null>(null),[error,setError]=useState(''),[message,setMessage]=useState('');
+ async function refresh(signal?:AbortSignal){setLoading(true);setError('');try{const response=await fetch('/api/admin/members',{cache:'no-store',signal});const result=await response.json();if(!response.ok)throw new Error(result.error||'อ่านรายชื่อไม่สำเร็จ');if(!signal?.aborted)setUsers(result.items||[]);}catch(e){if(!signal?.aborted)setError(e instanceof Error?e.message:'อ่านรายชื่อไม่สำเร็จ');}finally{if(!signal?.aborted)setLoading(false);}}
+ useEffect(()=>{const controller=new AbortController();void refresh(controller.signal);return()=>controller.abort();},[]);
+ async function updateMember(member: Member, remove = false) {
+  if (busy) return;
+  if (remove && !window.confirm(`ลบคำขอสมัครของ ${member.full_name || member.email || 'สมาชิกนี้'} หรือไม่?`)) return;
+  const action = remove ? 'ลบคำขอสมัคร' : 'อนุมัติสมาชิก';
+  setBusy({id:member.id,remove});
+  setError('');
+  setMessage('');
+  try {
+   const response = await fetch(`/api/admin/members/${encodeURIComponent(member.id)}`, {method:remove ? 'DELETE' : 'PATCH'});
+   const result = await response.json();
+   if (!response.ok) throw new Error(result.error || `${action}ไม่สำเร็จ`);
+   setUsers(rows => rows.filter(row => row.id !== member.id));
+   setMessage(`${action}เรียบร้อยแล้ว`);
+   window.dispatchEvent(new Event('members-updated'));
+  } catch (error) {
+   setError(error instanceof Error ? error.message : `${action}ไม่สำเร็จ`);
+  } finally {
+   setBusy(null);
+  }
+ }
+ return <div className="space-y-4">
+  <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm"><div><h1 className="text-xl font-bold text-emerald-950">อนุมัติสมาชิกใหม่</h1><p className="mt-1 text-sm text-gray-500">รายชื่อที่สถานะว่างหรือรออนุมัติ</p></div><div className="flex items-center gap-3"><span className="rounded-xl bg-emerald-50 px-3 py-2 text-sm text-emerald-800">รออนุมัติ: {loading?'…':error?'ตรวจสอบไม่สำเร็จ':users.length} รายการ</span><button onClick={()=>void refresh()} disabled={loading||!!busy} className="rounded-xl border px-3 py-2 text-sm disabled:opacity-50">โหลดใหม่</button></div></div>
+  {error&&<p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-800">{error}</p>}{message&&<p role="status" className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">{message}</p>}
+  <div className="overflow-x-auto rounded-2xl border bg-white"><table className="w-full text-left text-sm"><thead className="bg-emerald-900 text-white"><tr>{['ชื่อ-นามสกุล','อีเมล','สถานะ','จัดการ'].map(label=><th key={label} className="p-3">{label}</th>)}</tr></thead><tbody className="divide-y">{loading?<tr><td colSpan={4} className="p-8 text-center">กำลังโหลดข้อมูล…</td></tr>:error&&users.length===0?<tr><td colSpan={4} className="p-8 text-center text-red-700">ไม่สามารถตรวจสอบรายชื่อได้ กรุณาโหลดใหม่</td></tr>:users.length===0?<tr><td colSpan={4} className="p-8 text-center text-gray-500">ไม่มีรายชื่อที่รอการอนุมัติในขณะนี้</td></tr>:users.map(user=><tr key={user.id}><td className="p-3">{user.full_name||'-'}</td><td className="p-3">{user.email||'-'}</td><td className="p-3"><span className="rounded-full bg-amber-50 px-3 py-1 text-amber-800">รออนุมัติ</span></td><td className="p-3"><div className="flex items-center gap-2 whitespace-nowrap"><button onClick={()=>void updateMember(user)} disabled={!!busy} className="rounded-xl bg-emerald-800 px-4 py-2 font-semibold text-white disabled:opacity-50">{busy?.id===user.id&&!busy.remove?'กำลังอนุมัติ…':'อนุมัติสิทธิ์'}</button><button type="button" onClick={()=>void updateMember(user,true)} disabled={!!busy} className="rounded-xl border border-red-200 bg-red-50 px-4 py-2 font-semibold text-red-700 hover:bg-red-100 disabled:opacity-50">{busy?.id===user.id&&busy.remove?'กำลังลบ…':'ลบ'}</button></div></td></tr>)}</tbody></table></div>
+ </div>;
 }

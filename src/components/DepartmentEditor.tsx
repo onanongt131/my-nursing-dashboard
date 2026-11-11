@@ -1,6 +1,5 @@
 'use client';
 import { useState, useEffect } from 'react';
-import { createClient } from '@/utils/supabase/client';
 import { PencilSquareIcon, CheckIcon, XMarkIcon } from '@heroicons/react/24/solid';
 import { Presentation } from 'lucide-react';
 
@@ -10,7 +9,9 @@ interface DepartmentEditorProps {
 }
 
 export default function DepartmentEditor({ departmentId, onClose }: DepartmentEditorProps) {
-  const supabase = createClient();
+  const [fetchError,setFetchError]=useState('');
+  const [reload,setReload]=useState(0);
+  const [canEdit,setCanEdit]=useState(false);
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(true);
   const [isEditing, setIsEditing] = useState(false); // สถานะสลับระหว่าง View กับ Edit
@@ -24,55 +25,11 @@ export default function DepartmentEditor({ departmentId, onClose }: DepartmentEd
   const [docFile, setDocFile] = useState<File | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // โหลดข้อมูลเดิมของหน่วยงาน
-  useEffect(() => {
-    async function fetchDeptInfo() {
-      if (!departmentId) return;
-      setFetching(true);
-      try {
-        // แปลง departmentId เป็น Number (หรือ String ตามประเภทของคอลัมน์ใน Supabase)
-        const targetId = Number(departmentId); 
-
-        const { data, error } = await supabase
-          .from('department_profiles') 
-          .select('presentation_text, video_url, image_url, document_url')
-          .eq('department_id', targetId) 
-          .maybeSingle();
-
-        if (error) {
-          console.error('Error fetching department profile:', JSON.stringify(error, null, 2));
-        } else if (data) {
-          setPresentationText(data.presentation_text || '');
-          setVideoUrl(data.video_url || '');
-          setImageUrl(data.image_url || ''); 
-          setDocumentUrl(data.document_url || '');
-        }
-      } catch (err) {
-        console.error('Unexpected error:', err);
-      } finally {
-        setFetching(false);
-      }
-    }
-    fetchDeptInfo();
-  }, [departmentId, supabase]);
-
-  // ฟังก์ชันอัปโหลดไฟล์ไปยัง Supabase Storage
-  const uploadFile = async (file: File, folder: string) => {
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${departmentId}_${Date.now()}.${fileExt}`;
-    const filePath = `${folder}/${fileName}`;
-
-    const { error: uploadError } = await supabase.storage
-      .from('department_files')
-      .upload(filePath, file);
-
-    if (uploadError) {
-      throw uploadError;
-    }
-
-    const { data } = supabase.storage.from('department_files').getPublicUrl(filePath);
-    return data.publicUrl;
-  };
+  useEffect(()=>{
+    const controller=new AbortController();setFetching(true);setFetchError('');setPresentationText('');setImageUrl('');setVideoUrl('');setDocumentUrl('');setCanEdit(false);setIsEditing(false);
+    fetch('/api/department-profile?'+new URLSearchParams({department_id:String(departmentId)}),{cache:'no-store',signal:controller.signal}).then(async r=>{const body=await r.json();if(!r.ok)throw new Error(body.error||'อ่านข้อมูลแนะนำหน่วยงานไม่สำเร็จ');const d=body.profile||{};setPresentationText(d.presentation_text||'');setImageUrl(d.image_url||'');setVideoUrl(d.video_url||'');setDocumentUrl(d.document_url||'');setCanEdit(body.canEdit===true);}).catch(e=>{if(e.name!=='AbortError')setFetchError(e.message);}).finally(()=>{if(!controller.signal.aborted)setFetching(false);});return()=>controller.abort();
+  },[departmentId,reload]);
+  const uploadFile=async(file:File,folder:string)=>{const form=new FormData();form.set('department_id',String(departmentId));form.set('folder',folder);form.set('file',file);const r=await fetch('/api/department-profile',{method:'POST',body:form}),body=await r.json();if(!r.ok)throw new Error(body.error||'อัปโหลดไม่สำเร็จ');return body.url;};
 
   // บันทึกข้อมูล
   const handleSave = async (e: React.FormEvent) => {
@@ -91,18 +48,7 @@ export default function DepartmentEditor({ departmentId, onClose }: DepartmentEd
         finalDocUrl = await uploadFile(docFile, 'documents');
       }
 
-      // แก้ไขตรงนี้: ใช้ตาราง 'department_profiles' ให้ตรงกับที่ดึงข้อมูลมา
-      const { error } = await supabase
-        .from('department_profiles') 
-        .upsert({
-          department_id: departmentId, // ต้องระบุ ID เพื่อให้ทราบว่าอัปเดตของใคร
-          presentation_text: presentationText,
-          video_url: videoUrl,
-          image_url: finalImgUrl,      // แก้ไขจาก infographic_url เป็น image_url
-          document_url: finalDocUrl,
-        }, { onConflict: 'department_id' }); // ใช้ onConflict เพื่อให้ Update ข้อมูลเดิมได้
-
-      if (error) throw error;
+      const response=await fetch('/api/department-profile',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({department_id:departmentId,presentation_text:presentationText,video_url:videoUrl,image_url:finalImgUrl,document_url:finalDocUrl})});const result=await response.json();if(!response.ok)throw new Error(result.error||'บันทึกไม่สำเร็จ');
 
       setImageUrl(finalImgUrl);
       setDocumentUrl(finalDocUrl);
@@ -111,7 +57,7 @@ export default function DepartmentEditor({ departmentId, onClose }: DepartmentEd
       setIsEditing(false);
       
       if (onClose) onClose();
-      window.location.reload();
+      setReload(v=>v+1);
     } catch (err: any) {
       console.error('Error saving profile:', err);
       alert('เกิดข้อผิดพลาดในการบันทึกข้อมูล: ' + err.message);
@@ -120,6 +66,7 @@ export default function DepartmentEditor({ departmentId, onClose }: DepartmentEd
     }
   };
 
+  if(fetchError)return <div role="alert" className="rounded-xl bg-red-50 p-3 text-xs text-red-800">{fetchError}<button type="button" onClick={()=>setReload(v=>v+1)} className="mt-2 block underline">ลองโหลดข้อมูลอีกครั้ง</button></div>;
   if (fetching) return <div className="text-center py-6 text-gray-400 text-xs">กำลังโหลด...</div>;
 
   if (!isEditing) {
@@ -130,7 +77,7 @@ export default function DepartmentEditor({ departmentId, onClose }: DepartmentEd
         <div className="flex justify-between items-center border-b pb-3">
           <h3 className="text-sm font-bold text-gray-800">ข้อมูลแนะนำหน่วยงาน</h3>
           <button
-            onClick={() => setIsEditing(true)}
+            disabled={!canEdit} onClick={() => setIsEditing(true)}
             className="px-3 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg text-xs font-bold flex items-center gap-1.5 transition cursor-pointer border border-emerald-200"
           >
             <PencilSquareIcon className="w-4 h-4" />
@@ -142,7 +89,7 @@ export default function DepartmentEditor({ departmentId, onClose }: DepartmentEd
           <div className="text-center py-8 text-gray-400 space-y-2">
             <p className="text-xs">ยังไม่มีข้อมูลแนะนำหน่วยงาน</p>
             <button
-              onClick={() => setIsEditing(true)}
+              disabled={!canEdit} onClick={() => setIsEditing(true)}
               className="px-4 py-2 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold shadow-sm transition cursor-pointer"
             >
               + เพิ่มข้อมูลแนะนำหน่วยงาน

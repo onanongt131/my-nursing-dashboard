@@ -1,7 +1,11 @@
 'use client';
 
-import { useState } from 'react';
-import { Pill, Droplets, User, Users } from 'lucide-react'; // นำเข้าไอคอนสำหรับแต่ละด้าน
+import { useState, useEffect } from 'react';
+import {createPortal} from 'react-dom';
+import {saveUnitRecord} from '@/lib/unitRecords/client';
+import IvCareFactorFields from '@/components/IvCareFactorFields';
+import {IV_FACTOR_GROUPS,type IvFactorSelection} from '@/lib/ivCareFactors';
+
 
 interface IvCareModalProps {
   isOpen: boolean;
@@ -50,11 +54,7 @@ export default function IvCareModal({
   const [site, setSite] = useState('');
   const [otherSite, setOtherSite] = useState('');
   
-  const [factorDrug, setFactorDrug] = useState('');
-  const [factorFluid, setFactorFluid] = useState('');
-  const [factorPatient, setFactorPatient] = useState('');
-  const [factorPersonnel, setFactorPersonnel] = useState('');
-
+  const [factors,setFactors]=useState<IvFactorSelection>({});
   // State ส่วนที่ 2
   const [auditMonth, setAuditMonth] = useState(new Date().toISOString().slice(0, 7));
   const [totalDays, setTotalDays] = useState('');
@@ -65,17 +65,20 @@ export default function IvCareModal({
   const [overCount, setOverCount] = useState('');
   const [underCount, setUnderCount] = useState('');
 
-  if (!isOpen) return null;
+  const [ready,setReady]=useState(false);
+  useEffect(()=>setReady(true),[]);
+  useEffect(()=>{if(!isOpen)return;const before=document.body.style.overflow;document.body.style.overflow='hidden';return()=>{document.body.style.overflow=before;};},[isOpen]);
+  if(!ready||!isOpen)return null;
 
   const handleSaveComplication = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!departmentId) return;
+    if (!departmentId || saving) return;
 
     setSaving(true);
     try {
       const finalSite = site === 'อื่นๆ ระบุเพิ่ม' ? `อื่นๆ: ${otherSite}` : site;
 
-      const { error } = await supabase.from('iv_care_complications').insert({
+      await saveUnitRecord('iv-complication',{
         department_id: Number(departmentId),
         record_date: compDate,
         hn,
@@ -84,14 +87,10 @@ export default function IvCareModal({
         grade: Number(grade),
         route,
         site: finalSite,
-        factor_drug: factorDrug || null,
-        factor_fluid: factorFluid || null,
-        factor_patient: factorPatient || null,
-        factor_personnel: factorPersonnel || null,
+        contributing_factors: {version:1,groups:IV_FACTOR_GROUPS.map(group=>({code:group.code,label:group.label,items:group.children.filter(parent=>factors[parent.code]).map(parent=>({code:parent.code,label:parent.label,detail:factors[parent.code].detail.trim(),causes:parent.options.filter(sub=>factors[parent.code].selected.includes(sub.code)).map(sub=>({code:sub.code,label:sub.label}))}))})).filter(group=>group.items.length)},
         status: 'pending', // 👈 เพิ่มสถานะเริ่มต้นเพื่อให้หัวหน้าตรวจสอบอนุมัติ
       });
 
-      if (error) throw error;
 
       alert('บันทึกภาวะแทรกซ้อน IV Care สำเร็จ (รอหัวหน้าตรวจสอบ)');
       setHn('');
@@ -101,10 +100,7 @@ export default function IvCareModal({
       setRoute('');
       setSite('');
       setOtherSite('');
-      setFactorDrug('');
-      setFactorFluid('');
-      setFactorPatient('');
-      setFactorPersonnel('');
+      setFactors({});
       onSuccess();
       onClose(); // เพิ่มการปิด Modal หลังจากบันทึกสำเร็จ (ตามความเหมาะสม)
     } catch (error: any) {
@@ -116,11 +112,11 @@ export default function IvCareModal({
 
   const handleSaveMonthly = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!departmentId) return;
+    if (!departmentId || saving) return;
 
     setSaving(true);
     try {
-      const { error } = await supabase.from('iv_care_monthly_summaries').upsert({
+      await saveUnitRecord('iv-summary',{
         department_id: Number(departmentId),
         audit_month: auditMonth,
         total_infusion_days: Number(totalDays) || 0,
@@ -129,9 +125,8 @@ export default function IvCareModal({
         first_attempt_punctures: Number(firstAttemptPunctures) || 0,
         over_count: overCount !== '' ? Number(overCount) : null,
         under_count: underCount !== '' ? Number(underCount) : null,
-      }, { onConflict: 'department_id, audit_month' });
+      });
 
-      if (error) throw error;
 
       alert('บันทึกข้อมูลสรุปรายเดือน IV Care สำเร็จ');
       onSuccess();
@@ -143,12 +138,12 @@ export default function IvCareModal({
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-y-auto">
-      <div className="bg-white rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] flex flex-col overflow-hidden">
+  return createPortal(
+    <div role="dialog" aria-modal="true" aria-label="บันทึกข้อมูล IV Care" className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/50 p-4 overflow-y-auto">
+      <div className="bg-white rounded-2xl shadow-xl max-w-4xl w-full max-h-[92dvh] flex flex-col overflow-hidden">
         
         {/* Header */}
-        <div className="bg-teal-800 text-white px-6 py-4 flex justify-between items-center">
+        <div className="shrink-0 bg-teal-800 text-white px-6 py-4 flex justify-between items-center">
           <div>
             <h2 className="text-lg font-bold">บันทึกข้อมูล IV Care</h2>
             <p className="text-xs text-teal-200">หน่วยงาน: {departmentName}</p>
@@ -157,7 +152,7 @@ export default function IvCareModal({
         </div>
 
         {/* Tabs Switcher */}
-        <div className="flex border-b border-gray-200 bg-gray-50 px-6 pt-3 gap-2">
+        <div className="flex shrink-0 flex-wrap border-b border-gray-200 bg-gray-50 px-6 pt-3 gap-2">
           <button
             type="button"
             onClick={() => setActiveTab('complication')}
@@ -183,7 +178,7 @@ export default function IvCareModal({
         </div>
 
         {/* Body Content */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="min-h-0 flex-1 overflow-y-auto p-6">
           
           {/* TAB 1: ภาวะแทรกซ้อน */}
           {activeTab === 'complication' && (
@@ -301,82 +296,7 @@ export default function IvCareModal({
                 </div>
               )}
 
-              {/* ปัจจัยที่ส่งผลให้เกิด (พร้อมเพิ่มไอคอนสวยงามแต่ละด้าน) */}
-              <div className="border border-gray-200 p-4 rounded-xl space-y-4 bg-gray-50/50">
-                <label className="block text-sm font-bold text-teal-900 uppercase tracking-wider mb-2">
-                  ปัจจัยที่ส่งผลให้เกิด (วิเคราะห์แต่ละด้าน)
-                </label>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {/* ด้านยา (Drug) */}
-                  <div>
-                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1">
-                      <span className="p-1 bg-blue-50 text-blue-600 rounded-md">
-                        <Pill size={16} />
-                      </span>
-                      ด้านยา (Drug)
-                    </label>
-                    <textarea
-                      rows={2}
-                      value={factorDrug}
-                      onChange={(e) => setFactorDrug(e.target.value)}
-                      placeholder="วิเคราะห์ปัจจัยด้านยา..."
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm resize-y bg-white"
-                    />
-                  </div>
-
-                  {/* ด้านสารน้ำ (Fluid) */}
-                  <div>
-                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1">
-                      <span className="p-1 bg-cyan-50 text-cyan-600 rounded-md">
-                        <Droplets size={16} />
-                      </span>
-                      ด้านสารน้ำ (Fluid)
-                    </label>
-                    <textarea
-                      rows={2}
-                      value={factorFluid}
-                      onChange={(e) => setFactorFluid(e.target.value)}
-                      placeholder="วิเคราะห์ปัจจัยด้านสารน้ำ..."
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm resize-y bg-white"
-                    />
-                  </div>
-
-                  {/* ด้านตัวผู้ป่วย (Patient) */}
-                  <div>
-                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1">
-                      <span className="p-1 bg-purple-50 text-purple-600 rounded-md">
-                        <User size={16} />
-                      </span>
-                      ด้านตัวผู้ป่วย (Patient)
-                    </label>
-                    <textarea
-                      rows={2}
-                      value={factorPatient}
-                      onChange={(e) => setFactorPatient(e.target.value)}
-                      placeholder="วิเคราะห์ปัจจัยด้านตัวผู้ป่วย..."
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm resize-y bg-white"
-                    />
-                  </div>
-
-                  {/* ด้านบุคลากร (Personnel) */}
-                  <div>
-                    <label className="flex items-center gap-2 text-sm font-medium text-gray-700 mb-1">
-                      <span className="p-1 bg-green-50 text-green-600 rounded-md">
-                        <Users size={16} />
-                      </span>
-                      ด้านบุคลากร (Personnel)
-                    </label>
-                    <textarea
-                      rows={2}
-                      value={factorPersonnel}
-                      onChange={(e) => setFactorPersonnel(e.target.value)}
-                      placeholder="วิเคราะห์ปัจจัยด้านบุคลากร..."
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm resize-y bg-white"
-                    />
-                  </div>
-                </div>
-              </div>
+              <IvCareFactorFields value={factors} onChange={setFactors} disabled={saving}/>
 
               <div className="flex justify-end gap-3 pt-4 border-t">
                 <button
@@ -515,6 +435,6 @@ export default function IvCareModal({
 
         </div>
       </div>
-    </div>
+    </div>,document.body
   );
 }

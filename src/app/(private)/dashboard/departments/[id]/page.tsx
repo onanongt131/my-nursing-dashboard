@@ -1,7 +1,12 @@
 'use client';
+import {readDepartmentRecords,loadRecordTables} from '@/lib/departmentRecords';
+import {requiresReview,reviewMonth} from '@/lib/review/period';
+import PressureSoreModal from '@/components/PressureSoreModal';
+import PressureSorePendingRows from '@/components/PressureSorePendingRows';
+
 import SpecialAuditApprovalPanel from '@/components/SpecialAuditApprovalPanel';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { createClient } from '@/utils/supabase/client';
 import AddEntryForm from '@/components/AddEntryForm';
 import React from 'react';
@@ -17,14 +22,20 @@ import ReadmitModal from '@/components/ReadmitModal';
 import AgainstMedicalAdviceModal from '@/components/AgainstMedicalAdviceModal';
 import BatchDetailModal from '@/components/BatchDetailModal';
 import DepartmentEditor from '@/components/DepartmentEditor';
+import DepartmentKpiDashboard from '@/components/DepartmentKpiDashboard';
+import {isDialysis} from '@/lib/dialysisStats';
+import DialysisMonthlyStats from '@/components/DialysisMonthlyStats';
 import DepartmentDailyStatsTab from '@/components/DepartmentDailyStatsTab';
+import dynamic from 'next/dynamic';
+const DepartmentP4P = dynamic(() => import('../../p4p/P4PClient'), {loading: () => <p className="p-4 text-sm text-slate-500">กำลังเปิด P4P…</p>});
 
 
-const YEARS = [2565, 2566, 2567, 2568, 2569] as const;
+const YEARS = [2565, 2566, 2567, 2568, 2569, 2570] as const;
 
 const RECORD_TABLES = [
   { name: 'nursing_chart_audits', key: 'audit' },
   { name: 'wp_qa_records', key: 'wp_qa' },
+  { name: 'nso_special_wp_records', key: 'wp_special' },
   { name: 'iv_care_complications', key: 'iv_care_comp' },
   { name: 'iv_care_monthly_summaries', key: 'iv_care_summary' },
   { name: 'fall_incident_records', key: 'fall' },
@@ -39,20 +50,34 @@ const RECORD_TABLES = [
 export default function SingleDepartmentPage() {
   const params = useParams();
   const deptId = params?.id as string;
+  const activeDepartment=useRef(deptId);activeDepartment.current=deptId;
+  const [pressureSoreOpen,setPressureSoreOpen]=useState(false);
+  const [pressureSoreCounts,setPressureSoreCounts]=useState({pending:0,total:0});
   const [departmentData, setDepartmentData] = useState<any>(null);
+  useEffect(()=>{setPressureSoreOpen(false);setPressureSoreCounts({pending:0,total:0});},[deptId,departmentData?.pressure_sore_enabled]);
+  const [departmentLoadError,setDepartmentLoadError]=useState('');
+  const [mappingWarning,setMappingWarning]=useState('');
+  const [readmitLoadError,setReadmitLoadError]=useState('');
+  const [pendingLoadError,setPendingLoadError]=useState('');
   const [activeKpi, setActiveKpi] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [activeModal, setActiveModal] = useState<'wp_qa' | 'iv_care' | 'fall' | 'audit' | 'readmit' | 'ama' | null>(null);
 
   // เพิ่ม State สำหรับจัดการสลับ Tab (ระหว่าง KPI เดิม กับ สถิติหอผู้ป่วย)
-  const [activeTab, setActiveTab] = useState<'kpi' | 'daily_stats'>('kpi');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'kpi' | 'daily_stats' | 'p4p'>('dashboard');
 
-  const [userRole, setUserRole] = useState<string>('admin');
-  const [canApprove, setCanApprove] = useState<boolean>(true);
-  const [userDepartmentId, setUserDepartmentId] = useState<number | string>(1);
+  const [userRole, setUserRole] = useState<string>('staff');
+  const [canApprove, setCanApprove] = useState<boolean>(false);
+  const [userDepartmentId, setUserDepartmentId] = useState<number | string>(0);
   const [allPendingRows, setAllPendingRows] = useState<any[]>([]);
   const [specialAuditCounts, setSpecialAuditCounts] = useState({pending:0,total:0});
   const [pendingLoading, setPendingLoading] = useState(false);
+  // โหลดประวัติ 11 ตารางเฉพาะเมื่อต้องใช้ (ไม่โหลดทันทีที่เปิด Dashboard/P4P)
+  const [monthlyLoadedDept, setMonthlyLoadedDept] = useState<string>('');
+  const [monthlyLoading, setMonthlyLoading] = useState(false);
+  const [monthlyFailedKeys, setMonthlyFailedKeys] = useState<string[]>([]);
+  const monthlyRequestRef = useRef<{ departmentId: string; promise: Promise<void> } | null>(null);
+
   const [showPendingTable, setShowPendingTable] = useState(false);
   const [showEditorModal, setShowEditorModal] = useState(false);
 
@@ -79,135 +104,102 @@ export default function SingleDepartmentPage() {
     status?: string;
   } | null>(null);
 
+  useEffect(()=>{setActiveTab('dashboard');setActiveModal(null);setDepartmentData(null);setMappingWarning('');setAllPendingRows([]);setReadmitLoadError('');setPendingLoadError('');setMonthlyLoadedDept('');setMonthlyFailedKeys([]);setMonthlyLoading(false);monthlyRequestRef.current=null;setMonthlyRecords(previous=>Object.fromEntries(Object.keys(previous).map(key=>[key,[]])));},[deptId]);
   const supabase = useMemo(() => createClient(), []);
 
   const fetchUserPermissions = useCallback(async () => {
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('role, department_id')
-        .eq('id', user.id)
-        .single();
-      if (profile) {
-        const role = profile.role || 'admin';
-        setUserRole(role);
-        setUserDepartmentId(profile.department_id || 1);
-
-        const privilegedRoles = ['approver', 'supervisor', 'head_nurse'];
-        setCanApprove(role === 'admin' || privilegedRoles.includes(role));
-      }
+      const r=await fetch('/api/department-records?'+new URLSearchParams({department_id:deptId,mode:'context'}),{cache:'no-store'}),profile=await r.json();if(!r.ok)throw new Error(profile.error||'อ่านสิทธิ์ไม่สำเร็จ');setUserRole(profile.role);setUserDepartmentId(profile.departmentId||0);setCanApprove(profile.canApprove===true);
     } catch (err) {
       console.error("Error fetching user permissions:", err);
     }
-  }, [supabase]);
+  }, [deptId]);
 
   const fetchDepartmentData = useCallback(async () => {
     if (!deptId) return;
     setLoading(true);
     try {
-      const [deptRes, kpiRes, entryRes, mapRes] = await Promise.all([
-        supabase.from('departments').select('*').eq('id', deptId).single(),
-        supabase.from('kpis').select('*'),
-        supabase.from('kpi_entries').select('*').eq('department_id', deptId),
-        supabase.from('kpi_department_map').select('department_id, kpi_id').eq('department_id', deptId)
-      ]);
-      if (deptRes.error || kpiRes.error || entryRes.error || mapRes.error) {
-        console.error("Supabase Error:", deptRes.error || kpiRes.error || entryRes.error || mapRes.error);
-        return;
-      }
-      const dept = deptRes.data;
-      const kpis = kpiRes.data || [];
-      const entries = entryRes.data || [];
-      const maps = mapRes.data || [];
-      const formattedDept = {
-        ...dept,
-        kpis: maps
-          .map((m: any) => {
-            const kpiData = kpis.find((k: any) => k.id === m.kpi_id);
-            return kpiData ? {
-              ...kpiData,
-              entries: entries.filter((e: any) => e.kpi_id === kpiData.id)
-            } : null;
-          })
-          .filter(Boolean)
-      };
+      setDepartmentLoadError('');
+      const r=await fetch('/api/department-data?'+new URLSearchParams({department_id:deptId}),{cache:'no-store'}),body=await r.json();if(!r.ok)throw new Error(body.error||'อ่านข้อมูลหน่วยงานไม่สำเร็จ');if(String(activeDepartment.current)!==String(deptId))return;
+      setDepartmentData(body.department);setMappingWarning(body.counts.unmappedEntries>0?'พบผลงานเดิม '+body.counts.unmappedEntries+' รายการที่ยังไม่ผูกตัวชี้วัดกับหน่วยงาน กรุณาตรวจ kpi_department_map':'');
 
-      setDepartmentData(formattedDept);
     } catch (err) {
-      console.error("Unexpected Error:", err);
+      if(String(activeDepartment.current)===String(deptId))setDepartmentLoadError(err instanceof Error?err.message:'อ่านข้อมูลไม่สำเร็จ');
     } finally {
-      setLoading(false);
+      if(String(activeDepartment.current)===String(deptId))setLoading(false);
     }
   }, [supabase, deptId]);
 
-  const fetchMonthlyRecords = useCallback(async (targetDeptId: string | number) => {
-    if (!targetDeptId) return;
-    try {
-      const results = await Promise.all(
-        RECORD_TABLES.map(async t => {
-          const { data, error } = await supabase.from(t.name).select('*').eq('department_id', targetDeptId);
-          if (error) {
-            return { key: t.key, data: [] };
-          }
-          return { key: t.key, data: data || [] };
-        })
-      );
-      const recordsMap = results.reduce((acc, curr) => {
-        if (!acc[curr.key]) {
-          acc[curr.key] = curr.data;
-        } else {
-          acc[curr.key] = [...acc[curr.key], ...curr.data];
-        }
-        return acc;
-      }, {} as Record<string, any[]>);
-      setMonthlyRecords(recordsMap);
-    } catch (err) {
-      console.error("Error fetching monthly records:", err);
+  const fetchMonthlyRecords = useCallback((targetDeptId:string|number, force=false):Promise<void> => {
+    if(!targetDeptId)return Promise.resolve();
+    const id=String(targetDeptId);
+    // หนึ่งคำขอที่กำลังโหลดใช้ร่วมกันได้ ไม่เปิดหลายชุดพร้อมกัน
+    if(!force){
+      if(monthlyLoadedDept===id)return Promise.resolve();
+      if(monthlyRequestRef.current?.departmentId===id)return monthlyRequestRef.current.promise;
     }
-  }, [supabase]);
+    setMonthlyLoading(true);
+    const task=(async()=>{
+      const results=await loadRecordTables(RECORD_TABLES,table=>readDepartmentRecords(table,id));
+      // ป้องกันคำขอเก่าทับข้อมูลหน่วยงานใหม่ หรือทับการ Refresh หลังบันทึก
+      if (String(activeDepartment.current) !== id) return;
+      const failures=results.filter(r=>r.error),map:Record<string,any[]>={};
+      results.forEach(r=>{if(r.items)map[r.key]=[...(map[r.key]||[]),...r.items];});
+      failures.forEach(r=>{delete map[r.key];});
+      setMonthlyRecords(previous=>({...previous,...map}));
+      setMonthlyFailedKeys(failures.map(r=>r.key));
+      setReadmitLoadError(failures.map(r=>r.error).join(' • '));
+      setMonthlyLoadedDept(id);
+    })();
+    monthlyRequestRef.current={departmentId:id,promise:task};
+    void task.then(()=>{
+      if(monthlyRequestRef.current?.promise===task){
+        monthlyRequestRef.current=null;
+        if(String(activeDepartment.current)===id)setMonthlyLoading(false);
+      }
+    },()=>{
+      if(monthlyRequestRef.current?.promise===task){
+        monthlyRequestRef.current=null;
+        if(String(activeDepartment.current)===id)setMonthlyLoading(false);
+      }
+    });
+    return task;
+  },[monthlyLoadedDept]);
 
-  const fetchPendingApproval = useCallback(async (targetDeptId: string | number) => {
+  const monthlyStatusClass = (key:string):string => {
+    const checked=monthlyLoadedDept===String(deptId) && !monthlyLoading && !monthlyFailedKeys.includes(key);
+    if(!checked)return 'bg-slate-600 text-white hover:bg-slate-500';
+    return hasSubmittedPreviousMonth(monthlyRecords[key]||[])
+      ? 'bg-emerald-700/80 text-white hover:bg-emerald-700'
+      : 'bg-amber-500 text-slate-950 hover:bg-amber-400';
+  };
+  const monthlyStatusTitle = (key:string):string => {
+    if(monthlyLoading)return 'กำลังตรวจสอบสถานะการส่งข้อมูล';
+    if(monthlyLoadedDept!==String(deptId))return 'ยังไม่ได้โหลดประวัติ — เปิดแท็บตัวชี้วัดเพื่อดูสถานะ';
+    if(monthlyFailedKeys.includes(key))return 'อ่านสถานะไม่สำเร็จ กรุณาลองโหลดใหม่';
+    return 'ตรวจสอบสถานะการส่งข้อมูลแล้ว';
+  };
+
+  const fetchPendingApproval = useCallback(async (targetDeptId:string|number) => {
     setPendingLoading(true);
     try {
-      const results = await Promise.all(
-        RECORD_TABLES.map(async t => {
-          const { data, error } = await supabase
-            .from(t.name)
-            .select('*')
-            .eq('department_id', targetDeptId)
-            .eq('status', 'pending');
-          if (!error && data && data.length > 0) {
-            const groupedMap = data.reduce((acc: any, item: any) => {
-              const rawMonth = item.audit_month || item.month || item.record_date || item.incident_date || item.admit_date || item.created_at || '';
-              const monthStr = typeof rawMonth === 'string' ? rawMonth : String(rawMonth || '');
-              const month = monthStr.substring(0, 7) || 'ไม่ระบุเดือน';
-              const groupKey = `${t.key}_${month}`;
-
-              if (!acc[groupKey]) {
-                acc[groupKey] = {
-                  type: t.key,
-                  audit_month: month,
-                  auditor_name: item.auditor_name || item.evaluator || item.staff_name || item.recorded_by || '-',
-                  items: []
-                };
-              }
-              acc[groupKey].items.push({ ...item, source_table: t.name });
-              return acc;
-            }, {});
-            return Object.values(groupedMap);
-          }
-          return [];
-        })
-      );
-      setAllPendingRows(results.flat());
-    } catch (err) {
-      console.error("Error fetching pending:", err);
-    } finally {
-      setPendingLoading(false);
-    }
-  }, [supabase]);
+      const results=await loadRecordTables(RECORD_TABLES,table=>readDepartmentRecords(table,targetDeptId,true));
+      if(String(targetDeptId)!==String(activeDepartment.current))return;
+      const failures=results.filter(r=>r.error),failedTables=new Set(failures.map(r=>r.name)),batches:any[]=[];
+      results.forEach(r=>{
+        if(!r.items)return;
+        const grouped:Record<string,any>={};
+        r.items.filter((item:any)=>requiresReview(item)).forEach((item:any)=>{
+          const month=String(reviewMonth(item)||item.created_at||'').slice(0,7)||'ไม่ระบุเดือน';
+          const batchKey=r.key+'_'+month;
+          grouped[batchKey] ||= {type:r.key,audit_month:month,auditor_name:item.auditor_name||item.evaluator||item.staff_name||item.recorded_by||'-',items:[]};
+          grouped[batchKey].items.push({...item,source_table:r.name});
+        });batches.push(...Object.values(grouped));
+      });
+      setAllPendingRows(previous=>[...previous.map(batch=>({...batch,items:batch.items.filter((item:any)=>failedTables.has(item.source_table))})).filter(batch=>batch.items.length),...batches]);
+      setPendingLoadError(failures.map(r=>r.error).join(' • '));
+    } finally {if(String(targetDeptId)===String(activeDepartment.current))setPendingLoading(false);}
+  }, []);
 
   useEffect(() => {
     fetchUserPermissions();
@@ -215,11 +207,15 @@ export default function SingleDepartmentPage() {
   }, [fetchUserPermissions, fetchDepartmentData]);
 
   useEffect(() => {
-    if (deptId) {
-      fetchPendingApproval(deptId);
-      fetchMonthlyRecords(deptId);
+    if (deptId) void fetchPendingApproval(deptId);
+  }, [deptId, fetchPendingApproval]);
+
+  useEffect(() => {
+    // ประวัติจำนวนมากโหลดเมื่อเปิด KPI หรือฟอร์มกรอกข้อมูลที่ใช้สถานะย้อนหลัง
+    if (deptId && (activeTab === 'kpi' || activeModal !== null)) {
+      void fetchMonthlyRecords(deptId);
     }
-  }, [deptId, fetchPendingApproval, fetchMonthlyRecords]);
+  }, [deptId, activeTab, activeModal, fetchMonthlyRecords]);
 
   const hasSubmittedPreviousMonth = (records: any[]) => {
     if (!Array.isArray(records)) return false;
@@ -248,7 +244,7 @@ export default function SingleDepartmentPage() {
     return 'stable';
   };
 
-  const totalPendingCount = allPendingRows.reduce((sum, batch: any) => sum + (batch.items?.length || 0), 0) + specialAuditCounts.pending;
+  const totalPendingCount = (allPendingRows.reduce((sum, batch: any) => sum + (batch.items?.length || 0), 0) + specialAuditCounts.pending) + pressureSoreCounts.pending;
 
   const canAccessDepartment = () => {
     if (userRole === 'admin') return true;
@@ -268,6 +264,7 @@ export default function SingleDepartmentPage() {
     );
   }
 
+  if(departmentLoadError&&!departmentData)return <div role="alert" className="rounded-xl bg-red-50 p-5 text-red-800">{departmentLoadError}<button type="button" className="ml-3 underline" onClick={()=>fetchDepartmentData()}>ลองโหลดใหม่</button></div>;
   if (!departmentData) return <div className="p-8 text-center text-red-500 font-medium">ไม่พบข้อมูลหน่วยงานนี้</div>;
 
   return (
@@ -336,7 +333,7 @@ export default function SingleDepartmentPage() {
             </h1>
             <span className="text-slate-400 text-sm hidden md:inline">|</span>
             <span className="text-sm text-slate-300">
-              ระบบรายงานตัวชี้วัดและผลการดำเนินงานคุณภาพทางการพยาบาล ประจำปีงบประมาณ 2569
+              ระบบรายงานตัวชี้วัดและผลการดำเนินงานคุณภาพทางการพยาบาล ประจำปีงบประมาณ 2570
             </span>
           </div>
           <div className="flex flex-wrap items-center gap-2 shrink-0">
@@ -347,27 +344,29 @@ export default function SingleDepartmentPage() {
               <PrinterIcon className="w-4 h-4" /> พิมพ์รายงาน
             </button>
             <button
-              onClick={() => (totalPendingCount > 0 || specialAuditCounts.total > 0) && setShowPendingTable(!showPendingTable)}
+              onClick={() => { if(totalPendingCount > 0 || (specialAuditCounts.total + pressureSoreCounts.total) > 0){setActiveTab('kpi');setShowPendingTable(true);} }}
               className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all ${
-                (totalPendingCount > 0 || specialAuditCounts.total > 0)
+                (totalPendingCount > 0 || (specialAuditCounts.total + pressureSoreCounts.total) > 0)
                   ? 'bg-red-500 text-white hover:bg-red-600 cursor-pointer animate-bounce'
                   : 'bg-slate-800 text-slate-400 cursor-not-allowed opacity-60'
               }`}
-              disabled={totalPendingCount === 0 && specialAuditCounts.total === 0}
+              disabled={totalPendingCount === 0 && (specialAuditCounts.total + pressureSoreCounts.total) === 0}
             >
-              <span>รออนุมัติ ({totalPendingCount})</span>
+              <span>รออนุมัติ ({pendingLoading?'กำลังโหลด…':pendingLoadError?'อ่านไม่ครบ':totalPendingCount})</span>
             </button>
           </div>
         </div>
 
         {/* แถบปุ่มลงข้อมูลระบบงานต่างๆ */}
-        <div className="pt-3 border-t border-emerald-800/60 flex flex-wrap items-center gap-2">
-          <span className="text-xs font-bold text-emerald-300 mr-2 uppercase tracking-wide">ลงข้อมูลระบบ:</span>
+        <div className="pt-3 border-t border-emerald-800/60 space-y-3">
+          <div className="text-xs font-bold text-emerald-300 tracking-wide">ลงข้อมูลระบบ:</div>
+          <div className="flex flex-wrap items-center gap-2 [&>button]:whitespace-nowrap [&>button]:shrink-0">
 
           <button
             onClick={() => setActiveModal('audit')}
+             title={monthlyStatusTitle('audit')}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer ${
-              hasSubmittedPreviousMonth(monthlyRecords.audit) ? 'bg-emerald-700/80 text-white hover:bg-emerald-700' : 'bg-amber-500 text-slate-950 hover:bg-amber-400'
+              monthlyStatusClass('audit')
             }`}
           >
             <DocumentCheckIcon className="w-4 h-4" />
@@ -375,8 +374,9 @@ export default function SingleDepartmentPage() {
           </button>
           <button
             onClick={() => setActiveModal('wp_qa')}
+             title={monthlyStatusTitle('wp_qa')}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer ${
-              hasSubmittedPreviousMonth(monthlyRecords.wp_qa) ? 'bg-emerald-700/80 text-white hover:bg-emerald-700' : 'bg-amber-500 text-slate-950 hover:bg-amber-400'
+              monthlyStatusClass('wp_qa')
             }`}
           >
             <PlusCircleIcon className="w-4 h-4" />
@@ -384,8 +384,9 @@ export default function SingleDepartmentPage() {
           </button>
           <button
             onClick={() => setActiveModal('iv_care')}
+             title={monthlyStatusTitle('iv_care')}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer ${
-              hasSubmittedPreviousMonth(monthlyRecords.iv_care) ? 'bg-emerald-700/80 text-white hover:bg-emerald-700' : 'bg-amber-500 text-slate-950 hover:bg-amber-400'
+              monthlyStatusClass('iv_care')
             }`}
           >
             <PlusCircleIcon className="w-4 h-4" />
@@ -393,36 +394,46 @@ export default function SingleDepartmentPage() {
           </button>
           <button
             onClick={() => setActiveModal('fall')}
+             title={monthlyStatusTitle('fall')}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer ${
-              hasSubmittedPreviousMonth(monthlyRecords.fall) ? 'bg-emerald-700/80 text-white hover:bg-emerald-700' : 'bg-amber-500 text-slate-950 hover:bg-amber-400'
+              monthlyStatusClass('fall')
             }`}
           >
             <PlusCircleIcon className="w-4 h-4" />
             <span>พลัดตกหกล้ม</span>
           </button>
-          <button
+          {!isDialysis(departmentData.Department)&&(<button
             onClick={() => setActiveModal('readmit')}
+             title={monthlyStatusTitle('readmit')}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer ${
-              hasSubmittedPreviousMonth(monthlyRecords.readmit) ? 'bg-emerald-700/80 text-white hover:bg-emerald-700' : 'bg-amber-500 text-slate-950 hover:bg-amber-400'
+              monthlyStatusClass('readmit')
             }`}
           >
             <PlusCircleIcon className="w-4 h-4" />
             <span>Readmit</span>
-          </button>
-          <button
+          </button>)}
+          {departmentData?.pressure_sore_enabled === true && (<button type="button" onClick={()=>setPressureSoreOpen(true)} className="rounded-xl bg-amber-500 px-4 py-2 text-xs font-bold text-slate-950 hover:bg-amber-400">✚ Pressure sore</button>)}
+{!isDialysis(departmentData.Department)&&(<button
             onClick={() => setActiveModal('ama')}
+             title={monthlyStatusTitle('ama')}
             className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all shadow-sm cursor-pointer ${
-              hasSubmittedPreviousMonth(monthlyRecords.ama) ? 'bg-emerald-700/80 text-white hover:bg-emerald-700' : 'bg-amber-500 text-slate-950 hover:bg-amber-400'
+              monthlyStatusClass('ama')
             }`}
           >
             <PlusCircleIcon className="w-4 h-4" />
             <span>จำหน่ายไม่สมัครใจ</span>
-          </button>
+          </button>)}
+          </div>
         </div>
       </div>
 
+      {mappingWarning&&<p role="alert" className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">{mappingWarning}</p>}
+      {departmentLoadError&&<p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-800">{departmentLoadError}</p>}
+      {pendingLoadError&&<p role="alert" className="mb-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">อ่านรายการรออนุมัติไม่ครบ • {pendingLoadError} <button type="button" className="ml-2 underline" disabled={pendingLoading} onClick={()=>fetchPendingApproval(deptId)}>ลองโหลดใหม่</button></p>}
+      {readmitLoadError&&<p role="alert" className="mb-3 rounded-xl bg-red-50 p-3 text-sm text-red-800">{readmitLoadError}</p>}
       {/* แถบสลับ Tab เมนู (ระหว่างตัวชี้วัด และ สถิติหอผู้ป่วย) */}
-      <div className="flex border-b border-slate-200 gap-6 print:hidden">
+      <div className="flex flex-wrap border-b border-slate-200 gap-6 print:hidden">
+        <button type="button" onClick={()=>setActiveTab('dashboard')} className={`pb-3 font-semibold text-sm border-b-2 ${activeTab==='dashboard'?'border-emerald-600 text-emerald-700':'border-transparent text-slate-500'}`}>📊 KPI dashboard</button>
         <button
           onClick={() => setActiveTab('kpi')}
           className={`pb-3 font-semibold text-sm transition border-b-2 cursor-pointer ${
@@ -443,19 +454,19 @@ export default function SingleDepartmentPage() {
         >
           📈 สถิติหอผู้ป่วยรายเดือน
         </button>
+        <button type="button" onClick={() => setActiveTab('p4p')} className={`pb-3 font-semibold text-sm transition border-b-2 cursor-pointer ${activeTab==='p4p'?'border-emerald-600 text-emerald-700':'border-transparent text-slate-500 hover:text-slate-700'}`}>📑 P4P</button>
       </div>
 
       {/* 2. ส่วนเนื้อหาหลัก แยกตาม Tab ที่เลือก */}
-      {activeTab === 'daily_stats' ? (
-        <DepartmentDailyStatsTab departmentId={deptId} />
+      {activeTab === 'dashboard' ? (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 items-start"><aside className="lg:col-span-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><DepartmentEditor departmentId={deptId}/></aside><div className="lg:col-span-9 min-w-0"><DepartmentKpiDashboard departmentId={deptId}/></div></div>
+      ) : activeTab === 'p4p' ? (
+        <DepartmentP4P key={deptId} departments={[{id:Number(deptId),name:String(departmentData.Department||departmentData.name||deptId)}]} defaultDepartment={Number(deptId)} />
+      ) : activeTab === 'daily_stats' ? (
+        isDialysis(departmentData.Department) ? <DialysisMonthlyStats key={deptId} departmentId={deptId} /> : <DepartmentDailyStatsTab departmentId={deptId} />
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          <div className="lg:col-span-3 space-y-4 print:hidden department-sidebar-card">
-            <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden p-4">
-              <DepartmentEditor departmentId={deptId}/>
-            </div>
-          </div>
-          <div className="lg:col-span-9 space-y-6 print-report-container">
+          <div className="lg:col-span-12 space-y-6 print-report-container">
             <div className="hidden print-header-title">
               <h2 className="text-xl font-bold text-black">กลุ่มภารกิจด้านการพยาบาล</h2>
               <h1 className="text-2xl font-extrabold text-black mt-1">{departmentData.Department}</h1>
@@ -515,6 +526,7 @@ export default function SingleDepartmentPage() {
                         </tr>
                       ))}
                     <SpecialAuditApprovalPanel departmentId={deptId} onCountsChange={setSpecialAuditCounts} />
+{departmentData?.pressure_sore_enabled === true && <PressureSorePendingRows departmentId={deptId} onCountsChange={setPressureSoreCounts}/>}
 </tbody>
                   </table>
                 </div>
@@ -786,9 +798,8 @@ export default function SingleDepartmentPage() {
           onApprove={() => {
             setViewingBatchGroup(null);
             fetchPendingApproval(deptId);
-            fetchMonthlyRecords(deptId);
+            fetchMonthlyRecords(deptId,true);
           }}
-          supabase={supabase}
         />
       )}
 
@@ -804,16 +815,17 @@ export default function SingleDepartmentPage() {
           onSuccess={() => {
             setActiveModal(null);
             fetchPendingApproval(deptId);
-            fetchMonthlyRecords(deptId);
+            fetchMonthlyRecords(deptId,true);
           }}
         />
       )}
 
-      <UnitWpQaModal isOpen={activeModal === 'wp_qa'} onClose={() => setActiveModal(null)} departmentId={deptId} departmentName={departmentData?.Department} supabase={supabase} onSuccess={() => { fetchDepartmentData(); fetchPendingApproval(deptId); fetchMonthlyRecords(deptId); }} />
-      <IvCareModal isOpen={activeModal === 'iv_care'} onClose={() => setActiveModal(null)} departmentId={deptId} departmentName={departmentData?.Department} supabase={supabase} onSuccess={() => { fetchDepartmentData(); fetchPendingApproval(deptId); fetchMonthlyRecords(deptId); }} />
-      <FallCareModal isOpen={activeModal === 'fall'} onClose={() => setActiveModal(null)} departmentId={deptId} departmentName={departmentData?.Department} supabase={supabase} onSuccess={() => { fetchDepartmentData(); fetchPendingApproval(deptId); fetchMonthlyRecords(deptId); }} />
-      <ReadmitModal isOpen={activeModal === 'readmit'} onClose={() => setActiveModal(null)} departmentId={deptId} departmentName={departmentData?.Department} supabase={supabase} onSuccess={() => { fetchDepartmentData(); fetchPendingApproval(deptId); fetchMonthlyRecords(deptId); }} />
-      <AgainstMedicalAdviceModal isOpen={activeModal === 'ama'} onClose={() => setActiveModal(null)} departmentId={deptId} departmentName={departmentData?.Department} supabase={supabase} onSuccess={() => { fetchDepartmentData(); fetchPendingApproval(deptId); fetchMonthlyRecords(deptId); }} />
+      <PressureSoreModal isOpen={pressureSoreOpen && departmentData?.pressure_sore_enabled === true} onClose={()=>setPressureSoreOpen(false)} departmentId={deptId} departmentName={departmentData?.Department} />
+<UnitWpQaModal isOpen={activeModal === 'wp_qa'} onClose={() => setActiveModal(null)} departmentId={deptId} departmentName={departmentData?.Department} supabase={supabase} onSuccess={() => { fetchDepartmentData(); fetchPendingApproval(deptId); fetchMonthlyRecords(deptId,true); }} />
+      <IvCareModal isOpen={activeModal === 'iv_care'} onClose={() => setActiveModal(null)} departmentId={deptId} departmentName={departmentData?.Department} supabase={supabase} onSuccess={() => { fetchDepartmentData(); fetchPendingApproval(deptId); fetchMonthlyRecords(deptId,true); }} />
+      <FallCareModal isOpen={activeModal === 'fall'} onClose={() => setActiveModal(null)} departmentId={deptId} departmentName={departmentData?.Department} supabase={supabase} onSuccess={() => { fetchDepartmentData(); fetchPendingApproval(deptId); fetchMonthlyRecords(deptId,true); }} />
+      <ReadmitModal isOpen={activeModal === 'readmit'} onClose={() => setActiveModal(null)} departmentId={deptId} departmentName={departmentData?.Department} supabase={supabase} onSuccess={() => { fetchDepartmentData(); fetchPendingApproval(deptId); fetchMonthlyRecords(deptId,true); }} />
+      <AgainstMedicalAdviceModal isOpen={activeModal === 'ama'} onClose={() => setActiveModal(null)} departmentId={deptId} departmentName={departmentData?.Department} supabase={supabase} onSuccess={() => { fetchDepartmentData(); fetchPendingApproval(deptId); fetchMonthlyRecords(deptId,true); }} />
     </div>
   );
 }

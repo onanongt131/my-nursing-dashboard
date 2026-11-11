@@ -8,7 +8,7 @@ import * as XLSX from 'xlsx';
 import { parseShift, type WorkShift } from '@/lib/scheduling/shiftParser';
 import { validateNightToMorning } from '@/lib/scheduling/rosterValidator';
 import { loadSchedulingRules, type SchedulingRule } from '@/lib/scheduling/ruleLoader';
-import { getVisibleDepartments, canSelectDepartment, canEditStaffing, type UserProfile, } from '@/lib/permissions/staffingAccess';
+import { getVisibleDepartments, canSelectDepartment, canEditStaffing, type UserProfile, type Department, } from '@/lib/permissions/staffingAccess';
 import { generateAutoSchedule, type AutoScheduleWarning, } from '@/lib/scheduling/autoScheduler';
 
 interface RosterRecord {
@@ -71,9 +71,9 @@ export default function StaffingSchedulePage() {
   const [validationIssues, setValidationIssues] = useState<ValidationIssue[]>([]);
   const [shiftValidationSummary, setShiftValidationSummary] = useState<ShiftValidationSummary[]>([]);
   const [hasValidated, setHasValidated] = useState<boolean>(false);
+  const [accessError, setAccessError] = useState('');
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [userGroup, setUserGroup] = useState<string | null>(null);
-  const [currentUserEmail, setCurrentUserEmail] = useState<string>('');
   const [autoScheduleWarnings, setAutoScheduleWarnings] = useState<AutoScheduleWarning[]>([]);
   const [autoScheduling, setAutoScheduling] = useState(false);
   const [pdfExporting, setPdfExporting] = useState(false);
@@ -146,152 +146,32 @@ export default function StaffingSchedulePage() {
     loadHolidays();
   }, [daysInMonth, selectedMonth, supabase]);
 
-  useEffect(() => {
-  async function loadSessionUser() {
-    try {
-      const response = await fetch('/api/session-user', {
-        cache: 'no-store',
-      });
 
-      if (!response.ok) {
-        console.error('ไม่พบ session ของผู้ใช้');
-        setCurrentUserEmail('');
-        return;
-      }
-
-      const result = await response.json();
-
-      setCurrentUserEmail(
-        result?.user?.email ?? ''
-      );
-    } catch (error) {
-      console.error(
-        'Load session user error:',
-        error
-      );
-
-      setCurrentUserEmail('');
-    }
-  }
-
-  loadSessionUser();
-}, []);
 
   // โหลด profile + สิทธิ์หน่วยงานจาก email ของ session
   useEffect(() => {
+    const controller = new AbortController();
     async function loadAccessContext() {
-      if (!currentUserEmail) return;
-
       try {
-        console.log('CURRENT USER EMAIL =', currentUserEmail);
-
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select(`
-            id,
-            full_name,
-            department_id,
-            role,
-            email
-          `)
-          .eq('email', currentUserEmail)
-          .single();
-
-        console.log('PROFILE =', profile);
-        console.log('PROFILE ERROR =', profileError);
-
-        if (profileError || !profile) {
-          console.error('Cannot load profile:', profileError);
-          setUserProfile(null);
-          setUserGroup(null);
-          setDepartments([]);
-          setSelectedDept('');
-          return;
-        }
-
-        const normalizedProfile: UserProfile = {
-          id: profile.id,
-          full_name: profile.full_name ?? null,
-          department_id: profile.department_id ?? null,
-          role: profile.role ?? null,
-          email: profile.email ?? null,
-        };
-
-        setUserProfile(normalizedProfile);
-
-        // หา group ของหน่วยงานผู้ใช้ เพื่อใช้กับ head_group
-        let currentUserGroup: string | null = null;
-
-        if (normalizedProfile.department_id) {
-          const { data: ownDepartment, error: ownDepartmentError } = await supabase
-            .from('departments')
-            .select('group')
-            .eq('id', normalizedProfile.department_id)
-            .single();
-
-          if (ownDepartmentError) {
-            console.error('Cannot load user group:', ownDepartmentError);
-          } else {
-            currentUserGroup = ownDepartment?.group ?? null;
-          }
-        }
-
-        setUserGroup(currentUserGroup);
-
-        // โหลดหน่วยงานทั้งหมด แล้วค่อยกรองตาม role
-        const { data: departmentRows, error: departmentsError } = await supabase
-          .from('departments')
-          .select('id, Department, group')
-          .order('Department', { ascending: true });
-
-        if (departmentsError) {
-          console.error('Error fetching departments:', departmentsError.message);
-          setDepartments([]);
-          setSelectedDept('');
-          return;
-        }
-
-        const allDepartments = departmentRows || [];
-        setDepartments(allDepartments);
-
-        const allowedDepartments = getVisibleDepartments(
-          allDepartments,
-          normalizedProfile,
-          currentUserGroup
-        );
-
-        console.log('ROLE =', normalizedProfile.role);
-        console.log('USER GROUP =', currentUserGroup);
-        console.log('ALL DEPARTMENTS =', allDepartments);
-        console.log('ALLOWED DEPARTMENTS =', allowedDepartments);
-
-        // admin / head_nurse / head_group เลือกหน่วยงานได้
-        if (canSelectDepartment(normalizedProfile.role)) {
-          const ownDeptExists = allowedDepartments.some(
-            (dept) =>
-              Number(dept.id) === Number(normalizedProfile.department_id)
-          );
-
-          setSelectedDept(
-            ownDeptExists
-              ? Number(normalizedProfile.department_id)
-              : allowedDepartments[0]?.id ?? ''
-          );
-        } else {
-          // head_department และ role อื่น ล็อกที่หน่วยงานของตัวเอง
-          setSelectedDept(normalizedProfile.department_id ?? '');
-        }
+        const response = await fetch('/api/staffing/access-context', {cache:'no-store',signal:controller.signal});
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'โหลดสิทธิ์ไม่สำเร็จ');
+        if (controller.signal.aborted) return;
+        const profile: UserProfile = result.profile;
+        const allowedDepartments: Department[] = result.departments || [];
+        setUserProfile(profile); setUserGroup(result.group ?? null); setDepartments(allowedDepartments);
+        const own = allowedDepartments.find(d => Number(d.id) === Number(profile.department_id));
+        setSelectedDept(own?.id ?? (canSelectDepartment(profile.role) ? allowedDepartments[0]?.id ?? '' : ''));
+        setAccessError('');
       } catch (error) {
-        console.error('Load access context error:', error);
-        setUserProfile(null);
-        setUserGroup(null);
-        setDepartments([]);
-        setSelectedDept('');
+        if (controller.signal.aborted) return;
+        setUserProfile(null); setUserGroup(null); setDepartments([]); setSelectedDept('');
+        setAccessError(error instanceof Error ? error.message : 'โหลดสิทธิ์ไม่สำเร็จ');
       }
     }
-
     loadAccessContext();
-  }, [supabase, currentUserEmail]);
+    return () => controller.abort();
+  }, []);
 
   const visibleDepartments = getVisibleDepartments(
     departments,
@@ -303,25 +183,29 @@ export default function StaffingSchedulePage() {
   const allowEdit = canEditStaffing(userProfile?.role);
 
   // โหลดรายชื่อพยาบาลและตารางเวรของแผนกที่เลือก
-  const fetchRosterData = useCallback(async () => {
+  const fetchRosterData = useCallback(async (signal: AbortSignal) => {
     if (!selectedDept) return;
     setLoading(true);
 
     const startDate = `${selectedMonth}-01`;
     const endDate = `${selectedMonth}-${String(daysInMonth).padStart(2, '0')}`;
 
-    const { data: staffRes, error: staffError } = await supabase
-      .from('staff')
-      .select('id, full_name, position, competency_level, can_be_shift_leader, active, schedule_mode')
-      .eq('department_id', selectedDept)
-      .eq('active', true)
-      .order('id', { ascending: true });
-
-    if (staffError) {
-      console.error('Error fetching staff:', staffError.message);
+    try {
+      const staffResponse = await fetch(`/api/staffing/staff?department_id=${selectedDept}`, {cache:'no-store', signal});
+      const staffResult = await staffResponse.json();
+      if (signal.aborted) return;
+      if (!staffResponse.ok) throw new Error(staffResult.error || 'อ่านรายชื่อบุคลากรไม่สำเร็จ');
+      setStaffList((staffResult.records || []).filter((person: {active: boolean}) => person.active === true));
+      setAccessError('');
+    } catch (error) {
+      if (signal.aborted) return;
+      setStaffList([]);
+      setRosterData({});
+      setPreviousDayRoster({});
+      setAccessError(error instanceof Error ? error.message : 'อ่านรายชื่อบุคลากรไม่สำเร็จ');
+      setLoading(false);
+      return;
     }
-
-    setStaffList(staffRes || []);
 
     const { data: rosterRes } = await supabase
       .from('monthly_roster')
@@ -329,6 +213,7 @@ export default function StaffingSchedulePage() {
       .eq('department_id', selectedDept)
       .gte('date', startDate)
       .lte('date', endDate);
+    if (signal.aborted) return;
 
     if (rosterRes) {
       const map: Record<string, string> = {};
@@ -350,6 +235,7 @@ export default function StaffingSchedulePage() {
       .select('staff_id, date, shift')
       .eq('department_id', selectedDept)
       .eq('date', previousDate);
+    if (signal.aborted) return;
 
     if (previousRosterError) {
       console.error('Error fetching previous month roster:', previousRosterError.message);
@@ -368,7 +254,9 @@ export default function StaffingSchedulePage() {
   }, [supabase, selectedDept, selectedMonth, daysInMonth]);
 
   useEffect(() => {
-    fetchRosterData();
+    const controller = new AbortController();
+    void fetchRosterData(controller.signal);
+    return () => controller.abort();
   }, [fetchRosterData]);
 
   // โหลดกติกาจัดเวรแยกจาก roster เพื่อให้ตรวจสอบ error / RLS ได้ชัดเจน
@@ -383,7 +271,9 @@ export default function StaffingSchedulePage() {
     setRulesError('');
 
     try {
-      const rules = await loadSchedulingRules(supabase, Number(selectedDept));
+      const response=await fetch(`/api/staffing/rules?department_id=${selectedDept}`,{cache:'no-store'});
+      const result=await response.json();if(!response.ok)throw new Error(result.error);
+      const rules:SchedulingRule[]=result.records||[];
       setSchedulingRules(rules);
 
       if (rules.length === 0) {
@@ -636,21 +526,14 @@ export default function StaffingSchedulePage() {
       daysInMonth
     ).padStart(2, '0')}`;
 
-    const { data: offRequests, error: offError } =
-      await supabase
-        .from('staff_requests')
-        .select('staff_id, request_date')
-        .eq('department_id', Number(selectedDept))
-        .eq('request_type', 'OFF')
-        .eq('status', 'approved')
-        .gte('request_date', startDate)
-        .lte('request_date', endDate);
-
-    if (offError) {
-      throw new Error(
-        `โหลดคำขอหยุดไม่สำเร็จ: ${offError.message}`
-      );
-    }
+    const offResponse = await fetch(
+      `/api/staffing/day-off?department_id=${selectedDept}&start=${startDate}&end=${endDate}`,
+      { cache: 'no-store' }
+    );
+    const offResult = await offResponse.json();
+    if (!offResponse.ok) throw new Error(offResult.error || 'โหลดคำขอหยุดไม่สำเร็จ');
+    const offRequests = (offResult.records as { staff_id: number; request_date: string; status: string }[])
+      .filter(item => item.status === 'approved');
 
     // 2. สร้าง key ของวันหยุดที่อนุมัติแล้ว
     const approvedDayOffKeys = new Set<string>(
@@ -2410,13 +2293,14 @@ setHasValidated(false);
     );
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 pt-0 px-4 pb-6 space-y-4 font-sans">
+    <div className="min-h-screen bg-slate-50 text-slate-800 pt-0 px-2 pb-3 space-y-3 font-sans">
+      {accessError && <div role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-800">{accessError}</div>}
       {/* Header */}
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="px-5 py-4 flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4 border-b border-slate-100">
-          <div className="min-w-0">
+        <div className="px-3 py-3 flex flex-nowrap overflow-x-auto justify-between items-center gap-3 border-b border-slate-100">
+          <div className="min-w-[240px]">
             <div className="flex flex-wrap items-center gap-3">
-              <h1 className="text-[22px] font-extrabold text-slate-900 tracking-tight">
+              <h1 className="text-[18px] font-extrabold text-slate-900 tracking-tight">
                 ตารางเวรปฏิบัติงาน
               </h1>
 
@@ -2439,7 +2323,7 @@ setHasValidated(false);
             )}
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-nowrap shrink-0 items-center gap-2">
             <select
               value={selectedDept}
               onChange={(e) => setSelectedDept(e.target.value)}
@@ -2504,7 +2388,7 @@ setHasValidated(false);
           </div>
         </div>
 
-        <div className="px-5 py-3 flex flex-wrap items-center gap-2 bg-slate-50/60">
+        <div className="px-3 py-3 flex flex-nowrap overflow-x-auto items-center [&>*]:shrink-0 gap-2 bg-slate-50/60 [&>button]:min-h-9 [&>button]:h-auto [&>button]:py-2 [&>button]:whitespace-normal [&>a]:text-center [&>a]:justify-center">
           {/* ทุก staff ที่ login แล้วต้องเห็นปุ่มขอหยุด */}
           {userProfile && (
             <a
@@ -2535,7 +2419,7 @@ setHasValidated(false);
                 disabled={loading || staffList.length === 0}
                 className="h-9 inline-flex items-center bg-sky-50 hover:bg-sky-100 text-sky-800 border border-sky-300 px-3 rounded-xl text-[11px] font-bold transition disabled:opacity-50"
               >
-                ดาวน์โหลด Excel
+                Download Excel
               </button>
 
               <button
@@ -2563,7 +2447,7 @@ setHasValidated(false);
                 }
                 className="h-9 inline-flex items-center bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-300 px-3 rounded-xl text-[11px] font-bold transition disabled:opacity-50"
               >
-                ดาวน์โหลด PDF
+                Download PDF
               </button>
 
               <a
@@ -2611,7 +2495,7 @@ setHasValidated(false);
               : 'ช่วยจัดเวรทั้งหมด'}
           </button>
 
-          <div className="flex-1" />
+          
 
           <button
             onClick={handleSaveRoster}

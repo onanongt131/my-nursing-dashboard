@@ -52,7 +52,7 @@ export default function WpSpecialAuditModal({ isOpen, onClose, formType, departm
     if (field !== "note" && !validNonnegativeInteger(value)) return;
     setPreview(false);
     setAnswers(prev => {
-      const next = { assessed: "", performed: "", note: "", ...prev[id], [field]: value };
+      const next: WpRecord = { ...prev[id], [field]: value };
       if (field !== "note" && next.assessed !== "" && next.performed !== "" && Number(next.assessed) === Number(next.performed)) next.note = "";
       return { ...prev, [id]: next };
     });

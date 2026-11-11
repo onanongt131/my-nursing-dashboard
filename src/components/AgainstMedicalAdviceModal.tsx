@@ -1,6 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import {loadUnitMonthly,saveUnitRecord} from '@/lib/unitRecords/client';
+import {createPortal} from 'react-dom';
+import {summarizeAmaDischarges} from '@/lib/amaDischarges';
 
 interface AgainstMedicalAdviceModalProps {
   isOpen: boolean;
@@ -37,59 +40,30 @@ export default function AgainstMedicalAdviceModal({
     return `${y}-${m}`;
   });
 
-  const currentYearTh = new Date().getFullYear() + 543;
-  const currentMonthNum = new Date().getMonth() + 1;
-  const [fiscalYear, setFiscalYear] = useState(currentYearTh);
-  const [month, setMonth] = useState(currentMonthNum);
   const [totalDischarges, setTotalDischarges] = useState('');
 
   // State นับจำนวนเคสไม่สมัครอยู่จากตารางรายเคสอัตโนมัติ
   const [totalAmaCount, setTotalAmaCount] = useState(0);
   const [loadingSummaryData, setLoadingSummaryData] = useState(false);
 
-  // ดึงข้อมูลจำนวนเคสตามเดือนที่เลือก
-  useEffect(() => {
-    if (isOpen && activeTab === 'summary' && departmentId) {
-      fetchMonthlyAmaStats();
-    }
-  }, [isOpen, activeTab, selectedMonthYear, departmentId]);
-
-  const fetchMonthlyAmaStats = async () => {
-    setLoadingSummaryData(true);
-    try {
-      const [y, m] = selectedMonthYear.split('-');
-      const startDate = `${y}-${m}-01`;
-      const endDate = new Date(Number(y), Number(m), 0).toISOString().slice(0, 10);
-
-      const { data, error } = await supabase
-        .from('ama_incident_records')
-        .select('id')
-        .eq('department_id', Number(departmentId))
-        .gte('incident_date', startDate)
-        .lte('incident_date', endDate);
-
-      if (error) throw error;
-
-      if (data) {
-        setTotalAmaCount(data.length);
-      }
-    } catch (error) {
-      console.error('Error fetching monthly AMA stats:', error);
-    } finally {
-      setLoadingSummaryData(false);
-    }
-  };
-
-  if (!isOpen) return null;
+  const [ready,setReady]=useState(false),[summaryError,setSummaryError]=useState('');
+  const [dischargeStats,setDischargeStats]=useState<ReturnType<typeof summarizeAmaDischarges>|null>(null);
+  useEffect(()=>setReady(true),[]);
+  useEffect(()=>{if(!isOpen)return;const before=document.body.style.overflow;document.body.style.overflow='hidden';return()=>{document.body.style.overflow=before;};},[isOpen]);
+  async function loadMonthly(signal?:AbortSignal){return loadUnitMonthly('ama',departmentId,selectedMonthYear,signal);}
+  useEffect(()=>{if(!isOpen||activeTab!=='summary'||!departmentId)return;let cancelled=false;setLoadingSummaryData(true);setSummaryError('');setDischargeStats(null);setTotalDischarges('');setTotalAmaCount(0);
+    loadMonthly().then(({stats,ama})=>{if(cancelled)return;setDischargeStats(stats);setTotalDischarges(stats.total===null?'':String(stats.total));setTotalAmaCount(ama);}).catch((error:any)=>{if(!cancelled)setSummaryError(error.message||'โหลดข้อมูลไม่สำเร็จ');}).finally(()=>{if(!cancelled)setLoadingSummaryData(false);});return()=>{cancelled=true;};
+  },[isOpen,activeTab,selectedMonthYear,departmentId]);
+  if(!ready||!isOpen)return null;
 
   // บันทึกข้อมูลส่วนที่ 1 (รายเคส)
   const handleSaveIncident = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!departmentId) return;
+    if (!departmentId || saving) return;
 
     setSaving(true);
     try {
-      const { error } = await supabase.from('ama_incident_records').insert({
+      await saveUnitRecord('ama-incident',{
         department_id: Number(departmentId),
         incident_date: incidentDate,
         hn,
@@ -99,7 +73,6 @@ export default function AgainstMedicalAdviceModal({
         status: 'pending',
       });
 
-      if (error) throw error;
 
       alert('บันทึกข้อมูลจำหน่ายไม่สมัครอยู่ (รายเคส) สำเร็จ');
       setHn('');
@@ -119,19 +92,12 @@ export default function AgainstMedicalAdviceModal({
   // บันทึกข้อมูลส่วนที่ 2 (สรุปรายเดือน)
   const handleSaveSummary = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!departmentId) return;
+    if (!departmentId || saving) return;
 
+    if(loadingSummaryData||summaryError||!dischargeStats?.complete){alert('ข้อมูลจำหน่ายยังไม่ครบ กรุณาตรวจสอบสถิติ');return;}
     setSaving(true);
     try {
-      const { error } = await supabase.from('ama_monthly_summary').upsert({
-        department_id: Number(departmentId),
-        fiscal_year: Number(fiscalYear),
-        month: Number(month),
-        total_discharges: Number(totalDischarges),
-        ama_count: totalAmaCount,
-      }, { onConflict: 'department_id,fiscal_year,month' });
-
-      if (error) throw error;
+      await saveUnitRecord('ama-summary',{department_id:Number(departmentId),month:selectedMonthYear});
 
       alert('บันทึกข้อมูลสรุปรายเดือนสำเร็จ');
       setTotalDischarges('');
@@ -144,12 +110,12 @@ export default function AgainstMedicalAdviceModal({
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-y-auto">
-      <div className="bg-white rounded-2xl shadow-xl max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden">
+  return createPortal(
+    <div role="dialog" aria-modal="true" aria-label="บันทึกจำหน่ายไม่สมัครอยู่" className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/50 p-4 overflow-y-auto">
+      <div className="bg-white rounded-2xl shadow-xl max-w-3xl w-full max-h-[92dvh] flex flex-col overflow-hidden">
         
         {/* Header */}
-        <div className="bg-teal-700 text-white px-6 py-4 flex justify-between items-center">
+        <div className="shrink-0 bg-teal-700 text-white px-6 py-4 flex justify-between items-center">
           <div>
             <h2 className="text-lg font-bold">บันทึกข้อมูลจำหน่ายไม่สมัครอยู่</h2>
             <p className="text-xs text-teal-100">หน่วยงาน: {departmentName}</p>
@@ -158,7 +124,7 @@ export default function AgainstMedicalAdviceModal({
         </div>
 
         {/* Tabs Switcher */}
-        <div className="flex border-b bg-gray-50">
+        <div className="flex shrink-0 border-b bg-gray-50">
           <button
             type="button"
             onClick={() => setActiveTab('incident')}
@@ -184,7 +150,7 @@ export default function AgainstMedicalAdviceModal({
         </div>
 
         {/* Body Content */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="min-h-0 flex-1 overflow-y-auto p-6">
           {activeTab === 'incident' ? (
             <form onSubmit={handleSaveIncident} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-teal-50/50 p-4 rounded-xl border border-teal-100">
@@ -268,35 +234,39 @@ export default function AgainstMedicalAdviceModal({
                       onChange={(e) => {
                         const val = e.target.value;
                         setSelectedMonthYear(val);
-                        if (val) {
-                          const [y, m] = val.split('-');
-                          setFiscalYear(Number(y) + 543);
-                          setMonth(Number(m));
-                        }
+
                       }}
                       className="w-full px-3 py-2 border rounded-lg text-sm bg-white font-semibold focus:ring-2 focus:ring-teal-500"
                       required
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">ยอดจำหน่ายเดือนนี้ (Total Discharges)</label>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">ยอดจำหน่ายรวมทั้งหมดเดือนนี้ (Total Discharges)</label>
                     <input
                       type="number"
                       min="0"
-                      placeholder="เช่น 300"
+                      placeholder={loadingSummaryData?'กำลังดึงยอด…':'รอข้อมูลครบทุกเวร'}
                       value={totalDischarges}
-                      onChange={(e) => setTotalDischarges(e.target.value)}
+                      readOnly
+                      aria-describedby="ama-discharge-status"
                       className="w-full px-3 py-2 border rounded-lg text-sm bg-white font-semibold focus:ring-2 focus:ring-teal-500"
                       required
                     />
                   </div>
                 </div>
 
+                {!loadingSummaryData&&(summaryError||(dischargeStats&&!dischargeStats.complete))&&<div id="ama-discharge-status" role="alert" className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                  {summaryError||<><strong>ข้อมูลไม่ครบทุกเวร/ต้องแก้ไข {dischargeStats?.valid}/{dischargeStats?.expected} เวร</strong>
+                    {!!dischargeStats?.missing.length&&<p className="mt-1 break-words">วันที่/เวรที่ขาด: {dischargeStats.missing.join(', ')}</p>}
+                    {!!dischargeStats?.duplicate.length&&<p className="mt-1 break-words">วันที่/เวรซ้ำ: {dischargeStats.duplicate.join(', ')}</p>}
+                    {!!dischargeStats?.invalid.length&&<p className="mt-1 break-words">วันที่/เวรยอดไม่ครบหรือไม่ถูกต้อง: {dischargeStats.invalid.join(', ')}</p>}
+                  </>}
+                </div>}
                 {/* กล่องแสดงผลจำนวนเคสไม่สมัครอยู่ ที่นับจากส่วนที่ 1 อัตโนมัติ */}
                 <div className="bg-white p-3 rounded-lg border border-teal-200 text-center">
                   <span className="text-xs text-gray-500 block">จำนวนไม่สมัครอยู่ (นับจากรายการรายเคสในเดือนนี้)</span>
                   <span className="text-xl font-bold text-teal-800">
-                    {loadingSummaryData ? 'กำลังโหลด...' : `${totalAmaCount} เคส`}
+                    {loadingSummaryData ? 'กำลังโหลด...' : summaryError ? 'อ่านข้อมูลไม่สำเร็จ' : `${totalAmaCount} เคส`}
                   </span>
                 </div>
 
@@ -305,7 +275,7 @@ export default function AgainstMedicalAdviceModal({
 
               <div className="flex justify-end gap-3 pt-4 border-t">
                 <button type="button" onClick={onClose} className="px-5 py-2 border rounded-lg text-gray-700 hover:bg-gray-100 text-sm font-medium">ยกเลิก</button>
-                <button type="submit" disabled={saving} className="px-6 py-2 bg-teal-700 hover:bg-teal-800 text-white rounded-lg text-sm font-bold shadow disabled:opacity-50">
+                <button type="submit" disabled={saving||loadingSummaryData||!!summaryError||!dischargeStats?.complete} className="px-6 py-2 bg-teal-700 hover:bg-teal-800 text-white rounded-lg text-sm font-bold shadow disabled:opacity-50">
                   {saving ? 'กำลังบันทึก...' : 'บันทึกข้อมูลสรุปรายเดือน'}
                 </button>
               </div>
@@ -314,6 +284,6 @@ export default function AgainstMedicalAdviceModal({
         </div>
 
       </div>
-    </div>
+    </div>, document.body
   );
 }

@@ -10,7 +10,7 @@ export default function RkpRmPage() {
   const [loading, setLoading] = useState(true);
   const [selectedKpi, setSelectedKpi] = useState<any | null>(null);
 
-  const years = [2565, 2566, 2567, 2568, 2569];
+  const years = [2565, 2566, 2567, 2568, 2569, 2570];
 
   // ฟังก์ชันคำนวณผลรวมรายปีตามประเภทตัวชี้วัด
   const calculateYearValue = (kpi: any, year: number) => {

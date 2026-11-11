@@ -49,54 +49,29 @@ export const saveKpiEntry = async (payload: KpiEntryPayload) => {
 };
 
 export interface ProductivityEntry {
+    department_group?: string;
+    group_order?: number;
+    department_order?: number;
   id: number;
   fiscal_year: number;
   month: number;
   department_id: number;
   nhppd_value: number;
   np_value: number;
-  department_name?: string; // เพิ่มบรรทัดนี้
+  department_name?: string;
+  completeness?: import('./productivityReport').NpCompleteness;
 }
 
 export const getProductivityData = async (year: string) => {
-  if (!supabase) {
-    throw new Error('ระบบฐานข้อมูลยังไม่พร้อมใช้งาน');
-  }
-
-  // เพิ่ม .headers({ 'Cache-Control': 'no-cache' }) เพื่อสั่ง Supabase ว่าอย่าใช้ข้อมูลเก่า
-  const { data: kpiData, error: kpiError } = await supabase
-    .from('nursing_kpi_data')
-    .select('*', { count: 'exact', head: false }) // ระบุว่าไม่ต้องใช้ Cache
-    .eq('fiscal_year', parseInt(year))
-    .order('department_id', { ascending: true })
-    .order('month', { ascending: true });
-
-  if (kpiError) {
-    console.error("Supabase Error (KPI):", kpiError);
-    throw new Error(`ดึงข้อมูล KPI ไม่สำเร็จ: ${kpiError.message}`);
-  }
-
-  // 2. ดึงชื่อหน่วยงานทั้งหมดมาเก็บไว้ (เพื่อให้แสดงผลได้)
-  const { data: deptData, error: deptError } = await supabase
-    .from('departments')
-    .select('id, Department'); // ดึง id และชื่อคอลัมน์ Department ให้ตรงกับฐานข้อมูล
-
-  if (deptError) {
-    console.error("Supabase Error (Dept):", deptError);
-    // ไม่ throw error ที่นี่ เพื่อให้หน้าเว็บยังทำงานได้แม้ดึงชื่อหน่วยงานไม่ได้
-  }
-
-  // 3. เชื่อมข้อมูล (Client-side Join)
-  const combinedData = kpiData?.map((kpi: any) => {
-    // หาชื่อหน่วยงานจาก id ที่ตรงกัน
-    const dept = deptData?.find((d: any) => d.id === kpi.department_id);
-    return {
-      ...kpi,
-      department_name: dept ? dept.Department : 'ไม่ระบุหน่วยงาน'
-    };
+  const response = await fetch('/api/productivity-report?' + new URLSearchParams({ fiscal_year: year }), {
+    cache: 'no-store', credentials: 'same-origin',
   });
+  const body = await response.json().catch(() => null);
+  if (!response.ok || !Array.isArray(body?.items)) {
+    throw new Error(body?.error || 'อ่านข้อมูล Productivity ไม่สำเร็จ');
+  }
+  return body.items;
 
-  return combinedData;
 };
 
 export const upsertProductivityData = async (newDataArray: any[]) => {

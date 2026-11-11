@@ -1,0 +1,25 @@
+'use client';
+import CopyableKpiChart from './CopyableKpiChart';
+import DepartmentKpiTable from './DepartmentKpiTable';
+import {useEffect,useState} from 'react';
+import {BarChart,Bar,Cell,XAxis,YAxis,CartesianGrid,Tooltip,ResponsiveContainer} from 'recharts';
+type Month={month:string;numerator:number;pending:number;denominator:number|null;rate:number|null};
+type Year={year:number;count:number;ratedCount:number;pending:number;denominator:number|null;rate:number|null;missingDenominator:number;monthly:Month[]};
+type Item={key:string;years:Year[]};
+const colors=['#94a3b8','#8b5cf6','#3b82f6','#059669'];
+const fmt=(v:number|null|undefined)=>v==null?'—':v.toLocaleString('th-TH',{maximumFractionDigits:2});
+function Detail({active,payload}:{active?:boolean;payload?:readonly any[]}){const row:Year|undefined=payload?.[0]?.payload;if(!active||!row)return null;return <div className="max-h-96 w-72 overflow-auto rounded-xl border border-teal-200 bg-white p-3 text-xs shadow-xl"><p className="font-bold text-teal-900">ปีงบประมาณ {row.year} • {fmt(row.rate)}%</p><p>ตัวตั้ง/ตัวหารที่คำนวณ: {row.ratedCount}/{fmt(row.denominator)}</p><p className="text-amber-700">รออนุมัติ {row.pending} ราย (ยังไม่รวมในอัตรา)</p>{row.missingDenominator>0&&<p className="text-amber-700">มีเคสที่ยังขาดตัวหาร {row.missingDenominator} เดือน</p>}<div className="mt-2 space-y-1 border-t pt-2">{row.monthly.map(m=><div key={m.month} className="flex justify-between gap-2"><span>{m.month}</span><span>{fmt(m.rate)}% • {m.numerator}/{fmt(m.denominator)}</span></div>)}</div></div>;}
+export default function DepartmentReadmitAmaCharts({departmentId,view='chart'}:{departmentId:string;view?:'chart'|'table'}){
+ const [items,setItems]=useState<Item[]>([]),[error,setError]=useState(''),[loading,setLoading]=useState(true);
+ useEffect(()=>{const controller=new AbortController();setItems([]);setError('');setLoading(true);fetch('/api/department-readmit-ama-kpi?department_id='+encodeURIComponent(departmentId),{signal:controller.signal,cache:'no-store'}).then(async r=>{const d=await r.json();if(!r.ok)throw new Error(d.error||'อ่านกราฟไม่สำเร็จ');setItems(d.items);}).catch(e=>{if(e.name!=='AbortError')setError(e.message);}).finally(()=>{if(!controller.signal.aborted)setLoading(false);});return()=>controller.abort();},[departmentId]);
+ return <section className="space-y-3">{error?<p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-800">{error}</p>:loading?<p className="p-4 text-sm text-slate-500">กำลังโหลดตัวชี้วัด…</p>:<div className="grid grid-cols-1 gap-4 xl:grid-cols-2">{items.map(item=><article data-kpi-chart key={item.key} className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><div className="flex items-center gap-2"><h4 className="font-bold text-teal-900">{item.key==='readmit'?'อัตรา Re-admit':'อัตราจำหน่ายไม่สมัครใจ (AMA)'}</h4>{view==='chart'&&item.years.some(y=>y.rate!==null)&&<CopyableKpiChart title={item.key==='readmit'?'อัตรา Re-admit':'อัตราจำหน่ายไม่สมัครใจ (AMA)'}/>}</div><p className="mb-3 text-xs text-slate-500">จำนวนรายที่อนุมัติ ÷ {item.key==='readmit'?'จำหน่ายเดือนก่อน':'จำหน่ายทั้งหมด'} × 100</p>{view==='table'?<DepartmentKpiTable title={item.key==='readmit'?'อัตรา Re-admit':'อัตราจำหน่ายไม่สมัครใจ (AMA)'} key={departmentId+item.key} years={item.years.map(y=>y.year)} getDetail={(year,month)=>{
+  const row=item.years.find(y=>y.year===year);
+  if(!row)return null;
+  if(month===undefined)return row.denominator===null?null:{n:row.ratedCount,d:row.denominator};
+  const entry=row.monthly.find(m=>Number(m.month.slice(-2))===month);
+  return entry&&entry.denominator!==null?{n:entry.numerator,d:entry.denominator}:null;
+ }} getRate={(year,month)=>{
+  const row=item.years.find(y=>y.year===year);
+  return month===undefined?row?.rate:row?.monthly.find(m=>Number(m.month.slice(-2))===month)?.rate;
+ }} />:item.years.some(y=>y.rate!==null)?<div className="h-64"><ResponsiveContainer width="100%" height="100%"><BarChart data={item.years} margin={{top:24,right:12,left:-16,bottom:0}}><CartesianGrid strokeDasharray="3 3" vertical={false}/><XAxis dataKey="year" tick={{fontSize:11}}/><YAxis unit="%" tick={{fontSize:10}}/><Tooltip filterNull={false} content={<Detail/>}/><Bar dataKey="rate" radius={[6,6,0,0]} maxBarSize={65} label={{position:'top',fontSize:11,formatter:(v:any)=>v==null?'':Number(v).toFixed(2)+'%'}}>{item.years.map((y,i)=><Cell key={y.year} fill={colors[i]}/>)}</Bar></BarChart></ResponsiveContainer></div>:<p className="flex h-64 items-center justify-center text-sm text-slate-400">ยังไม่มีคู่ข้อมูลรายเคสที่อนุมัติและตัวหาร</p>}<div className="grid grid-cols-4 gap-1 border-t pt-2 text-center text-xs">{item.years.map(y=><div key={y.year}><strong>{y.year}</strong><p className="text-slate-600">{y.ratedCount}/{fmt(y.denominator)}</p>{y.pending>0&&<p className="text-amber-700">รออนุมัติ {y.pending}</p>}{y.missingDenominator>0&&<p className="text-amber-700">ขาดตัวหาร {y.missingDenominator} เดือน</p>}</div>)}</div></article>)}</div>}</section>;
+}

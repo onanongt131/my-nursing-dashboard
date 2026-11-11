@@ -1,0 +1,8 @@
+'use client';
+import {useEffect,useState} from 'react';
+import {PRESSURE_LEVELS} from '@/lib/pressureSore';
+export default function PressureSoreLevelCounts({departmentId,month}:{departmentId:string|number;month:string}){
+ const [data,setData]=useState<{counts:Record<string,number>;pending_counts:Record<string,number>}|null>(null),[error,setError]=useState('');
+ useEffect(()=>{const controller=new AbortController();setData(null);setError('');fetch(`/api/pressure-sores/summary?department_id=${encodeURIComponent(String(departmentId))}&month=${encodeURIComponent(month)}`,{signal:controller.signal,cache:'no-store'}).then(async r=>{const b=await r.json();if(!r.ok)throw new Error(b.error||'โหลดจำนวนแผลไม่สำเร็จ');setData(b);}).catch(e=>{if(e.name!=='AbortError')setError(e.message);});return()=>controller.abort();},[departmentId,month]);
+ return <div className="overflow-x-auto"><h4 className="my-3 font-bold text-emerald-900">จำนวนรายการตามระดับแผล (ข้อมูลปัจจุบันจากรายผู้ป่วย)</h4>{error?<p className="text-red-700">{error}</p>:<table className="w-full text-center text-sm"><thead><tr><th className="border p-2">สถานะ</th>{PRESSURE_LEVELS.map(l=><th key={l} className="border bg-emerald-50 p-2">{['DTI','Unstage'].includes(l)?l:`ระดับ ${l}`}</th>)}</tr></thead><tbody><tr><th className="border p-2">รวม</th>{PRESSURE_LEVELS.map(l=><td key={l} className="border p-2">{data?data.counts[l]??0:'…'}</td>)}</tr><tr><th className="border p-2">รออนุมัติ</th>{PRESSURE_LEVELS.map(l=><td key={l} className="border p-2 text-amber-700">{data?data.pending_counts[l]??0:'…'}</td>)}</tr></tbody></table>}</div>;
+}

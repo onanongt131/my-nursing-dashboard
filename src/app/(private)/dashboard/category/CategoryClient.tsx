@@ -161,7 +161,7 @@ export default function CategoryClient({ category }: { category: string }) {
                 <tr>
                   <th className="p-3.5 text-gray-600 text-xs font-bold min-w-[200px]">ตัวชี้วัด (KPI)</th>
                   <th className="p-3.5 text-center text-gray-600 text-xs font-bold">Goal</th>
-                  {[2565, 2566, 2567, 2568, 2569].map(y => (
+                  {[2565, 2566, 2567, 2568, 2569, 2570].map(y => (
                     <th key={y} className="p-3.5 text-center text-gray-600 text-xs font-bold">{y}</th>
                   ))}
                   <th className="p-3.5 text-center text-gray-600 text-xs font-bold">Le</th>
@@ -184,7 +184,7 @@ export default function CategoryClient({ category }: { category: string }) {
                         <span>{kpi.target_value}</span>
                       </span>
                     </td>
-                    {[2565, 2566, 2567, 2568, 2569].map((year) => {
+                    {[2565, 2566, 2567, 2568, 2569, 2570].map((year) => {
                       const avg = calculateYearlySummary(kpi.kpi_entries || [], year, kpi.Type);
                       const hasData = avg !== null && avg !== "-" && avg !== ""; 
                       const pass = hasData ? checkStatus(Number(avg), kpi.target_value, kpi.operator) : false;
@@ -210,7 +210,7 @@ export default function CategoryClient({ category }: { category: string }) {
                     
                     <td className="p-3.5 text-center">
                       {(() => {
-                        const latestYear = 2569;
+                        const latestYear = 2570;
                         const avg = calculateYearlySummary(kpi.kpi_entries || [], latestYear, kpi.Type);
                         const hasData = avg !== null && avg !== "-" && avg !== ""; 
                         const pass = hasData ? checkStatus(Number(avg), kpi.target_value, kpi.operator) : false;
@@ -236,7 +236,7 @@ export default function CategoryClient({ category }: { category: string }) {
                         kpi.Type, 
                         kpi.operator, 
                         kpi.target_value, // ส่งค่า target_value เข้าไปให้ฟังก์ชันช่วยวิเคราะห์
-                        2569  
+                        2570  
                       )}
                     </td>
                     <td className="p-3.5 text-center">
@@ -317,7 +317,7 @@ export default function CategoryClient({ category }: { category: string }) {
             </div>
             <h3 className="font-bold text-gray-800 text-lg mb-6">{selectedKpi.name}</h3>
             <ResponsiveContainer height={250} width="100%">
-              <BarChart data={[2565, 2566, 2567, 2568, 2569].map(y => ({
+              <BarChart data={[2565, 2566, 2567, 2568, 2569, 2570].map(y => ({
                 year: y,
                 value: parseFloat(calculateYearlySummary(selectedKpi.kpi_entries || [], y, selectedKpi.Type).toString()) || 0
               }))}>

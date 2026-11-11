@@ -8,7 +8,7 @@ export default function ClientDepartmentView({ initialKpis }: { initialKpis: any
 
   // สรุปข้อมูลสำหรับกราฟ (Logic เดิมของคุณ)
   const getChartData = (kpi: any) => {
-    const years = [2565, 2566, 2567, 2568, 2569];
+    const years = [2565, 2566, 2567, 2568, 2569, 2570];
     return years.map(year => {
       const entries = kpi.kpi_entries?.filter((e: any) => e.year === year) || [];
       const val = entries.reduce((sum: number, e: any) => sum + (e.value || 0), 0);

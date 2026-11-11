@@ -193,7 +193,7 @@ export default function AddEntryForm({ kpiId, type, deptId, onSuccess }: {
             <div className="grid grid-cols-2 gap-2">
               <input 
                 type="number" 
-                placeholder="ลงปี พ.ศ. เช่น 2569" 
+                placeholder="ลงปี พ.ศ. เช่น 2570" 
                 className="border p-2 rounded-lg text-sm placeholder-slate-400" 
                 value={formData.year} 
                 onChange={(e) => setFormData({...formData, year: e.target.value})} 

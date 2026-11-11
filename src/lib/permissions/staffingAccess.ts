@@ -51,7 +51,7 @@ export function getVisibleDepartments(
   }
 
   // head_group เห็นเฉพาะหน่วยงานในกลุ่มงานของตัวเอง
-  if (profile.role === 'head_group') {
+  if (profile.role === 'head_group' && userGroup) {
     return departments.filter(
       (dept) => dept.group === userGroup
     );

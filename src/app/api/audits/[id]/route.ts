@@ -1,3 +1,4 @@
+import {requiresReview} from '@/lib/review/period';
 import { NextRequest, NextResponse } from 'next/server';
 import { AUDIT_COLUMNS, canCreate, canRead, cleanText, currentUser, db, fail, isRecord, safeAnswers, unexpected, validDate, validId, validateLRDraft, validateSpecialUnitAnswers } from '@/lib/audits/chartServer';
 export const runtime = 'nodejs';
@@ -20,9 +21,10 @@ export async function PATCH(request: NextRequest, context: Context) {
   try {
     const user = await currentUser(); if (!user) return fail('กรุณาเข้าสู่ระบบ', 401);
     const { id } = await context.params; if (!validId(id)) return fail('ID ไม่ถูกต้อง');
-    const { data: existing, error: readError } = await db().from('nso_special_audits').select('id,department_id,created_by,status,form_type').eq('id', id).maybeSingle();
+    const { data: existing, error: readError } = await db().from('nso_special_audits').select('id,department_id,created_by,status,form_type,audit_month,audit_date').eq('id', id).maybeSingle();
     if (readError) return unexpected(readError);
     if (!existing) return fail('ไม่พบรายการ', 404);
+    if(!requiresReview(existing))return fail('ข้อมูลก่อนปีงบประมาณ 2570 ไม่อยู่ในขั้นตอนแก้ไข',409);
     if (!canCreate(user, existing.department_id)) return fail('ไม่มีสิทธิ์แก้ไขข้อมูลหน่วยงานนี้', 403);
     if (existing.status !== 'draft') return fail('แก้ไขได้เฉพาะรายการร่าง', 409);
     if (existing.created_by !== user.id && !['admin','head_nurse'].includes(user.role)) return fail('ไม่มีสิทธิ์แก้ไข', 403);

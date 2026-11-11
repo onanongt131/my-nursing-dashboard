@@ -1,650 +1,156 @@
 'use client';
+import { ReportStatusIcon, ReportStatusLegend, ReportValue, MonthlyTableViewport } from '@/components/MonthlyReportStatus';
+import { sortMonthlyDepartments } from '@/lib/monthlyReportDepartments';
+import ReportMonthHeading from '@/components/ReportMonthHeading';
+import {useState,useEffect,useMemo,useCallback,useRef} from 'react';
+import {createPortal} from 'react-dom';
+import {createClient} from '@/utils/supabase/client';
+import {ivFraction,ivPercent,type IvMetric,type IvReportRow} from '@/lib/ivCareReport';
+const months=[{id:10,name:'OCT'},{id:11,name:'NOV'},{id:12,name:'DEC'},{id:1,name:'JAN'},{id:2,name:'FEB'},{id:3,name:'MAR'},{id:4,name:'APR'},{id:5,name:'MAY'},{id:6,name:'JUN'},{id:7,name:'JUL'},{id:8,name:'AUG'},{id:9,name:'SEP'}];
+const tabs:{key:IvMetric;label:string;detail:string}[]=[{key:'success',label:'อัตราความสำเร็จ',detail:'ครั้งแรกสำเร็จ / แทงเข็มทั้งหมด'},{key:'phlebitis',label:'Phlebitis',detail:'ระดับ 3–4 / ตำแหน่งให้สารน้ำ'},{key:'extravasation',label:'Extravasation',detail:'ทุกระดับ / ตำแหน่งให้สารน้ำ'},{key:'infiltration',label:'Infiltration',detail:'ทุกระดับ / ตำแหน่งให้สารน้ำ'}];
+const fmt=(n:number|null)=>n===null?'—':n.toFixed(2);
+type IvDepartment = {id: number | string; Department: string; group?: string | null};
 
-import React, { useState, useEffect } from 'react';
-import { createClient } from '@supabase/supabase-js';
+type IvExportIncident = {
+ department_id: string | number;
+ record_date: string;
+ complication: string;
+ grade: number;
+ status: string;
+ contributing_factors?: {groups?: {label: string; items: {label: string; detail?: string; causes: {label: string}[]}[]}[]};
+ factor_drug?: string;
+ factor_fluid?: string;
+ factor_patient?: string;
+ factor_personnel?: string;
+};
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL || '',
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-);
-
-const ThaiMonths = [
-  { id: 10, name: 'OCT' }, { id: 11, name: 'NOV' }, { id: 12, name: 'DEC' },
-  { id: 1, name: 'JAN' }, { id: 2, name: 'FEB' }, { id: 3, name: 'MAR' },
-  { id: 4, name: 'APR' }, { id: 5, name: 'MAY' }, { id: 6, name: 'JUN' },
-  { id: 7, name: 'JUL' }, { id: 8, name: 'AUG' }, { id: 9, name: 'SEP' }
-];
-
-const AvailableYears = [2570, 2569, 2568, 2567, 2566];
-
-export default function IvCarePage() {
-  const [activeSubTab, setActiveSubTab] = useState('success');
-  const [tableData, setTableData] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [selectedYear, setSelectedYear] = useState(2568);
-  const [departmentsMap, setDepartmentsMap] = useState<{ [key: number]: string }>({});
-  const [summaryStats, setSummaryStats] = useState({ success: 0, phlebitis: 0, extravasation: 0, infiltration: 0 });
-
-  const [modalOpen, setModalOpen] = useState(false);
-  const [selectedDeptModal, setSelectedDeptModal] = useState<{ id: number; name: string } | null>(null);
-  const [historicalData, setHistoricalData] = useState<any[]>([]);
-  const [loadingHistory, setLoadingHistory] = useState(false);
-
-  // State สำหรับ Modal แยกตามระดับ Phlebitis (ระดับ 1, 2, 3 ขึ้นไป)
-  const [phlebModalOpen, setPhlebModalOpen] = useState(false);
-  const [selectedPhlebDetail, setSelectedPhlebDetail] = useState<{
-    monthName: string;
-    deptName: string;
-    lvl1: string;
-    lvl2: string;
-    lvl3up: string;
-  } | null>(null);
-
-  // State สำหรับ Modal แยกตามระดับ Extravasation / Infiltration ทั้ง 4 ระดับ
-  const [detailModalOpen, setDetailModalOpen] = useState(false);
-  const [selectedCellDetail, setSelectedCellDetail] = useState<{
-    title: string;
-    monthName: string;
-    deptName: string;
-    lvl1: string;
-    lvl2: string;
-    lvl3: string;
-    lvl4: string;
-  } | null>(null);
-
-  useEffect(() => {
-    fetchDepartmentsAndData();
-
-    const channel = supabase
-      .channel('public:iv_care_data')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'iv_care_data' },
-        () => {
-          fetchDepartmentsAndData();
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [selectedYear, activeSubTab]);
-
-  const fetchDepartmentsAndData = async () => {
-    setLoading(true);
-
-    const { data: deptData } = await supabase.from('departments').select('*');
-    const deptMap: { [key: number]: string } = {};
-    
-    if (deptData) {
-      deptData.forEach((d: any) => {
-        const deptId = d.id !== undefined ? d.id : d.department_id;
-        const deptName = d.Department || d.name || d.department_name || d.title;
-        if (deptId !== undefined && deptName) {
-          deptMap[Number(deptId)] = deptName;
-        }
-      });
-    }
-    setDepartmentsMap(deptMap);
-
-    const { data, error } = await supabase
-      .from('iv_care_data')
-      .select('*')
-      .eq('fiscal_year', selectedYear);
-
-    if (!error && data) {
-      processTableData(data, deptMap);
-    }
-    setLoading(false);
-  };
-
-  const getMappedDepartmentName = (originalName: string, year: number) => {
-    if (year === 2566 || year === 2567 || year === 2568) {
-      if (originalName === 'อายุรกรรม 4') return 'อายุรกรรมชาย 1';
-      if (originalName === 'อายุรกรรม 2') return 'อายุรกรรมชาย 2';
-      if (originalName === 'อายุรกรรม 5') return 'อายุรกรรมหญิง';
-      if (originalName === 'อายุรกรรม 6') return 'ร่มไทร';
-    }
-    return originalName;
-  };
-
-  const processTableData = (rawData: any[], deptMap: { [key: number]: string }) => {
-    const grouped: { [key: number]: any } = {};
-
-    rawData.forEach(row => {
-      const deptId = Number(row.department_id);
-      const rawDeptName = deptMap[deptId] || `หน่วยงาน ${deptId}`;
-      const departmentName = getMappedDepartmentName(rawDeptName, selectedYear);
-
-      if (!grouped[deptId]) {
-        grouped[deptId] = { 
-          department_id: deptId,
-          department_name: departmentName,
-          raw_name: rawDeptName
-        };
-        ThaiMonths.forEach(m => { grouped[deptId][m.id] = null; });
-      }
-
-      let calculatedValue = 0;
-      const ivPos = Number(row.iv_position) || 0;
-
-      if (activeSubTab === 'success') {
-        const allIv = Number(row.all_iv_insertion) || 0;
-        const firstIv = Number(row.first_iv_insertion) || 0;
-        calculatedValue = allIv > 0 ? (firstIv / allIv) * 100 : 0;
-      } else if (activeSubTab === 'phlebitis') {
-        const p3 = Number(row.phlebitis_3) || 0;
-        const p4 = Number(row.phlebitis_4) || 0;
-        calculatedValue = ivPos > 0 ? ((p3 + p4) / ivPos) * 100 : 0;
-      } else if (activeSubTab === 'extravasation') {
-        const e1 = Number(row.extravasation_1) || 0;
-        const e2 = Number(row.extravasation_2) || 0;
-        const e3 = Number(row.extravasation_3) || 0;
-        const e4 = Number(row.extravasation_4) || 0;
-        calculatedValue = ivPos > 0 ? ((e1 + e2 + e3 + e4) / ivPos) * 100 : 0;
-      } else if (activeSubTab === 'infiltration') {
-        const i1 = Number(row.infiltration_1) || 0;
-        const i2 = Number(row.infiltration_2) || 0;
-        const i3 = Number(row.infiltration_3) || 0;
-        const i4 = Number(row.infiltration_4) || 0;
-        calculatedValue = ivPos > 0 ? ((i1 + i2 + i3 + i4) / ivPos) * 100 : 0;
-      }
-
-      grouped[deptId][row.month] = calculatedValue;
-    });
-
-    const result = Object.values(grouped).map((dept: any) => {
-      let sum = 0;
-      let count = 0;
-
-      ThaiMonths.forEach(m => {
-        const val = dept[m.id];
-        if (val !== null && val !== undefined) {
-          let shouldInclude = true;
-
-          if (selectedYear === 2569 && dept.raw_name === 'อายุรกรรม 3') {
-            if (m.id === 10 || m.id === 11 || m.id === 12 || m.id === 1 || m.id === 2) {
-              shouldInclude = false;
-            }
-          }
-
-          if (selectedYear === 2569 && dept.raw_name === 'อายุรกรรม 7') {
-            if (m.id === 10 || m.id === 11 || m.id === 12 || m.id === 1 || m.id === 2 || m.id === 3) {
-              shouldInclude = false;
-            }
-          }
-
-          if (shouldInclude) {
-            sum += val;
-            count++;
-          }
-        }
-      });
-
-      dept.average = count > 0 ? (sum / count).toFixed(2) : '0.00';
-      return dept;
-    });
-
-    result.sort((a, b) => a.department_id - b.department_id);
-    setTableData(result);
-    calculateOverallStats(rawData);
-  };
-
-  const calculateOverallStats = (rawData: any[]) => {
-    let totalSuccess = 0, countSuccess = 0;
-    let totalPhlebitis = 0, totalExtravasation = 0, totalInfiltration = 0;
-    let totalIvPos = 0;
-
-    rawData.forEach(row => {
-      const ivPos = Number(row.iv_position) || 0;
-      totalIvPos += ivPos;
-
-      const allIv = Number(row.all_iv_insertion) || 0;
-      const firstIv = Number(row.first_iv_insertion) || 0;
-      if (allIv > 0) {
-        totalSuccess += (firstIv / allIv) * 100;
-        countSuccess++;
-      }
-
-      totalPhlebitis += (Number(row.phlebitis_3) || 0) + (Number(row.phlebitis_4) || 0);
-      totalExtravasation += (Number(row.extravasation_1) || 0) + (Number(row.extravasation_2) || 0) + (Number(row.extravasation_3) || 0) + (Number(row.extravasation_4) || 0);
-      totalInfiltration += (Number(row.infiltration_1) || 0) + (Number(row.infiltration_2) || 0) + (Number(row.infiltration_3) || 0) + (Number(row.infiltration_4) || 0);
-    });
-
-    setSummaryStats({
-      success: countSuccess > 0 ? Number((totalSuccess / countSuccess).toFixed(2)) : 0,
-      phlebitis: totalIvPos > 0 ? Number(((totalPhlebitis / totalIvPos) * 100).toFixed(2)) : 0,
-      extravasation: totalIvPos > 0 ? Number(((totalExtravasation / totalIvPos) * 100).toFixed(2)) : 0,
-      infiltration: totalIvPos > 0 ? Number(((totalInfiltration / totalIvPos) * 100).toFixed(2)) : 0,
-    });
-  };
-
-  const handleDepartmentClick = async (deptId: number, deptName: string) => {
-    setSelectedDeptModal({ id: deptId, name: deptName });
-    setModalOpen(true);
-    setLoadingHistory(true);
-
-    const { data, error } = await supabase
-      .from('iv_care_data')
-      .select('*')
-      .eq('department_id', deptId);
-
-    if (!error && data) {
-      const yearMap: { [year: number]: { sum: number; count: number } } = {};
-
-      AvailableYears.forEach(y => {
-        yearMap[y] = { sum: 0, count: 0 };
-      });
-
-      data.forEach(row => {
-        const y = Number(row.fiscal_year);
-        if (yearMap[y]) {
-          let val = 0;
-          const ivPos = Number(row.iv_position) || 0;
-
-          if (activeSubTab === 'success') {
-            const allIv = Number(row.all_iv_insertion) || 0;
-            const firstIv = Number(row.first_iv_insertion) || 0;
-            val = allIv > 0 ? (firstIv / allIv) * 100 : 0;
-          } else if (activeSubTab === 'phlebitis') {
-            const p3 = Number(row.phlebitis_3) || 0;
-            const p4 = Number(row.phlebitis_4) || 0;
-            val = ivPos > 0 ? ((p3 + p4) / ivPos) * 100 : 0;
-          } else if (activeSubTab === 'extravasation') {
-            const e1 = Number(row.extravasation_1) || 0;
-            const e2 = Number(row.extravasation_2) || 0;
-            const e3 = Number(row.extravasation_3) || 0;
-            const e4 = Number(row.extravasation_4) || 0;
-            val = ivPos > 0 ? ((e1 + e2 + e3 + e4) / ivPos) * 100 : 0;
-          } else if (activeSubTab === 'infiltration') {
-            const i1 = Number(row.infiltration_1) || 0;
-            const i2 = Number(row.infiltration_2) || 0;
-            const i3 = Number(row.infiltration_3) || 0;
-            const i4 = Number(row.infiltration_4) || 0;
-            val = ivPos > 0 ? ((i1 + i2 + i3 + i4) / ivPos) * 100 : 0;
-          }
-
-          yearMap[y].sum += val;
-          yearMap[y].count++;
-        }
-      });
-
-      const historyResult = AvailableYears.map(y => {
-        const info = yearMap[y];
-        const avg = info.count > 0 ? (info.sum / info.count).toFixed(2) : null;
-        return {
-          year: y,
-          average: avg
-        };
-      });
-
-      setHistoricalData(historyResult);
-    }
-    setLoadingHistory(false);
-  };
-
-  const handleCellClick = async (deptId: number, deptName: string, monthId: number, monthName: string) => {
-    if (activeSubTab === 'success') return;
-
-    setLoadingHistory(true);
-
-    const { data, error } = await supabase
-      .from('iv_care_data')
-      .select('*')
-      .eq('department_id', deptId)
-      .eq('fiscal_year', selectedYear)
-      .eq('month', monthId)
-      .single();
-
-    if (!error && data) {
-      const ivPos = Number(data.iv_position) || 0;
-
-      if (activeSubTab === 'phlebitis') {
-        const p1 = Number(data.phlebitis_1) || 0;
-        const p2 = Number(data.phlebitis_2) || 0;
-        const p3 = Number(data.phlebitis_3) || 0;
-        const p4 = Number(data.phlebitis_4) || 0;
-
-        setSelectedPhlebDetail({
-          monthName,
-          deptName,
-          lvl1: ivPos > 0 ? ((p1 / ivPos) * 100).toFixed(2) : '0.00',
-          lvl2: ivPos > 0 ? ((p2 / ivPos) * 100).toFixed(2) : '0.00',
-          lvl3up: ivPos > 0 ? (((p3 + p4) / ivPos) * 100).toFixed(2) : '0.00',
-        });
-        setPhlebModalOpen(true);
-      } else if (activeSubTab === 'extravasation' || activeSubTab === 'infiltration') {
-        const prefix = activeSubTab === 'extravasation' ? 'extravasation' : 'infiltration';
-        const v1 = Number(data[`${prefix}_1`]) || 0;
-        const v2 = Number(data[`${prefix}_2`]) || 0;
-        const v3 = Number(data[`${prefix}_3`]) || 0;
-        const v4 = Number(data[`${prefix}_4`]) || 0;
-
-        setSelectedCellDetail({
-          title: activeSubTab === 'extravasation' ? 'Extravasation' : 'Infiltration',
-          monthName,
-          deptName,
-          lvl1: ivPos > 0 ? ((v1 / ivPos) * 100).toFixed(2) : '0.00',
-          lvl2: ivPos > 0 ? ((v2 / ivPos) * 100).toFixed(2) : '0.00',
-          lvl3: ivPos > 0 ? ((v3 / ivPos) * 100).toFixed(2) : '0.00',
-          lvl4: ivPos > 0 ? ((v4 / ivPos) * 100).toFixed(2) : '0.00',
-        });
-        setDetailModalOpen(true);
-      }
-    }
-    setLoadingHistory(false);
-  };
-
-  return (
-    <div className="p-6 bg-gradient-to-br from-slate-50 to-blue-50/40 min-h-screen rounded-3xl shadow-xs border border-gray-100/80 m-4">
-      {/* ส่วนหัวข้อและตัวเลือกปีงบประมาณ */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center bg-white p-6 rounded-2xl shadow-xs border border-gray-100 mb-6 gap-4">
-        <div>
-          <h1 className="text-2xl font-extrabold text-gray-800 tracking-tight">รายงาน IV Care</h1>
-          <p className="text-sm text-gray-500 mt-0.5">ระบบติดตามตัวชี้วัดคุณภาพการให้สารน้ำหลอดเลือดดำ</p>
-        </div>
-        <div className="flex items-center gap-3 w-full sm:w-auto bg-gray-50/80 p-2.5 rounded-2xl border border-gray-200/70">
-          <label className="text-sm font-bold text-gray-700 whitespace-nowrap pl-2">📅 ปีงบประมาณ:</label>
-          <select 
-            value={selectedYear} 
-            onChange={(e) => setSelectedYear(Number(e.target.value))}
-            className="border border-blue-300 rounded-xl px-4 py-2 text-sm font-bold text-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white shadow-xs w-full sm:w-48 cursor-pointer transition-all hover:border-blue-400"
-          >
-            {AvailableYears.map(year => (
-              <option key={year} value={year}>ปีงบประมาณ {year}</option>
-            ))}
-          </select>
-        </div>
-      </div>
-
-      {/* เมนูแท็บการ์ดด้านบน */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        {[
-          { key: 'success', label: 'ความสำเร็จของการให้สารน้ำ', stat: `${summaryStats.success}%` },
-          { key: 'phlebitis', label: 'Phlebitis', stat: `${summaryStats.phlebitis}%` },
-          { key: 'extravasation', label: 'Extravasation', stat: `${summaryStats.extravasation}%` },
-          { key: 'infiltration', label: 'Infiltration', stat: `${summaryStats.infiltration}%` },
-        ].map(tab => {
-          const isActive = activeSubTab === tab.key;
-          return (
-            <button
-              key={tab.key}
-              onClick={() => setActiveSubTab(tab.key)}
-              className={`p-5 rounded-2xl text-left transition-all duration-300 flex items-center justify-between cursor-pointer relative overflow-hidden shadow-xs ${
-                isActive 
-                  ? 'bg-gradient-to-br from-blue-600 to-blue-700 text-white shadow-md ring-2 ring-blue-300/50 scale-[1.01]' 
-                  : 'bg-white text-gray-700 border border-gray-200/80 hover:border-blue-300 hover:shadow-sm'
-              }`}
-            >
-              <div className="w-1/2 pr-3">
-                <span className={`text-base font-extrabold tracking-tight leading-snug block ${isActive ? 'text-white' : 'text-gray-800'}`}>
-                  {tab.label}
-                </span>
-              </div>
-              <div className={`h-12 w-[1px] ${isActive ? 'bg-blue-400/40' : 'bg-gray-200'}`}></div>
-              <div className="w-1/2 pl-3 flex flex-col items-end text-right">
-                <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full mb-1 ${
-                  isActive ? 'bg-blue-800/80 text-blue-200' : 'bg-gray-100 text-gray-600'
-                }`}>
-                  ภาพรวม
-                </span>
-                <span className={`text-2xl font-black tracking-tight whitespace-nowrap ${isActive ? 'text-white' : 'text-blue-600'}`}>
-                  {tab.stat}
-                </span>
-              </div>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* ตารางแสดงผล */}
-      <div className="overflow-x-auto border border-gray-200/80 rounded-2xl shadow-xs bg-white">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50/80">
-            <tr>
-              <th className="px-4 py-3.5 text-left text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-200">ชื่อหน่วยงาน</th>
-              {ThaiMonths.map(m => (
-                <th key={m.id} className="px-2 py-3.5 text-center text-xs font-bold text-gray-700 uppercase tracking-wider border-r border-gray-200">{m.name}</th>
-              ))}
-              <th className="px-4 py-3.5 text-center text-xs font-bold text-gray-800 uppercase tracking-wider bg-gray-100/80">ค่าเฉลี่ย</th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {loading ? (
-              <tr><td colSpan={14} className="text-center py-10 text-gray-500 font-medium">กำลังโหลดข้อมูล...</td></tr>
-            ) : tableData.length === 0 ? (
-              <tr><td colSpan={14} className="text-center py-10 text-gray-500 font-medium">ไม่มีข้อมูลในปีงบประมาณนี้</td></tr>
-            ) : (
-              tableData.map((row, idx) => {
-                const avgNum = Number(row.average);
-                let avgColorClass = "text-blue-700";
-                
-                if (activeSubTab === 'success') {
-                  if (avgNum < 80) avgColorClass = "text-red-600";
-                } else {
-                  if (avgNum > 0) avgColorClass = "text-red-600";
-                }
-
-                return (
-                  <tr key={idx} className="hover:bg-slate-50/80 transition-colors">
-                    <td className="px-4 py-3 text-sm border-r border-gray-200 font-bold bg-gray-50/30">
-                      <button 
-                        onClick={() => handleDepartmentClick(row.department_id, row.department_name)}
-                        className="text-blue-600 hover:text-blue-800 hover:underline text-left cursor-pointer flex items-center gap-1.5"
-                      >
-                        <span>🏢</span>
-                        <span>{row.department_name}</span>
-                      </button>
-                    </td>
-                    {ThaiMonths.map(m => {
-                      const val = row[m.id];
-                      let badgeClass = "text-gray-400 text-xs";
-                      let displayText = "ไม่มีข้อมูล";
-
-                      if (val !== null && val !== undefined) {
-                        displayText = Number(val).toFixed(1);
-                        if (activeSubTab === 'success') {
-                          if (val > 100) {
-                            badgeClass = "bg-purple-600 text-white border border-purple-700 font-extrabold px-2.5 py-1 rounded-md text-xs inline-block shadow-md animate-pulse";
-                          } else if (val < 80) {
-                            badgeClass = "bg-red-50 text-red-600 border border-red-200 font-semibold px-2.5 py-1 rounded-md text-xs inline-block shadow-2xs";
-                          } else {
-                            badgeClass = "bg-emerald-50 text-emerald-600 border border-emerald-200 font-semibold px-2.5 py-1 rounded-md text-xs inline-block shadow-2xs";
-                          }
-                        } else {
-                          badgeClass = val > 0 
-                            ? "bg-red-50 text-red-600 border border-red-200 font-semibold px-2.5 py-1 rounded-md text-xs inline-block shadow-2xs" 
-                            : "bg-emerald-50 text-emerald-600 border border-emerald-200 font-semibold px-2.5 py-1 rounded-md text-xs inline-block shadow-2xs";
-                        }
-                      }
-
-                      const isClickable = activeSubTab !== 'success';
-
-                      return (
-                        <td key={m.id} className="px-2 py-3 text-sm text-center border-r border-gray-200">
-                          {isClickable && val !== null && val !== undefined ? (
-                            <button
-                              onClick={() => handleCellClick(row.department_id, row.department_name, m.id, m.name)}
-                              className={`${badgeClass} cursor-pointer hover:scale-105 transition-transform`}
-                              title="คลิกเพื่อดูรายละเอียดรายระดับ"
-                            >
-                              {displayText}
-                            </button>
-                          ) : (
-                            <span className={badgeClass}>{displayText}</span>
-                          )}
-                        </td>
-                      );
-                    })}
-                    <td className={`px-4 py-3 text-sm text-center font-extrabold bg-blue-50/30 ${avgColorClass}`}>
-                      {row.average}
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      {/* Modal ประวัติย้อนหลังรายปี */}
-      {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg overflow-hidden border border-gray-100 animate-in fade-in zoom-in-95 duration-150">
-            <div className="bg-blue-600 px-6 py-4 flex justify-between items-center text-white">
-              <div>
-                <h3 className="font-bold text-lg">สถิติย้อนหลังรายปี</h3>
-                <p className="text-xs text-blue-100 opacity-90">{selectedDeptModal?.name}</p>
-              </div>
-              <button 
-                onClick={() => setModalOpen(false)}
-                className="bg-blue-700/60 hover:bg-blue-700 text-white rounded-full p-1.5 w-8 h-8 flex items-center justify-center transition-colors cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-            
-            <div className="p-6">
-              {loadingHistory ? (
-                <div className="py-12 text-center text-gray-500 font-medium">กำลังโหลดข้ามปี...</div>
-              ) : (
-                <div className="space-y-3">
-                  <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
-                    เรียงข้อมูลปีย้อนหลัง (ปีปัจจุบัน ถึง อดีต) - แท็บ: {activeSubTab}
-                  </div>
-                  {historicalData.map((item, index) => (
-                    <div 
-                      key={index} 
-                      className="flex justify-between items-center bg-gray-50 hover:bg-blue-50/50 p-4 rounded-xl border border-gray-200/80 transition-all"
-                    >
-                      <span className="font-bold text-gray-700 text-sm">
-                        ปีงบประมาณ {item.year}
-                      </span>
-                      <span className={`font-extrabold text-base ${item.average !== null ? (Number(item.average) < 80 && activeSubTab === 'success' ? 'text-red-600' : 'text-blue-600') : 'text-gray-400'}`}>
-                        {item.average !== null ? `${item.average}` : 'ไม่มีข้อมูล'}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <div className="bg-gray-50 px-6 py-3.5 flex justify-end border-t border-gray-100">
-              <button
-                onClick={() => setModalOpen(false)}
-                className="bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold px-5 py-2 rounded-xl text-sm transition-colors cursor-pointer"
-              >
-                ปิดหน้าต่าง
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal แสดงรายละเอียด Phlebitis (ระดับ 1, 2, 3 ขึ้นไป) */}
-      {phlebModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden border border-gray-100">
-            <div className="bg-blue-600 px-6 py-4 flex justify-between items-center text-white">
-              <div>
-                <h3 className="font-bold text-base">รายละเอียด Phlebitis แยกตามระดับ</h3>
-                <p className="text-xs text-blue-100 opacity-90">{selectedPhlebDetail?.deptName} (เดือน {selectedPhlebDetail?.monthName} ปี {selectedYear})</p>
-              </div>
-              <button 
-                onClick={() => setPhlebModalOpen(false)}
-                className="bg-blue-700/60 hover:bg-blue-700 text-white rounded-full p-1.5 w-7 h-7 flex items-center justify-center cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-            
-            <div className="p-6">
-              {loadingHistory ? (
-                <div className="py-8 text-center text-gray-500 font-medium">กำลังโหลดข้อมูล...</div>
-              ) : (
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center bg-gray-50 p-3.5 rounded-xl border border-gray-200/80">
-                    <span className="font-semibold text-gray-700 text-sm">อัตราการเกิด phlebitis ระดับ 1</span>
-                    <span className="font-extrabold text-blue-600 text-base">{selectedPhlebDetail?.lvl1}%</span>
-                  </div>
-                  <div className="flex justify-between items-center bg-gray-50 p-3.5 rounded-xl border border-gray-200/80">
-                    <span className="font-semibold text-gray-700 text-sm">อัตราการเกิด phlebitis ระดับ 2</span>
-                    <span className="font-extrabold text-blue-600 text-base">{selectedPhlebDetail?.lvl2}%</span>
-                  </div>
-                  <div className="flex justify-between items-center bg-red-50/50 p-3.5 rounded-xl border border-red-100">
-                    <span className="font-semibold text-red-700 text-sm">อัตราการเกิด phlebitis ระดับ 3 ขึ้นไป</span>
-                    <span className="font-extrabold text-red-600 text-base">{selectedPhlebDetail?.lvl3up}%</span>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="bg-gray-50 px-6 py-3 flex justify-end border-t border-gray-100">
-              <button
-                onClick={() => setPhlebModalOpen(false)}
-                className="bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold px-4 py-2 rounded-xl text-sm cursor-pointer"
-              >
-                ปิดหน้าต่าง
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal แสดงรายละเอียด Extravasation / Infiltration ทั้ง 4 ระดับ */}
-      {detailModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md overflow-hidden border border-gray-100">
-            <div className="bg-blue-600 px-6 py-4 flex justify-between items-center text-white">
-              <div>
-                <h3 className="font-bold text-base">รายละเอียด {selectedCellDetail?.title} แยกตามระดับ</h3>
-                <p className="text-xs text-blue-100 opacity-90">{selectedCellDetail?.deptName} (เดือน {selectedCellDetail?.monthName} ปี {selectedYear})</p>
-              </div>
-              <button 
-                onClick={() => setDetailModalOpen(false)}
-                className="bg-blue-700/60 hover:bg-blue-700 text-white rounded-full p-1.5 w-7 h-7 flex items-center justify-center cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-            
-            <div className="p-6">
-              {loadingHistory ? (
-                <div className="py-8 text-center text-gray-500 font-medium">กำลังโหลดข้อมูล...</div>
-              ) : (
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center bg-gray-50 p-3 rounded-xl border border-gray-200/80">
-                    <span className="font-semibold text-gray-700 text-sm">อัตราการเกิด {selectedCellDetail?.title} ระดับ 1</span>
-                    <span className="font-extrabold text-blue-600 text-base">{selectedCellDetail?.lvl1}%</span>
-                  </div>
-                  <div className="flex justify-between items-center bg-gray-50 p-3 rounded-xl border border-gray-200/80">
-                    <span className="font-semibold text-gray-700 text-sm">อัตราการเกิด {selectedCellDetail?.title} ระดับ 2</span>
-                    <span className="font-extrabold text-blue-600 text-base">{selectedCellDetail?.lvl2}%</span>
-                  </div>
-                  <div className="flex justify-between items-center bg-gray-50 p-3 rounded-xl border border-gray-200/80">
-                    <span className="font-semibold text-gray-700 text-sm">อัตราการเกิด {selectedCellDetail?.title} ระดับ 3</span>
-                    <span className="font-extrabold text-red-600 text-base">{selectedCellDetail?.lvl3}%</span>
-                  </div>
-                  <div className="flex justify-between items-center bg-red-50/50 p-3 rounded-xl border border-red-100">
-                    <span className="font-semibold text-red-700 text-sm">อัตราการเกิด {selectedCellDetail?.title} ระดับ 4</span>
-                    <span className="font-extrabold text-red-600 text-base">{selectedCellDetail?.lvl4}%</span>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            <div className="bg-gray-50 px-6 py-3 flex justify-end border-t border-gray-100">
-              <button
-                onClick={() => setDetailModalOpen(false)}
-                className="bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold px-4 py-2 rounded-xl text-sm cursor-pointer"
-              >
-                ปิดหน้าต่าง
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
+export default function IvCarePage(){
+ const [year,setYear]=useState(2570),[tab,setTab]=useState<IvMetric>('success'),[rows,setRows]=useState<IvReportRow[]>([]),[departments,setDepartments]=useState<IvDepartment[]>([]),[loading,setLoading]=useState(true),[error,setError]=useState(''),[warning,setWarning]=useState(''),[pendingMonths,setPendingMonths]=useState<Set<string>>(new Set()),[detail,setDetail]=useState<{title:string;subtitle:string;lines:{label:string;value:string}[]}|null>(null);
+ const [incidents,setIncidents]=useState<IvExportIncident[]>([]);
+ const [exportMonth,setExportMonth]=useState(10);
+ const supabase=useMemo(()=>createClient(),[]),generation=useRef(0);
+ const load=useCallback(async()=>{const token=++generation.current;setLoading(true);try{const response=await fetch('/api/iv-care-report',{cache:'no-store'});const body=await response.json();if(!response.ok)throw Error(body.error||'โหลดรายงานไม่สำเร็จ');if(token!==generation.current)return;setRows(body.items||[]);setIncidents(body.incidents||[]);setDepartments(sortMonthlyDepartments<IvDepartment>(body.departments||[]));setPendingMonths(new Set(body.pending_months||[]));setWarning(body.invalid?'ข้อมูลไม่ถูกต้อง/สรุปซ้ำ '+body.invalid+' รายการ':'');setError('');}catch(e){if(token===generation.current)setError(e instanceof Error?e.message:'โหลดไม่สำเร็จ');}finally{if(token===generation.current)setLoading(false);}},[]);
+ useEffect(()=>{void load();const channel=supabase.channel('iv-care-report').on('postgres_changes',{event:'*',schema:'public',table:'iv_care_data'},()=>void load()).on('postgres_changes',{event:'*',schema:'public',table:'iv_care_complications'},()=>void load()).on('postgres_changes',{event:'*',schema:'public',table:'iv_care_monthly_summaries'},()=>void load()).subscribe();return()=>{generation.current++;void supabase.removeChannel(channel);};},[load,supabase]);
+ useEffect(()=>{if(!detail)return;const before=document.body.style.overflow;document.body.style.overflow='hidden';return()=>{document.body.style.overflow=before;};},[detail]);
+ const years=useMemo(()=>Array.from(new Set([2570,2569,2568,2567,2566,...rows.map(r=>Number(r.fiscal_year))])).sort((a,b)=>b-a),[rows]);
+ const selected=useMemo(()=>rows.filter(r=>Number(r.fiscal_year)===year),[rows,year]);
+ const monthlyMetrics=useMemo(()=>months.map(month=>{
+   const data=selected.filter(row=>Number(row.month)===month.id);
+   return {...month,values:Object.fromEntries(tabs.map(metric=>[metric.key,ivPercent(data,metric.key,'overall')]))};
+ }),[selected]);
+ const departmentNames=useMemo(()=>Object.fromEntries(departments.map(d=>[String(d.id),d.Department])),[departments]);
+ const name=(id:string|number,y=year)=>{const raw=departmentNames[String(id)]||`หน่วยงาน ${id}`;if(![2566,2567,2568].includes(y))return raw;return ({'อายุรกรรม 4':'อายุรกรรมชาย 1','อายุรกรรม 2':'อายุรกรรมชาย 2','อายุรกรรม 5':'อายุรกรรมหญิง','อายุรกรรม 6':'ร่มไทร'} as Record<string,string>)[raw]||raw;};
+ const hasPending = (id: string, month: number) =>
+   year === 2570 && pendingMonths.has(id + ':' + (month >= 10 ? '2026' : '2027') + '-' + String(month).padStart(2, '0'));
+ const units=departments.map(d=>String(d.id));
+ const monthRows=useMemo(()=>{
+   const buckets=new Map<string,IvReportRow[]>();
+   for(const row of selected){
+     const key=String(row.department_id)+':'+Number(row.month);
+     const group=buckets.get(key);
+     if(group)group.push(row);
+     else buckets.set(key,[row]);
+   }
+   return buckets;
+ },[selected]);
+ const hasExportData=units.some(id=>monthRows.has(id+':'+exportMonth)||hasPending(id,exportMonth));
+ function downloadMonthly(){
+   const reportRows=[
+     ['IV Care','ปีงบประมาณ',year,'เดือน',months.find(month=>month.id===exportMonth)?.name],
+     ['หน่วยงาน',...tabs.flatMap(metric=>[metric.label+' (%)',metric.label+' ตัวตั้ง',metric.label+' ตัวหาร']),'สถานะ'],
+     ...units.map(id=>{
+       const data=monthRows.get(id+':'+exportMonth)||[];
+       const values=tabs.map(metric=>ivPercent(data,metric.key));
+       const status=hasPending(id,exportMonth)?'มีรายการรออนุมัติ':values.some(value=>value!==null)?'มีผลรายงาน':'ไม่มีข้อมูล';
+       const metrics=tabs.flatMap((metric,index)=>{
+         const pairs=data.flatMap(row=>{
+           const denominator=Number(metric.key==='success'?row.all_iv_insertion:row.iv_position);
+           const pair=ivFraction(row,metric.key);
+           return pair&&denominator>0?[pair]:[];
+         });
+         // Historical rates can average multiple records. Keep their paired counts in matching order.
+         return [values[index]?.toFixed(2),pairs.map(pair=>pair.n).join(' / '),pairs.map(pair=>pair.d).join(' / ')];
+       });
+       return [name(id),...metrics,status];
+     }),
+   ];
+   const period=`${year-(exportMonth>=10?544:543)}-${String(exportMonth).padStart(2,'0')}`;
+   const monthlyIncidents=incidents.filter(row=>row.record_date.slice(0,7)===period);
+   if(monthlyIncidents.length){
+     reportRows.push([],['รายละเอียดปัจจัยภาวะแทรกซ้อน'],
+       ['หน่วยงาน','วันที่','ภาวะแทรกซ้อน','ระดับ','สถานะ','ปัจจัยจากแบบบันทึก','ปัจจัยด้านยา','ปัจจัยด้านสารน้ำ','ปัจจัยด้านผู้ป่วย','ปัจจัยด้านบุคลากร']);
+     for(const row of monthlyIncidents){
+       const factors=row.contributing_factors?.groups?.flatMap(group=>group.items.map(item=>
+         [group.label,item.label,...item.causes.map(cause=>cause.label),item.detail].filter(Boolean).join(' · ')
+       )).join(' | ');
+       reportRows.push([name(row.department_id),row.record_date,row.complication,row.grade,
+         row.status==='pending'?'รออนุมัติ':'อนุมัติแล้ว',factors,row.factor_drug,row.factor_fluid,row.factor_patient,row.factor_personnel]);
+     }
+   }
+   const csv=reportRows.map(row=>row.map(value=>{
+     const cell=String(value??'');
+     const safeCell=/^\s*[=+@-]/.test(cell)?"'"+cell:cell;
+     return '"'+safeCell.replaceAll('"','""')+'"';
+   }).join(',')).join('\r\n');
+   const url=URL.createObjectURL(new Blob(['\uFEFF',csv],{type:'text/csv;charset=utf-8'}));
+   const link=document.createElement('a');
+   link.href=url;
+   link.download=`IV-Care-${year}-${String(exportMonth).padStart(2,'0')}.csv`;
+   link.click();
+   window.setTimeout(()=>URL.revokeObjectURL(url),1000);
+ }
+ function unitAverage(id:string){let data=selected.filter(r=>String(r.department_id)===id);if(year===2569){const raw=departmentNames[id];if(raw==='อายุรกรรม 3')data=data.filter(r=>![10,11,12,1,2].includes(Number(r.month)));if(raw==='อายุรกรรม 7')data=data.filter(r=>![10,11,12,1,2,3].includes(Number(r.month)));}return ivPercent(data,tab);}
+ function history(id:string){setDetail({title:'สถิติย้อนหลังรายปี',subtitle:name(id)+' · '+tabs.find(t=>t.key===tab)?.label,lines:years.map(y=>({label:`ปีงบประมาณ ${y}`,value:fmt(ivPercent(rows.filter(r=>String(r.department_id)===id&&Number(r.fiscal_year)===y),tab))+'%'}))});}
+ function cell(id:string,m:number){if(tab==='success')return;const data=selected.filter(r=>String(r.department_id)===id&&Number(r.month)===m);const usable=data.filter(r=>r.source!=='live'||r.has_summary);const denominator=usable.reduce((s,r)=>s+(Number(r.iv_position)||0),0);const prefix=tab;const lines=[1,2,3,4].map(level=>{const count=usable.reduce((s,r)=>s+(Number(r[`${prefix}_${level}`])||0),0);return {label:`ระดับ ${level} · ${count} ครั้ง`,value:denominator>0?(count/denominator*100).toFixed(2)+'%':'—'};});setDetail({title:tabs.find(t=>t.key===tab)?.label||'',subtitle:`${name(id)} · ${months.find(x=>x.id===m)?.name} · ปีงบประมาณ ${year}`,lines:[{label:'จำนวนตำแหน่งให้สารน้ำ',value:denominator>0?denominator.toLocaleString():'—'},...lines]});}
+ const scoreColor=(v:number|null)=>v===null?'text-slate-300':(tab==='success'?v>=80:v===0)?'border-emerald-200 bg-emerald-50 text-emerald-700':'border-rose-200 bg-rose-50 text-rose-600';
+ return <div className="mx-auto w-full min-w-0 max-w-[1480px] space-y-3 px-3 py-4 sm:px-5 lg:px-6"><header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 rounded-2xl border border-teal-100 bg-white px-4 py-3 shadow-sm">
+   <h1 className="text-lg font-extrabold text-slate-900">รายงาน IV Care</h1>
+   <ReportStatusLegend statuses={['pending','missing']}/>
+   <div className="flex flex-wrap items-center gap-2 text-xs">
+    <label htmlFor="iv-year" className="font-semibold text-slate-700">ปีงบประมาณ</label>
+    <select id="iv-year" value={year} onChange={e=>{setYear(Number(e.target.value));setDetail(null);}}
+      className="h-8 rounded-lg border border-teal-200 bg-teal-50 px-2 text-teal-900">
+     {years.map(y=><option key={y} value={y}>{y}</option>)}
+    </select>
+    <button type="button" disabled={loading} onClick={()=>void load()}
+      className="h-8 rounded-lg border border-slate-200 px-3 text-slate-600 disabled:opacity-50">{loading?'กำลังโหลด…':'โหลดใหม่'}</button>
+   </div>
+   <div className="flex flex-wrap items-center gap-2 text-xs">
+    <label htmlFor="iv-export-month" className="font-semibold text-slate-700">เลือกเดือน</label>
+    <input id="iv-export-month" type="month"
+      value={`${year-(exportMonth>=10?544:543)}-${String(exportMonth).padStart(2,'0')}`}
+      min={`${year-544}-10`} max={`${year-543}-09`}
+      onChange={event=>{
+       const input=event.currentTarget;
+       if(input.value&&input.validity.valid)setExportMonth(Number(input.value.slice(-2)));
+      }}
+      className="h-8 rounded-lg border border-teal-200 bg-white px-2 text-slate-700"/>
+    <button type="button" onClick={downloadMonthly} disabled={loading||!!error||!hasExportData}
+      aria-label="ดาวน์โหลดรายงาน IV Care รายเดือน (CSV)"
+      className="h-8 rounded-lg bg-teal-700 px-3 font-semibold text-white hover:bg-teal-800 disabled:opacity-50">Download</button>
+   </div>
+ </header>
+ {error&&<p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{error}</p>}{year===2570&&warning&&<p role="status" className="rounded-xl bg-amber-50 p-3 text-sm text-amber-800">{warning}</p>}
+ <section aria-label="เลือกตัวชี้วัด IV Care" className="grid grid-cols-2 gap-3 lg:grid-cols-4">{tabs.map(t=>{const v=ivPercent(selected,t.key,'overall'),active=tab===t.key;return <button key={t.key} type="button" aria-pressed={active} onClick={()=>{setTab(t.key);setDetail(null);}} className={`group/card rounded-xl border px-3 py-1.5 text-left shadow-sm transition ${active?'border-teal-800 bg-teal-800 text-white':'border-slate-200 bg-white text-slate-800 hover:border-teal-300'}`}><div className="flex items-center justify-between gap-2"><h2 className="text-sm font-bold leading-5">{t.label}</h2></div><span className="group/monthly relative inline-block" aria-describedby={!loading&&!error?`iv-monthly-${t.key}`:undefined}>
+   <span className="block mt-0.5 text-xl font-extrabold tabular-nums">{loading?'…':fmt(v)}<span className={`ml-1 text-sm ${active?'text-teal-200':'text-slate-400'}`}>{v===null?'':'%'}</span></span>
+   {!loading&&!error&&<span id={`iv-monthly-${t.key}`} role="tooltip"
+     className="absolute left-0 top-full z-40 hidden w-40 rounded-xl lg:w-48 border border-teal-100 bg-white p-3 text-xs text-slate-700 shadow-lg group-hover/monthly:block group-focus-visible/card:block">
+     <span className="mb-2 block font-semibold text-teal-800">{t.label} · รายเดือน</span>
+     {monthlyMetrics.map(month=><span key={month.id} className="flex justify-between gap-2 py-0.5">
+       <span>{month.name}</span><span className="font-semibold tabular-nums">{month.values[t.key]===null?'—':fmt(month.values[t.key])+'%'}</span>
+     </span>)}
+   </span>}
+ </span></button>;})}</section>
+ <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"><div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-3"><div className="flex flex-wrap items-baseline gap-x-3"><h2 className="text-sm font-bold text-slate-800">{tabs.find(t=>t.key===tab)?.label} · รายหน่วยงาน</h2><p className="text-xs text-slate-400">{units.length} หน่วยงาน · ตุลาคม – กันยายน · ร้อยละ</p></div><p className="text-[11px] text-slate-400">{tab==='success'?'เกณฑ์สีตามเดิม: ตั้งแต่ 80%':'เกณฑ์สีตามเดิม: 0%'}</p></div><MonthlyTableViewport label="ตาราง IV Care"><table className="w-full min-w-[1160px] table-fixed border-separate border-spacing-0 text-xs"><colgroup><col className="w-[170px]"/>{months.map(m=><col key={m.id}/>)}<col className="w-[92px]"/></colgroup><thead className="sticky top-0 z-20 bg-slate-50 text-slate-600"><tr><th className="sticky left-0 z-30 bg-slate-50 px-3 py-2 text-left">หน่วยงาน</th>{months.map(m=><ReportMonthHeading key={m.id} month={m.id} />)}<th className="bg-teal-50 px-1 py-2">{year===2570?'รวมทั้งปี':'ค่าเฉลี่ย'}</th></tr></thead><tbody>{loading?<tr><td colSpan={14} className="p-10 text-center text-slate-400">กำลังโหลดข้อมูล…</td></tr>:!units.length?<tr><td colSpan={14} className="p-10 text-center text-slate-400">ยังไม่มีข้อมูล{year===2570?'ที่อนุมัติแล้ว':''}ในปีงบประมาณ {year}</td></tr>:units.map(id=><tr key={id} className="group hover:bg-teal-50/30"><td className="sticky left-0 z-10 border-t border-slate-100 bg-white px-3 py-1.5 group-hover:bg-teal-50"><button type="button" title={name(id)} onClick={()=>history(id)} className="flex w-full min-w-0 items-center gap-1.5 text-left font-medium text-indigo-600 hover:text-indigo-900 hover:underline"><span aria-hidden="true" className="shrink-0">🏢</span><span className="truncate">{name(id)}</span></button></td>{months.map(m=>{
+   const v=ivPercent(monthRows.get(id+':'+m.id)||[],tab);
+   const pending=hasPending(id,m.id);
+   return <td key={m.id} className="border-l border-t border-slate-100 px-1 py-1 text-center">
+     {v!==null?<ReportValue warning={pending&&<ReportStatusIcon status="pending"/>}>
+       <button type="button" disabled={tab==='success'} onClick={()=>cell(id,m.id)}
+         className={'min-w-8 rounded-md border px-1 py-0.5 font-semibold tabular-nums '+scoreColor(v)}>{v.toFixed(1)}</button>
+     </ReportValue>:pending?<ReportStatusIcon status="pending"/>:<ReportStatusIcon status="missing" detail="ไม่มีข้อมูลหรือไม่มีตัวหารที่ใช้คำนวณ"/>}
+   </td>;
+ })}<td className="border-t border-slate-100 bg-teal-50/60 px-1 py-1.5 text-center font-bold tabular-nums text-teal-900"><ReportValue warning={months.some(m=>hasPending(id,m.id))&&<ReportStatusIcon status="pending"/>}>{fmt(unitAverage(id))}</ReportValue></td></tr>)}</tbody></table></MonthlyTableViewport></section>
+ {detail&&createPortal(<div role="dialog" aria-modal="true" aria-label={detail.title} className="fixed inset-0 z-[2147483647] flex items-center justify-center bg-slate-950/60 p-3"><div className="flex max-h-[90dvh] w-full max-w-lg flex-col overflow-hidden rounded-2xl bg-white shadow-2xl"><header className="flex items-center justify-between gap-3 bg-teal-800 p-4 text-white"><div><h3 className="font-bold">{detail.title}</h3><p className="mt-1 text-xs text-teal-100">{detail.subtitle}</p></div><button type="button" aria-label="ปิด" onClick={()=>setDetail(null)} className="rounded-lg px-2 py-1 text-xl">×</button></header><div className="space-y-2 overflow-y-auto p-4">{detail.lines.map((line,i)=><div key={i} className="flex items-center justify-between gap-4 rounded-xl border border-slate-200 p-3 text-sm"><span className="text-slate-600">{line.label}</span><strong className="tabular-nums text-teal-800">{line.value==='—%'?'—':line.value}</strong></div>)}</div><footer className="flex justify-end border-t p-3"><button type="button" onClick={()=>setDetail(null)} className="rounded-xl bg-slate-100 px-4 py-2 text-sm">ปิดหน้าต่าง</button></footer></div></div>,document.body)}
+ </div>;
 }

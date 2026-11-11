@@ -1,0 +1,2298 @@
+{
+  "ศัลยกรรมประสาท": {
+    "10": {
+      "cases": 6,
+      "days": 1085,
+      "riskDays": 601,
+      "pending": false
+    },
+    "11": {
+      "cases": 11,
+      "days": 1199,
+      "riskDays": 756,
+      "pending": false
+    },
+    "12": {
+      "cases": 6,
+      "days": 1178,
+      "riskDays": 711,
+      "pending": false
+    },
+    "1": {
+      "cases": 9,
+      "days": 1266,
+      "riskDays": 727,
+      "pending": false
+    },
+    "2": {
+      "cases": 4,
+      "days": 1001,
+      "riskDays": 509,
+      "pending": false
+    },
+    "3": {
+      "cases": 5,
+      "days": 892,
+      "riskDays": 431,
+      "pending": false
+    },
+    "4": {
+      "cases": 4,
+      "days": 922,
+      "riskDays": 464,
+      "pending": false
+    },
+    "5": {
+      "cases": 2,
+      "days": 1030,
+      "riskDays": 542,
+      "pending": false
+    },
+    "6": {
+      "cases": 2,
+      "days": 1051,
+      "riskDays": 721,
+      "pending": false
+    },
+    "7": {
+      "cases": 2,
+      "days": 918,
+      "riskDays": 592,
+      "pending": false
+    },
+    "8": {
+      "cases": 3,
+      "days": 1133,
+      "riskDays": 615,
+      "pending": false
+    },
+    "9": {
+      "cases": 6,
+      "days": 1192,
+      "riskDays": 712,
+      "pending": false
+    }
+  },
+  "ศัลยกรรมกระดูก": {
+    "10": {
+      "cases": 0,
+      "days": 851,
+      "riskDays": 69,
+      "pending": false
+    },
+    "11": {
+      "cases": 0,
+      "days": 908,
+      "riskDays": 158,
+      "pending": false
+    },
+    "12": {
+      "cases": 1,
+      "days": 756,
+      "riskDays": 236,
+      "pending": false
+    },
+    "1": {
+      "cases": 0,
+      "days": 988,
+      "riskDays": 140,
+      "pending": false
+    },
+    "2": {
+      "cases": 2,
+      "days": 871,
+      "riskDays": 72,
+      "pending": false
+    },
+    "3": {
+      "cases": 2,
+      "days": 896,
+      "riskDays": 110,
+      "pending": false
+    },
+    "4": {
+      "cases": 1,
+      "days": 699,
+      "riskDays": 107,
+      "pending": false
+    },
+    "5": {
+      "cases": 0,
+      "days": 761,
+      "riskDays": 85,
+      "pending": false
+    },
+    "6": {
+      "cases": 0,
+      "days": 843,
+      "riskDays": 125,
+      "pending": false
+    },
+    "7": {
+      "cases": 0,
+      "days": 734,
+      "riskDays": 109,
+      "pending": false
+    },
+    "8": {
+      "cases": 0,
+      "days": 798,
+      "riskDays": 106,
+      "pending": false
+    },
+    "9": {
+      "cases": 4,
+      "days": 869,
+      "riskDays": 165,
+      "pending": false
+    }
+  },
+  "ศัลยกรรมชาย": {
+    "10": {
+      "cases": 0,
+      "days": 947,
+      "riskDays": 51,
+      "pending": false
+    },
+    "11": {
+      "cases": 1,
+      "days": 909,
+      "riskDays": 201,
+      "pending": false
+    },
+    "12": {
+      "cases": 3,
+      "days": 870,
+      "riskDays": 68,
+      "pending": false
+    },
+    "1": {
+      "cases": 0,
+      "days": 980,
+      "riskDays": 48,
+      "pending": false
+    },
+    "2": {
+      "cases": 1,
+      "days": 869,
+      "riskDays": 67,
+      "pending": false
+    },
+    "3": {
+      "cases": 0,
+      "days": 823,
+      "riskDays": 24,
+      "pending": false
+    },
+    "4": {
+      "cases": 0,
+      "days": 676,
+      "riskDays": 13,
+      "pending": false
+    },
+    "5": {
+      "cases": 2,
+      "days": 888,
+      "riskDays": 8,
+      "pending": false
+    },
+    "6": {
+      "cases": 0,
+      "days": 940,
+      "riskDays": 71,
+      "pending": false
+    },
+    "7": {
+      "cases": 0,
+      "days": 923,
+      "riskDays": 34,
+      "pending": false
+    },
+    "8": {
+      "cases": 0,
+      "days": 1011,
+      "riskDays": 19,
+      "pending": false
+    },
+    "9": {
+      "cases": 1,
+      "days": 990,
+      "riskDays": 8,
+      "pending": false
+    }
+  },
+  "ศัลยกรรมหญิง": {
+    "10": {
+      "cases": 0,
+      "days": 785,
+      "riskDays": 79,
+      "pending": false
+    },
+    "11": {
+      "cases": 1,
+      "days": 793,
+      "riskDays": 54,
+      "pending": false
+    },
+    "12": {
+      "cases": 2,
+      "days": 808,
+      "riskDays": 95,
+      "pending": false
+    },
+    "1": {
+      "cases": 1,
+      "days": 914,
+      "riskDays": 88,
+      "pending": false
+    },
+    "2": {
+      "cases": 1,
+      "days": 766,
+      "riskDays": 55,
+      "pending": false
+    },
+    "3": {
+      "cases": 0,
+      "days": 855,
+      "riskDays": 60,
+      "pending": false
+    },
+    "4": {
+      "cases": 0,
+      "days": 648,
+      "riskDays": 68,
+      "pending": false
+    },
+    "5": {
+      "cases": 0,
+      "days": 579,
+      "riskDays": 75,
+      "pending": false
+    },
+    "6": {
+      "cases": 0,
+      "days": 730,
+      "riskDays": 69,
+      "pending": false
+    },
+    "7": {
+      "cases": 0,
+      "days": 767,
+      "riskDays": 88,
+      "pending": false
+    },
+    "8": {
+      "cases": 0,
+      "days": 978,
+      "riskDays": 89,
+      "pending": false
+    },
+    "9": {
+      "cases": 0,
+      "days": 893,
+      "riskDays": 70,
+      "pending": false
+    }
+  },
+  "น้อมเกล้า 2": {
+    "10": {
+      "cases": 0,
+      "days": 350,
+      "riskDays": 99,
+      "pending": false
+    },
+    "11": {
+      "cases": 0,
+      "days": 344,
+      "riskDays": 111,
+      "pending": false
+    },
+    "12": {
+      "cases": 0,
+      "days": 305,
+      "riskDays": 53,
+      "pending": false
+    },
+    "1": {
+      "cases": 0,
+      "days": 284,
+      "riskDays": 20,
+      "pending": false
+    },
+    "2": {
+      "cases": 0,
+      "days": 279,
+      "riskDays": 27,
+      "pending": false
+    },
+    "3": {
+      "cases": 0,
+      "days": 333,
+      "riskDays": 70,
+      "pending": false
+    },
+    "4": {
+      "cases": 0,
+      "days": 292,
+      "riskDays": 12,
+      "pending": false
+    },
+    "5": {
+      "cases": 0,
+      "days": 315,
+      "riskDays": 3,
+      "pending": false
+    },
+    "6": {
+      "cases": 0,
+      "days": 288,
+      "riskDays": 25,
+      "pending": false
+    },
+    "7": {
+      "cases": 0,
+      "days": 277,
+      "riskDays": 81,
+      "pending": false
+    },
+    "8": {
+      "cases": 0,
+      "days": 309,
+      "riskDays": 43,
+      "pending": false
+    },
+    "9": {
+      "cases": 0,
+      "days": 336,
+      "riskDays": 98,
+      "pending": false
+    }
+  },
+  "น้อมเกล้า 3": {
+    "10": {
+      "cases": 0,
+      "days": 350,
+      "riskDays": 63,
+      "pending": false
+    },
+    "11": {
+      "cases": 0,
+      "days": 350,
+      "riskDays": 63,
+      "pending": false
+    },
+    "12": {
+      "cases": 0,
+      "days": 259,
+      "riskDays": 11,
+      "pending": false
+    },
+    "1": {
+      "cases": 0,
+      "days": 303,
+      "riskDays": 6,
+      "pending": false
+    },
+    "2": {
+      "cases": 0,
+      "days": 285,
+      "riskDays": 17,
+      "pending": false
+    },
+    "3": {
+      "cases": 0,
+      "days": 331,
+      "riskDays": 13,
+      "pending": false
+    },
+    "4": {
+      "cases": 0,
+      "days": 258,
+      "riskDays": 17,
+      "pending": false
+    },
+    "5": {
+      "cases": 0,
+      "days": 320,
+      "riskDays": 33,
+      "pending": false
+    },
+    "6": {
+      "cases": 0,
+      "days": 329,
+      "riskDays": 44,
+      "pending": false
+    },
+    "7": {
+      "cases": 0,
+      "days": 329,
+      "riskDays": 126,
+      "pending": false
+    },
+    "8": {
+      "cases": 0,
+      "days": 307,
+      "riskDays": 15,
+      "pending": false
+    },
+    "9": {
+      "cases": 0,
+      "days": 308,
+      "riskDays": 46,
+      "pending": false
+    }
+  },
+  "น้อมเกล้า 4": {
+    "10": {
+      "cases": 0,
+      "days": 317,
+      "riskDays": 50,
+      "pending": false
+    },
+    "11": {
+      "cases": 0,
+      "days": 291,
+      "riskDays": 20,
+      "pending": false
+    },
+    "12": {
+      "cases": 0,
+      "days": 203,
+      "riskDays": 10,
+      "pending": false
+    },
+    "1": {
+      "cases": 0,
+      "days": 261,
+      "riskDays": 12,
+      "pending": false
+    },
+    "2": {
+      "cases": 0,
+      "days": 214,
+      "riskDays": 20,
+      "pending": false
+    },
+    "3": {
+      "cases": 0,
+      "days": 282,
+      "riskDays": 8,
+      "pending": false
+    },
+    "4": {
+      "cases": 0,
+      "days": 199,
+      "riskDays": 12,
+      "pending": false
+    },
+    "5": {
+      "cases": 0,
+      "days": 248,
+      "riskDays": 13,
+      "pending": false
+    },
+    "6": {
+      "cases": 0,
+      "days": 273,
+      "riskDays": 47,
+      "pending": false
+    },
+    "7": {
+      "cases": 0,
+      "days": 261,
+      "riskDays": 59,
+      "pending": false
+    },
+    "8": {
+      "cases": 1,
+      "days": 261,
+      "riskDays": 66,
+      "pending": false
+    },
+    "9": {
+      "cases": 0,
+      "days": 242,
+      "riskDays": 32,
+      "pending": false
+    }
+  },
+  "รส 200 ปีบน": {
+    "10": {
+      "cases": 1,
+      "days": 174,
+      "riskDays": 11,
+      "pending": false
+    },
+    "11": {
+      "cases": 0,
+      "days": 155,
+      "riskDays": 5,
+      "pending": false
+    },
+    "12": {
+      "cases": 0,
+      "days": 200,
+      "riskDays": 0,
+      "pending": false
+    },
+    "1": {
+      "cases": 0,
+      "days": 203,
+      "riskDays": 0,
+      "pending": false
+    },
+    "2": {
+      "cases": 0,
+      "days": 165,
+      "riskDays": 1,
+      "pending": false
+    },
+    "3": {
+      "cases": 0,
+      "days": 165,
+      "riskDays": 1,
+      "pending": false
+    },
+    "4": {
+      "cases": 0,
+      "days": 133,
+      "riskDays": 1,
+      "pending": false
+    },
+    "5": {
+      "cases": 0,
+      "days": 177,
+      "riskDays": 14,
+      "pending": false
+    },
+    "6": {
+      "cases": 0,
+      "days": 165,
+      "riskDays": 14,
+      "pending": false
+    },
+    "7": {
+      "cases": 0,
+      "days": 197,
+      "riskDays": 0,
+      "pending": false
+    },
+    "8": {
+      "cases": 0,
+      "days": 195,
+      "riskDays": 0,
+      "pending": false
+    },
+    "9": {
+      "cases": 0,
+      "days": 194,
+      "riskDays": 0,
+      "pending": false
+    }
+  },
+  "รส 200 ปีล่าง": {
+    "10": {
+      "cases": 0,
+      "days": 213,
+      "riskDays": 66,
+      "pending": false
+    },
+    "11": {
+      "cases": 0,
+      "days": 198,
+      "riskDays": 15,
+      "pending": false
+    },
+    "12": {
+      "cases": 0,
+      "days": 182,
+      "riskDays": 41,
+      "pending": false
+    },
+    "1": {
+      "cases": 0,
+      "days": 184,
+      "riskDays": 42,
+      "pending": false
+    },
+    "2": {
+      "cases": 0,
+      "days": 142,
+      "riskDays": 32,
+      "pending": false
+    },
+    "3": {
+      "cases": 0,
+      "days": 205,
+      "riskDays": 29,
+      "pending": false
+    },
+    "4": {
+      "cases": 0,
+      "days": 164,
+      "riskDays": 4,
+      "pending": false
+    },
+    "5": {
+      "cases": 0,
+      "days": 157,
+      "riskDays": 26,
+      "pending": false
+    },
+    "6": {
+      "cases": 0,
+      "days": 126,
+      "riskDays": 52,
+      "pending": false
+    },
+    "7": {
+      "cases": 0,
+      "days": 232,
+      "riskDays": 48,
+      "pending": false
+    },
+    "8": {
+      "cases": 0,
+      "days": 223,
+      "riskDays": 53,
+      "pending": false
+    },
+    "9": {
+      "cases": 0,
+      "days": 132,
+      "riskDays": 45,
+      "pending": false
+    }
+  },
+  "อายุรกรรม 4": {
+    "10": {
+      "cases": 5,
+      "days": 1591,
+      "riskDays": 713,
+      "pending": false
+    },
+    "11": {
+      "cases": 5,
+      "days": 1590,
+      "riskDays": 795,
+      "pending": false
+    },
+    "12": {
+      "cases": 15,
+      "days": 1517,
+      "riskDays": 672,
+      "pending": false
+    },
+    "1": {
+      "cases": 15,
+      "days": 1664,
+      "riskDays": 694,
+      "pending": false
+    },
+    "2": {
+      "cases": 1,
+      "days": 1039,
+      "riskDays": 276,
+      "pending": false
+    },
+    "3": {
+      "cases": 0,
+      "days": 988,
+      "riskDays": 161,
+      "pending": false
+    },
+    "4": {
+      "cases": 0,
+      "days": 542,
+      "riskDays": 353,
+      "pending": false
+    },
+    "5": {
+      "cases": 3,
+      "days": 886,
+      "riskDays": 271,
+      "pending": false
+    },
+    "6": {
+      "cases": 2,
+      "days": 965,
+      "riskDays": 307,
+      "pending": false
+    },
+    "7": {
+      "cases": 8,
+      "days": 975,
+      "riskDays": 284,
+      "pending": false
+    }
+  },
+  "อายุรกรรม 5": {
+    "10": {
+      "cases": 1,
+      "days": 1327,
+      "riskDays": 425,
+      "pending": false
+    },
+    "11": {
+      "cases": 2,
+      "days": 1237,
+      "riskDays": 454,
+      "pending": false
+    },
+    "12": {
+      "cases": 1,
+      "days": 1147,
+      "riskDays": 390,
+      "pending": false
+    },
+    "1": {
+      "cases": 4,
+      "days": 1419,
+      "riskDays": 438,
+      "pending": false
+    },
+    "2": {
+      "cases": 3,
+      "days": 1225,
+      "riskDays": 304,
+      "pending": false
+    },
+    "3": {
+      "cases": 3,
+      "days": 1335,
+      "riskDays": 391,
+      "pending": false
+    },
+    "4": {
+      "cases": 2,
+      "days": 1341,
+      "riskDays": 311,
+      "pending": false
+    },
+    "5": {
+      "cases": 3,
+      "days": 1485,
+      "riskDays": 469,
+      "pending": false
+    },
+    "6": {
+      "cases": null,
+      "days": 0,
+      "riskDays": 0,
+      "pending": false
+    }
+  },
+  "อายุรกรรม 2": {
+    "10": {
+      "cases": 4,
+      "days": 752,
+      "riskDays": 281,
+      "pending": false
+    },
+    "11": {
+      "cases": 2,
+      "days": 885,
+      "riskDays": 365,
+      "pending": false
+    },
+    "12": {
+      "cases": 1,
+      "days": 898,
+      "riskDays": 277,
+      "pending": false
+    },
+    "1": {
+      "cases": 1,
+      "days": 826,
+      "riskDays": 229,
+      "pending": false
+    },
+    "2": {
+      "cases": 4,
+      "days": 861,
+      "riskDays": 306,
+      "pending": false
+    },
+    "3": {
+      "cases": 1,
+      "days": 901,
+      "riskDays": 322,
+      "pending": false
+    },
+    "4": {
+      "cases": 0,
+      "days": 833,
+      "riskDays": 286,
+      "pending": false
+    },
+    "5": {
+      "cases": 1,
+      "days": 945,
+      "riskDays": 290,
+      "pending": false
+    },
+    "6": {
+      "cases": 1,
+      "days": 919,
+      "riskDays": 115,
+      "pending": false
+    },
+    "7": {
+      "cases": 0,
+      "days": 1004,
+      "riskDays": 270,
+      "pending": false
+    },
+    "8": {
+      "cases": 0,
+      "days": 1021,
+      "riskDays": 203,
+      "pending": false
+    },
+    "9": {
+      "cases": 0,
+      "days": 1018,
+      "riskDays": 252,
+      "pending": false
+    }
+  },
+  "อายุรกรรม 6": {
+    "10": {
+      "cases": 4,
+      "days": 823,
+      "riskDays": 155,
+      "pending": false
+    },
+    "11": {
+      "cases": 1,
+      "days": 705,
+      "riskDays": 119,
+      "pending": false
+    },
+    "12": {
+      "cases": 0,
+      "days": 775,
+      "riskDays": 129,
+      "pending": false
+    },
+    "1": {
+      "cases": 0,
+      "days": 810,
+      "riskDays": 196,
+      "pending": false
+    },
+    "2": {
+      "cases": 0,
+      "days": 702,
+      "riskDays": 103,
+      "pending": false
+    },
+    "3": {
+      "cases": 1,
+      "days": 763,
+      "riskDays": 118,
+      "pending": false
+    },
+    "4": {
+      "cases": 1,
+      "days": 699,
+      "riskDays": 91,
+      "pending": false
+    },
+    "5": {
+      "cases": 0,
+      "days": 651,
+      "riskDays": 128,
+      "pending": false
+    },
+    "6": {
+      "cases": null,
+      "days": 0,
+      "riskDays": 0,
+      "pending": false
+    },
+    "7": {
+      "cases": null,
+      "days": 0,
+      "riskDays": 0,
+      "pending": false
+    }
+  },
+  "สงฆ์อาพาธ": {
+    "10": {
+      "cases": 0,
+      "days": 209,
+      "riskDays": 13,
+      "pending": false
+    },
+    "11": {
+      "cases": 0,
+      "days": 242,
+      "riskDays": 2,
+      "pending": false
+    },
+    "12": {
+      "cases": 0,
+      "days": 238,
+      "riskDays": 12,
+      "pending": false
+    },
+    "1": {
+      "cases": 0,
+      "days": 270,
+      "riskDays": 39,
+      "pending": false
+    },
+    "2": {
+      "cases": 0,
+      "days": 267,
+      "riskDays": 2,
+      "pending": false
+    },
+    "3": {
+      "cases": 0,
+      "days": 292,
+      "riskDays": 34,
+      "pending": false
+    },
+    "4": {
+      "cases": 0,
+      "days": 236,
+      "riskDays": 7,
+      "pending": false
+    },
+    "5": {
+      "cases": 0,
+      "days": 258,
+      "riskDays": 68,
+      "pending": false
+    },
+    "6": {
+      "cases": 0,
+      "days": 258,
+      "riskDays": 89,
+      "pending": false
+    },
+    "7": {
+      "cases": 0,
+      "days": 283,
+      "riskDays": 76,
+      "pending": false
+    },
+    "8": {
+      "cases": 0,
+      "days": 180,
+      "riskDays": 8,
+      "pending": false
+    },
+    "9": {
+      "cases": 0,
+      "days": 142,
+      "riskDays": 30,
+      "pending": false
+    }
+  },
+  "สูติกรรมหลังคลอด": {
+    "10": {
+      "cases": 0,
+      "days": 581,
+      "riskDays": 0,
+      "pending": false
+    },
+    "11": {
+      "cases": 0,
+      "days": 580,
+      "riskDays": 0,
+      "pending": false
+    },
+    "12": {
+      "cases": 0,
+      "days": 570,
+      "riskDays": 0,
+      "pending": false
+    },
+    "1": {
+      "cases": 0,
+      "days": 519,
+      "riskDays": 0,
+      "pending": false
+    },
+    "2": {
+      "cases": 0,
+      "days": 519,
+      "riskDays": 0,
+      "pending": false
+    },
+    "3": {
+      "cases": 0,
+      "days": 531,
+      "riskDays": 0,
+      "pending": false
+    },
+    "4": {
+      "cases": 0,
+      "days": 531,
+      "riskDays": 0,
+      "pending": false
+    },
+    "5": {
+      "cases": 0,
+      "days": 531,
+      "riskDays": 0,
+      "pending": false
+    },
+    "6": {
+      "cases": 0,
+      "days": 531,
+      "riskDays": 0,
+      "pending": false
+    },
+    "7": {
+      "cases": 0,
+      "days": 522,
+      "riskDays": 0,
+      "pending": false
+    },
+    "8": {
+      "cases": 0,
+      "days": 623,
+      "riskDays": 0,
+      "pending": false
+    },
+    "9": {
+      "cases": 0,
+      "days": 599,
+      "riskDays": 0,
+      "pending": false
+    }
+  },
+  "Sick newborn": {
+    "10": {
+      "cases": 0,
+      "days": 795,
+      "riskDays": 240,
+      "pending": false
+    },
+    "11": {
+      "cases": 0,
+      "days": 689,
+      "riskDays": 137,
+      "pending": false
+    },
+    "12": {
+      "cases": 0,
+      "days": 772,
+      "riskDays": 316,
+      "pending": false
+    },
+    "4": {
+      "cases": 0,
+      "days": 607,
+      "riskDays": 186,
+      "pending": false
+    },
+    "5": {
+      "cases": 0,
+      "days": 608,
+      "riskDays": 116,
+      "pending": false
+    },
+    "6": {
+      "cases": 0,
+      "days": 669,
+      "riskDays": 126,
+      "pending": false
+    },
+    "7": {
+      "cases": 0,
+      "days": 704,
+      "riskDays": 110,
+      "pending": false
+    },
+    "8": {
+      "cases": 0,
+      "days": 816,
+      "riskDays": 170,
+      "pending": false
+    },
+    "9": {
+      "cases": 0,
+      "days": 698,
+      "riskDays": 123,
+      "pending": false
+    }
+  },
+  "กุมารเวชกรรม 1": {
+    "10": {
+      "cases": 0,
+      "days": 696,
+      "riskDays": 57,
+      "pending": false
+    },
+    "11": {
+      "cases": 0,
+      "days": 537,
+      "riskDays": 0,
+      "pending": false
+    },
+    "12": {
+      "cases": 0,
+      "days": 445,
+      "riskDays": 0,
+      "pending": false
+    },
+    "1": {
+      "cases": 0,
+      "days": 355,
+      "riskDays": 9,
+      "pending": false
+    },
+    "2": {
+      "cases": 0,
+      "days": 365,
+      "riskDays": 0,
+      "pending": false
+    },
+    "3": {
+      "cases": 0,
+      "days": 397,
+      "riskDays": 0,
+      "pending": false
+    },
+    "4": {
+      "cases": 0,
+      "days": 443,
+      "riskDays": 0,
+      "pending": false
+    },
+    "5": {
+      "cases": 0,
+      "days": 413,
+      "riskDays": 0,
+      "pending": false
+    },
+    "6": {
+      "cases": 0,
+      "days": 547,
+      "riskDays": 0,
+      "pending": false
+    },
+    "7": {
+      "cases": 0,
+      "days": 657,
+      "riskDays": 0,
+      "pending": false
+    },
+    "8": {
+      "cases": 0,
+      "days": 535,
+      "riskDays": 6,
+      "pending": false
+    },
+    "9": {
+      "cases": 0,
+      "days": 781,
+      "riskDays": 6,
+      "pending": false
+    }
+  },
+  "กุมารเวชกรรม 2": {
+    "10": {
+      "cases": 0,
+      "days": 480,
+      "riskDays": 0,
+      "pending": false
+    },
+    "11": {
+      "cases": 0,
+      "days": 623,
+      "riskDays": 0,
+      "pending": false
+    },
+    "12": {
+      "cases": 0,
+      "days": 516,
+      "riskDays": 0,
+      "pending": false
+    },
+    "1": {
+      "cases": 0,
+      "days": 539,
+      "riskDays": 0,
+      "pending": false
+    },
+    "2": {
+      "cases": 0,
+      "days": 531,
+      "riskDays": 0,
+      "pending": false
+    },
+    "3": {
+      "cases": 0,
+      "days": 519,
+      "riskDays": 0,
+      "pending": false
+    },
+    "4": {
+      "cases": 0,
+      "days": 483,
+      "riskDays": 0,
+      "pending": false
+    },
+    "5": {
+      "cases": 0,
+      "days": 632,
+      "riskDays": 0,
+      "pending": false
+    },
+    "6": {
+      "cases": 0,
+      "days": 799,
+      "riskDays": 0,
+      "pending": false
+    },
+    "7": {
+      "cases": 0,
+      "days": 842,
+      "riskDays": 0,
+      "pending": false
+    },
+    "8": {
+      "cases": 0,
+      "days": 605,
+      "riskDays": 0,
+      "pending": false
+    },
+    "9": {
+      "cases": 0,
+      "days": 552,
+      "riskDays": 0,
+      "pending": false
+    }
+  },
+  "นรีเวชกรรม": {
+    "10": {
+      "cases": 0,
+      "days": 618,
+      "riskDays": 76,
+      "pending": false
+    },
+    "11": {
+      "cases": 1,
+      "days": 601,
+      "riskDays": 124,
+      "pending": false
+    },
+    "12": {
+      "cases": 1,
+      "days": 538,
+      "riskDays": 29,
+      "pending": false
+    },
+    "1": {
+      "cases": 0,
+      "days": 495,
+      "riskDays": 0,
+      "pending": false
+    },
+    "2": {
+      "cases": 0,
+      "days": 502,
+      "riskDays": 0,
+      "pending": false
+    },
+    "3": {
+      "cases": 2,
+      "days": 547,
+      "riskDays": 31,
+      "pending": false
+    },
+    "4": {
+      "cases": 0,
+      "days": 471,
+      "riskDays": 23,
+      "pending": false
+    },
+    "5": {
+      "cases": 0,
+      "days": 530,
+      "riskDays": 23,
+      "pending": false
+    },
+    "6": {
+      "cases": 0,
+      "days": 627,
+      "riskDays": 43,
+      "pending": false
+    },
+    "7": {
+      "cases": 2,
+      "days": 640,
+      "riskDays": 8,
+      "pending": false
+    },
+    "8": {
+      "cases": 0,
+      "days": 579,
+      "riskDays": 31,
+      "pending": false
+    },
+    "9": {
+      "cases": 1,
+      "days": 629,
+      "riskDays": 22,
+      "pending": false
+    }
+  },
+  "หลวงพอแช่มชั้น 2": {
+    "10": {
+      "cases": 0,
+      "days": 320,
+      "riskDays": 13,
+      "pending": false
+    },
+    "11": {
+      "cases": 0,
+      "days": 308,
+      "riskDays": 4,
+      "pending": false
+    },
+    "12": {
+      "cases": 0,
+      "days": 287,
+      "riskDays": 20,
+      "pending": false
+    },
+    "1": {
+      "cases": 0,
+      "days": 254,
+      "riskDays": 4,
+      "pending": false
+    },
+    "2": {
+      "cases": 0,
+      "days": 278,
+      "riskDays": 0,
+      "pending": false
+    },
+    "3": {
+      "cases": 0,
+      "days": 323,
+      "riskDays": 16,
+      "pending": false
+    },
+    "4": {
+      "cases": 0,
+      "days": 235,
+      "riskDays": 0,
+      "pending": false
+    },
+    "5": {
+      "cases": 0,
+      "days": 289,
+      "riskDays": 0,
+      "pending": false
+    },
+    "6": {
+      "cases": 0,
+      "days": 313,
+      "riskDays": 5,
+      "pending": false
+    },
+    "7": {
+      "cases": 0,
+      "days": 302,
+      "riskDays": 0,
+      "pending": false
+    },
+    "8": {
+      "cases": 1,
+      "days": 304,
+      "riskDays": 43,
+      "pending": false
+    },
+    "9": {
+      "cases": 0,
+      "days": 289,
+      "riskDays": 5,
+      "pending": false
+    }
+  },
+  "หลวงพ่อแช่มชั้น 3": {
+    "10": {
+      "cases": 0,
+      "days": 338,
+      "riskDays": 25,
+      "pending": false
+    },
+    "11": {
+      "cases": 0,
+      "days": 342,
+      "riskDays": 8,
+      "pending": false
+    },
+    "12": {
+      "cases": 0,
+      "days": 278,
+      "riskDays": 23,
+      "pending": false
+    },
+    "1": {
+      "cases": 0,
+      "days": 311,
+      "riskDays": 41,
+      "pending": false
+    },
+    "2": {
+      "cases": 0,
+      "days": 329,
+      "riskDays": 47,
+      "pending": false
+    },
+    "3": {
+      "cases": 0,
+      "days": 343,
+      "riskDays": 33,
+      "pending": false
+    },
+    "4": {
+      "cases": 0,
+      "days": 290,
+      "riskDays": 12,
+      "pending": false
+    },
+    "5": {
+      "cases": 0,
+      "days": 326,
+      "riskDays": 41,
+      "pending": false
+    },
+    "6": {
+      "cases": 0,
+      "days": 340,
+      "riskDays": 62,
+      "pending": false
+    },
+    "7": {
+      "cases": 0,
+      "days": 330,
+      "riskDays": 22,
+      "pending": false
+    },
+    "8": {
+      "cases": 0,
+      "days": 308,
+      "riskDays": 27,
+      "pending": false
+    },
+    "9": {
+      "cases": 0,
+      "days": 335,
+      "riskDays": 48,
+      "pending": false
+    }
+  },
+  "หลวงพ่อแช่มชั้น 4": {
+    "10": {
+      "cases": 0,
+      "days": 365,
+      "riskDays": 164,
+      "pending": false
+    },
+    "11": {
+      "cases": 0,
+      "days": 314,
+      "riskDays": 128,
+      "pending": false
+    },
+    "12": {
+      "cases": 0,
+      "days": 381,
+      "riskDays": 145,
+      "pending": false
+    },
+    "1": {
+      "cases": 0,
+      "days": 367,
+      "riskDays": 0,
+      "pending": false
+    },
+    "2": {
+      "cases": 0,
+      "days": 293,
+      "riskDays": 121,
+      "pending": false
+    },
+    "3": {
+      "cases": 0,
+      "days": 336,
+      "riskDays": 130,
+      "pending": false
+    },
+    "4": {
+      "cases": 0,
+      "days": 323,
+      "riskDays": 113,
+      "pending": false
+    },
+    "5": {
+      "cases": 0,
+      "days": 277,
+      "riskDays": 114,
+      "pending": false
+    },
+    "6": {
+      "cases": 0,
+      "days": 364,
+      "riskDays": 140,
+      "pending": false
+    },
+    "7": {
+      "cases": 0,
+      "days": 301,
+      "riskDays": 117,
+      "pending": false
+    },
+    "8": {
+      "cases": 0,
+      "days": 328,
+      "riskDays": 124,
+      "pending": false
+    },
+    "9": {
+      "cases": 0,
+      "days": 333,
+      "riskDays": 126,
+      "pending": false
+    }
+  },
+  "Stroke unit": {
+    "10": {
+      "cases": 0,
+      "days": 143,
+      "riskDays": 41,
+      "pending": false
+    },
+    "11": {
+      "cases": 0,
+      "days": 147,
+      "riskDays": 74,
+      "pending": false
+    },
+    "12": {
+      "cases": 1,
+      "days": 148,
+      "riskDays": 44,
+      "pending": false
+    },
+    "1": {
+      "cases": 0,
+      "days": 141,
+      "riskDays": 71,
+      "pending": false
+    },
+    "2": {
+      "cases": 0,
+      "days": 132,
+      "riskDays": 69,
+      "pending": false
+    },
+    "3": {
+      "cases": 0,
+      "days": 141,
+      "riskDays": 40,
+      "pending": false
+    },
+    "4": {
+      "cases": 0,
+      "days": 155,
+      "riskDays": 57,
+      "pending": false
+    },
+    "5": {
+      "cases": 0,
+      "days": 160,
+      "riskDays": 38,
+      "pending": false
+    },
+    "6": {
+      "cases": 0,
+      "days": 140,
+      "riskDays": 37,
+      "pending": false
+    },
+    "7": {
+      "cases": 0,
+      "days": 135,
+      "riskDays": 15,
+      "pending": false
+    },
+    "8": {
+      "cases": 0,
+      "days": 124,
+      "riskDays": 35,
+      "pending": false
+    },
+    "9": {
+      "cases": 0,
+      "days": 151,
+      "riskDays": 49,
+      "pending": false
+    }
+  },
+  "รติพัฒน์": {
+    "10": {
+      "cases": 0,
+      "days": 156,
+      "riskDays": 8,
+      "pending": false
+    },
+    "11": {
+      "cases": 0,
+      "days": 161,
+      "riskDays": 18,
+      "pending": false
+    },
+    "12": {
+      "cases": 0,
+      "days": 185,
+      "riskDays": 0,
+      "pending": false
+    },
+    "1": {
+      "cases": 0,
+      "days": 148,
+      "riskDays": 0,
+      "pending": false
+    },
+    "2": {
+      "cases": 0,
+      "days": 185,
+      "riskDays": 0,
+      "pending": false
+    },
+    "3": {
+      "cases": 0,
+      "days": 194,
+      "riskDays": 0,
+      "pending": false
+    },
+    "4": {
+      "cases": 0,
+      "days": 168,
+      "riskDays": 0,
+      "pending": false
+    },
+    "5": {
+      "cases": 0,
+      "days": 94,
+      "riskDays": 0,
+      "pending": false
+    },
+    "6": {
+      "cases": 0,
+      "days": 172,
+      "riskDays": 0,
+      "pending": false
+    },
+    "7": {
+      "cases": 0,
+      "days": 145,
+      "riskDays": 0,
+      "pending": false
+    },
+    "8": {
+      "cases": 0,
+      "days": 208,
+      "riskDays": 14,
+      "pending": false
+    },
+    "9": {
+      "cases": 1,
+      "days": 147,
+      "riskDays": 10,
+      "pending": false
+    }
+  },
+  "EENT": {
+    "10": {
+      "cases": 0,
+      "days": 495,
+      "riskDays": 56,
+      "pending": false
+    },
+    "11": {
+      "cases": 0,
+      "days": 440,
+      "riskDays": 41,
+      "pending": false
+    },
+    "12": {
+      "cases": 0,
+      "days": 427,
+      "riskDays": 40,
+      "pending": false
+    },
+    "1": {
+      "cases": 0,
+      "days": 458,
+      "riskDays": 28,
+      "pending": false
+    },
+    "2": {
+      "cases": 0,
+      "days": 408,
+      "riskDays": 32,
+      "pending": false
+    },
+    "3": {
+      "cases": 0,
+      "days": 468,
+      "riskDays": 63,
+      "pending": false
+    },
+    "4": {
+      "cases": 0,
+      "days": 294,
+      "riskDays": 25,
+      "pending": false
+    },
+    "5": {
+      "cases": 0,
+      "days": 456,
+      "riskDays": 31,
+      "pending": false
+    },
+    "6": {
+      "cases": 0,
+      "days": 417,
+      "riskDays": 0,
+      "pending": false
+    },
+    "7": {
+      "cases": 0,
+      "days": 429,
+      "riskDays": 31,
+      "pending": false
+    },
+    "8": {
+      "cases": 0,
+      "days": 526,
+      "riskDays": 39,
+      "pending": false
+    },
+    "9": {
+      "cases": 2,
+      "days": 501,
+      "riskDays": 25,
+      "pending": false
+    }
+  },
+  "SICU": {
+    "10": {
+      "cases": 1,
+      "days": 158,
+      "riskDays": 44,
+      "pending": false
+    },
+    "11": {
+      "cases": 0,
+      "days": 108,
+      "riskDays": 43,
+      "pending": false
+    },
+    "12": {
+      "cases": 0,
+      "days": 210,
+      "riskDays": 176,
+      "pending": false
+    },
+    "1": {
+      "cases": 0,
+      "days": 218,
+      "riskDays": 108,
+      "pending": false
+    },
+    "2": {
+      "cases": 3,
+      "days": 167,
+      "riskDays": 39,
+      "pending": false
+    },
+    "3": {
+      "cases": 0,
+      "days": 219,
+      "riskDays": 135,
+      "pending": false
+    },
+    "4": {
+      "cases": 0,
+      "days": 200,
+      "riskDays": 182,
+      "pending": false
+    },
+    "5": {
+      "cases": 0,
+      "days": 161,
+      "riskDays": 46,
+      "pending": false
+    },
+    "6": {
+      "cases": 1,
+      "days": 155,
+      "riskDays": 40,
+      "pending": false
+    },
+    "8": {
+      "cases": 1,
+      "days": 211,
+      "riskDays": 121,
+      "pending": false
+    },
+    "9": {
+      "cases": 1,
+      "days": 266,
+      "riskDays": 88,
+      "pending": false
+    }
+  },
+  "MICU": {
+    "10": {
+      "cases": 15,
+      "days": 285,
+      "riskDays": 285,
+      "pending": false
+    },
+    "11": {
+      "cases": 6,
+      "days": 287,
+      "riskDays": 287,
+      "pending": false
+    },
+    "12": {
+      "cases": 3,
+      "days": 280,
+      "riskDays": 280,
+      "pending": false
+    },
+    "1": {
+      "cases": 2,
+      "days": 264,
+      "riskDays": 264,
+      "pending": false
+    },
+    "2": {
+      "cases": 0,
+      "days": 225,
+      "riskDays": 225,
+      "pending": false
+    },
+    "3": {
+      "cases": 2,
+      "days": 257,
+      "riskDays": 257,
+      "pending": false
+    },
+    "4": {
+      "cases": 1,
+      "days": 249,
+      "riskDays": 249,
+      "pending": false
+    },
+    "5": {
+      "cases": 1,
+      "days": 263,
+      "riskDays": 263,
+      "pending": false
+    },
+    "6": {
+      "cases": 0,
+      "days": 281,
+      "riskDays": 281,
+      "pending": false
+    },
+    "7": {
+      "cases": 1,
+      "days": 292,
+      "riskDays": 292,
+      "pending": false
+    },
+    "8": {
+      "cases": 0,
+      "days": 281,
+      "riskDays": 281,
+      "pending": false
+    },
+    "9": {
+      "cases": 4,
+      "days": 260,
+      "riskDays": 260,
+      "pending": false
+    }
+  },
+  "CCU": {
+    "10": {
+      "cases": 1,
+      "days": 195,
+      "riskDays": 80,
+      "pending": false
+    },
+    "11": {
+      "cases": 1,
+      "days": 196,
+      "riskDays": 109,
+      "pending": false
+    },
+    "12": {
+      "cases": 3,
+      "days": 229,
+      "riskDays": 161,
+      "pending": false
+    },
+    "1": {
+      "cases": 0,
+      "days": 222,
+      "riskDays": 222,
+      "pending": false
+    },
+    "2": {
+      "cases": 2,
+      "days": 178,
+      "riskDays": 109,
+      "pending": false
+    },
+    "3": {
+      "cases": 0,
+      "days": 223,
+      "riskDays": 120,
+      "pending": false
+    },
+    "4": {
+      "cases": 0,
+      "days": 191,
+      "riskDays": 88,
+      "pending": false
+    },
+    "5": {
+      "cases": 2,
+      "days": 202,
+      "riskDays": 125,
+      "pending": false
+    },
+    "6": {
+      "cases": 2,
+      "days": 182,
+      "riskDays": 102,
+      "pending": false
+    },
+    "7": {
+      "cases": 0,
+      "days": 217,
+      "riskDays": 115,
+      "pending": false
+    },
+    "8": {
+      "cases": 6,
+      "days": 214,
+      "riskDays": 102,
+      "pending": false
+    },
+    "9": {
+      "cases": 5,
+      "days": 206,
+      "riskDays": 155,
+      "pending": false
+    }
+  },
+  "RCU": {
+    "10": {
+      "cases": 11,
+      "days": 442,
+      "riskDays": 404,
+      "pending": false
+    },
+    "11": {
+      "cases": 8,
+      "days": 389,
+      "riskDays": 371,
+      "pending": false
+    },
+    "12": {
+      "cases": 8,
+      "days": 396,
+      "riskDays": 391,
+      "pending": false
+    },
+    "1": {
+      "cases": 11,
+      "days": 401,
+      "riskDays": 386,
+      "pending": false
+    },
+    "2": {
+      "cases": 11,
+      "days": 342,
+      "riskDays": 314,
+      "pending": false
+    },
+    "3": {
+      "cases": 6,
+      "days": 382,
+      "riskDays": 366,
+      "pending": false
+    },
+    "4": {
+      "cases": 5,
+      "days": 345,
+      "riskDays": 338,
+      "pending": false
+    },
+    "5": {
+      "cases": 3,
+      "days": 379,
+      "riskDays": 324,
+      "pending": false
+    },
+    "6": {
+      "cases": 1,
+      "days": 368,
+      "riskDays": 365,
+      "pending": false
+    },
+    "7": {
+      "cases": 5,
+      "days": 400,
+      "riskDays": 399,
+      "pending": false
+    },
+    "8": {
+      "cases": 13,
+      "days": 438,
+      "riskDays": 405,
+      "pending": false
+    },
+    "9": {
+      "cases": 6,
+      "days": 442,
+      "riskDays": 401,
+      "pending": false
+    }
+  },
+  "NICU": {
+    "10": {
+      "cases": 0,
+      "days": 335,
+      "riskDays": 138,
+      "pending": false
+    },
+    "11": {
+      "cases": 0,
+      "days": 345,
+      "riskDays": 85,
+      "pending": false
+    },
+    "12": {
+      "cases": 0,
+      "days": 333,
+      "riskDays": 132,
+      "pending": false
+    },
+    "1": {
+      "cases": 1,
+      "days": 287,
+      "riskDays": 81,
+      "pending": false
+    },
+    "2": {
+      "cases": 0,
+      "days": 116,
+      "riskDays": 116,
+      "pending": false
+    },
+    "3": {
+      "cases": 0,
+      "days": 328,
+      "riskDays": 43,
+      "pending": false
+    },
+    "4": {
+      "cases": 1,
+      "days": 316,
+      "riskDays": 157,
+      "pending": false
+    },
+    "5": {
+      "cases": 0,
+      "days": 306,
+      "riskDays": 84,
+      "pending": false
+    },
+    "6": {
+      "cases": 0,
+      "days": 300,
+      "riskDays": 96,
+      "pending": false
+    },
+    "7": {
+      "cases": 0,
+      "days": 285,
+      "riskDays": 85,
+      "pending": false
+    },
+    "8": {
+      "cases": 2,
+      "days": 323,
+      "riskDays": 140,
+      "pending": false
+    },
+    "9": {
+      "cases": 0,
+      "days": 345,
+      "riskDays": 178,
+      "pending": false
+    }
+  },
+  "PICU": {
+    "10": {
+      "cases": 0,
+      "days": 132,
+      "riskDays": 124,
+      "pending": false
+    },
+    "11": {
+      "cases": 0,
+      "days": 128,
+      "riskDays": 118,
+      "pending": false
+    },
+    "12": {
+      "cases": 0,
+      "days": 108,
+      "riskDays": 108,
+      "pending": false
+    },
+    "1": {
+      "cases": 1,
+      "days": 123,
+      "riskDays": 116,
+      "pending": false
+    },
+    "2": {
+      "cases": 0,
+      "days": 95,
+      "riskDays": 82,
+      "pending": false
+    },
+    "3": {
+      "cases": 0,
+      "days": 143,
+      "riskDays": 128,
+      "pending": false
+    },
+    "4": {
+      "cases": 0,
+      "days": 112,
+      "riskDays": 108,
+      "pending": false
+    },
+    "5": {
+      "cases": 0,
+      "days": 90,
+      "riskDays": 88,
+      "pending": false
+    },
+    "6": {
+      "cases": 4,
+      "days": 172,
+      "riskDays": 168,
+      "pending": false
+    },
+    "7": {
+      "cases": 0,
+      "days": 156,
+      "riskDays": 132,
+      "pending": false
+    },
+    "8": {
+      "cases": 0,
+      "days": 86,
+      "riskDays": 83,
+      "pending": false
+    },
+    "9": {
+      "cases": 0,
+      "days": 127,
+      "riskDays": 125,
+      "pending": false
+    }
+  },
+  "ICCU": {
+    "10": {
+      "cases": 0,
+      "days": 238,
+      "riskDays": 112,
+      "pending": false
+    },
+    "11": {
+      "cases": 1,
+      "days": 256,
+      "riskDays": 101,
+      "pending": false
+    },
+    "12": {
+      "cases": 1,
+      "days": 283,
+      "riskDays": 79,
+      "pending": false
+    }
+  },
+  "อายุรกรรม 3": {
+    "6": {
+      "cases": 0,
+      "days": 872,
+      "riskDays": 112,
+      "pending": false
+    },
+    "7": {
+      "cases": 3,
+      "days": 972,
+      "riskDays": 146,
+      "pending": false
+    },
+    "8": {
+      "cases": 7,
+      "days": 983,
+      "riskDays": 317,
+      "pending": false
+    }
+  },
+  "พิเศษอายุรกรรม 5": {
+    "6": {
+      "cases": 0,
+      "days": 163,
+      "riskDays": 73,
+      "pending": false
+    },
+    "8": {
+      "cases": 1,
+      "days": 188,
+      "riskDays": 58,
+      "pending": false
+    },
+    "9": {
+      "cases": 0,
+      "days": 157,
+      "riskDays": 10,
+      "pending": false
+    }
+  },
+  "พิเศษอายุรกรรม 6": {
+    "9": {
+      "cases": 0,
+      "days": 803,
+      "riskDays": 121,
+      "pending": false
+    }
+  }
+}

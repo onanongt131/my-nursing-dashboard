@@ -1,6 +1,10 @@
 'use client';
 
+import {isDialysis} from '@/lib/dialysisStats';
 import { useState, useEffect } from 'react';
+import {loadUnitMonthly,saveUnitRecord} from '@/lib/unitRecords/client';
+import { createPortal } from 'react-dom';
+import { summarizeFallPatientDays } from '@/lib/fallPatientDays';
 
 interface FallCareModalProps {
   isOpen: boolean;
@@ -22,6 +26,7 @@ export default function FallCareModal({
   supabase,
   onSuccess,
 }: FallCareModalProps) {
+  const manualDays=isDialysis(departmentName);
   const [activeTab, setActiveTab] = useState<'incident' | 'summary'>('incident');
   const [saving, setSaving] = useState(false);
 
@@ -47,10 +52,6 @@ export default function FallCareModal({
     return `${y}-${m}`;
   });
 
-  const currentYearTh = new Date().getFullYear() + 543;
-  const currentMonthNum = new Date().getMonth() + 1;
-  const [fiscalYear, setFiscalYear] = useState(currentYearTh);
-  const [month, setMonth] = useState(currentMonthNum);
   const [patientDays, setPatientDays] = useState('');
 
   // State สำหรับแสดงผลสรุปตัวเลขเคสในเดือนนั้น
@@ -58,58 +59,31 @@ export default function FallCareModal({
   const [severeIncidents, setSevereIncidents] = useState(0);
   const [loadingSummaryData, setLoadingSummaryData] = useState(false);
 
-  // ดึงข้อมูลสรุปอุบัติการณ์ของเดือนที่เลือกมาแสดง
-  useEffect(() => {
-    if (isOpen && activeTab === 'summary' && departmentId) {
-      fetchMonthlyIncidentStats();
-    }
-  }, [isOpen, activeTab, selectedMonthYear, departmentId]);
+  const [ready,setReady]=useState(false);
+  const [daySummary,setDaySummary]=useState<ReturnType<typeof summarizeFallPatientDays>|null>(null);
+  const [summaryError,setSummaryError]=useState('');
+  useEffect(()=>setReady(true),[]);
+  useEffect(()=>{if(!isOpen)return;const previous=document.body.style.overflow;document.body.style.overflow='hidden';return()=>{document.body.style.overflow=previous;};},[isOpen]);
+  useEffect(()=>{
+    if(!isOpen||activeTab!=='summary'||!departmentId)return;
+    const controller=new AbortController();setLoadingSummaryData(true);setPatientDays('');setDaySummary(null);setSummaryError('');setTotalIncidents(0);setSevereIncidents(0);
+    loadUnitMonthly('fall',departmentId,selectedMonthYear,controller.signal).then(result=>{
+      if(controller.signal.aborted)return;
+      setDaySummary(result.days);setPatientDays(String((result.manual?result.patientDays:result.days?.total)??''));setTotalIncidents(result.total);setSevereIncidents(result.severe);
+    }).catch(error=>{if(!controller.signal.aborted)setSummaryError(error.message||'โหลดข้อมูลไม่สำเร็จ');}).finally(()=>{if(!controller.signal.aborted)setLoadingSummaryData(false);});
+    return()=>controller.abort();
+  },[isOpen,activeTab,selectedMonthYear,departmentId]);
 
-  const fetchMonthlyIncidentStats = async () => {
-    setLoadingSummaryData(true);
-    try {
-      const [y, m] = selectedMonthYear.split('-');
-      // กำหนดช่วงวันที่เริ่มต้นและสิ้นสุดของเดือนนั้น
-      const startDate = `${y}-${m}-01`;
-      const endDate = new Date(Number(y), Number(m), 0).toISOString().slice(0, 10);
-
-      const { data, error } = await supabase
-        .from('fall_incident_records')
-        .select('severity')
-        .eq('department_id', Number(departmentId))
-        .gte('incident_date', startDate)
-        .lte('incident_date', endDate);
-
-      if (error) throw error;
-
-      if (data) {
-        setTotalIncidents(data.length);
-        
-        // กรองระดับความรุนแรงที่มากกว่า E (F, G, H, I ตามลำดับตัวอักษร)
-        const severeList = ['F', 'G', 'H', 'I'];
-        const severeCount = data.filter((item: any) => 
-          severeList.includes(item.severity?.toUpperCase())
-        ).length;
-        
-        setSevereIncidents(severeCount);
-      }
-    } catch (error) {
-      console.error('Error fetching monthly stats:', error);
-    } finally {
-      setLoadingSummaryData(false);
-    }
-  };
-
-  if (!isOpen) return null;
+  if (!ready || !isOpen) return null;
 
   // บันทึกข้อมูลส่วนที่ 1 (รายเคส)
   const handleSaveIncident = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!departmentId) return;
+    if (!departmentId || saving) return;
 
     setSaving(true);
     try {
-      const { error } = await supabase.from('fall_incident_records').insert({
+      await saveUnitRecord('fall-incident',{
         department_id: Number(departmentId),
         hn,
         an,
@@ -126,7 +100,6 @@ export default function FallCareModal({
         status: 'pending',
       });
 
-      if (error) throw error;
 
       alert('บันทึกอุบัติการณ์การพลัดตกหกล้มสำเร็จ (รอหัวหน้าตรวจสอบ)');
       setHn('');
@@ -153,19 +126,12 @@ export default function FallCareModal({
   // บันทึกข้อมูลส่วนที่ 2 (สรุปรายเดือน) ลงตาราง fall_monthly_summary
   const handleSaveSummary = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!departmentId) return;
+    if (!departmentId || saving) return;
 
+    if(loadingSummaryData||summaryError||(!manualDays&&!daySummary?.complete)){alert('ข้อมูลคงพยาบาลเวรบ่ายไม่ครบหรือโหลดไม่สำเร็จ กรุณาตรวจสอบก่อนบันทึก');return;}
     setSaving(true);
     try {
-      const { error } = await supabase.from('fall_monthly_summary').upsert({
-        department_id: Number(departmentId),
-        fiscal_year: Number(fiscalYear),
-        month: Number(month),
-        patient_days: Number(patientDays),
-        // หากในฐานข้อมูลมีฟอลัมน์เก็บจำนวนเคสด้วย สามารถส่งค่าเพิ่มตรงนี้ได้ เช่น total_incidents หรือ severe_incidents
-      }, { onConflict: 'department_id,fiscal_year,month' });
-
-      if (error) throw error;
+      await saveUnitRecord('fall-summary',{department_id:Number(departmentId),month:selectedMonthYear,...(manualDays?{patient_days:Number(patientDays)}:{})});
 
       alert('บันทึกข้อมูลสรุปรายเดือนสำเร็จ');
       setPatientDays('');
@@ -178,12 +144,12 @@ export default function FallCareModal({
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-y-auto">
-      <div className="bg-white rounded-2xl shadow-xl max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden">
+  return createPortal(
+    <div role="dialog" aria-modal="true" aria-label="บันทึกการพลัดตกหกล้ม" className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/50 p-4 overflow-y-auto">
+      <div className="bg-white rounded-2xl shadow-xl max-w-3xl w-full max-h-[92dvh] flex flex-col overflow-hidden">
         
         {/* Header */}
-        <div className="bg-amber-600 text-white px-6 py-4 flex justify-between items-center">
+        <div className="shrink-0 bg-amber-600 text-white px-6 py-4 flex justify-between items-center">
           <div>
             <h2 className="text-lg font-bold">บันทึกข้อมูลอุบัติการณ์การพลัดตกหกล้ม (Fall)</h2>
             <p className="text-xs text-amber-100">หน่วยงาน: {departmentName}</p>
@@ -192,7 +158,7 @@ export default function FallCareModal({
         </div>
 
         {/* Tabs Switcher */}
-        <div className="flex border-b bg-gray-50">
+        <div className="flex shrink-0 border-b bg-gray-50">
           <button
             type="button"
             onClick={() => setActiveTab('incident')}
@@ -218,7 +184,7 @@ export default function FallCareModal({
         </div>
 
         {/* Body Content */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="min-h-0 flex-1 overflow-y-auto p-6">
           {activeTab === 'incident' ? (
             <form onSubmit={handleSaveIncident} className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-amber-50/50 p-4 rounded-xl border border-amber-100">
@@ -361,11 +327,7 @@ export default function FallCareModal({
                       onChange={(e) => {
                         const val = e.target.value;
                         setSelectedMonthYear(val);
-                        if (val) {
-                          const [y, m] = val.split('-');
-                          setFiscalYear(Number(y) + 543);
-                          setMonth(Number(m));
-                        }
+
                       }}
                       className="w-full px-3 py-2 border rounded-lg text-sm bg-white font-semibold focus:ring-2 focus:ring-amber-500"
                       required
@@ -376,27 +338,38 @@ export default function FallCareModal({
                     <input
                       type="number"
                       min="0"
-                      placeholder="เช่น 450"
+                      placeholder={manualDays ? 'กรอกจำนวนวันนอน' : loadingSummaryData ? 'กำลังดึงวันนอน…' : 'รอข้อมูลเวรบ่ายครบทุกวัน'}
                       value={patientDays}
-                      onChange={(e) => setPatientDays(e.target.value)}
+                      readOnly={!manualDays || loadingSummaryData}
+                      onChange={event=>setPatientDays(event.target.value)}
+                      aria-describedby="fall-patient-days-status"
                       className="w-full px-3 py-2 border rounded-lg text-sm bg-white font-semibold focus:ring-2 focus:ring-amber-500"
                       required
                     />
                   </div>
                 </div>
 
+                <div id="fall-patient-days-status" role="status" className="rounded-lg border border-amber-200 bg-white p-3 text-sm text-amber-900">
+                  {summaryError?summaryError:manualDays?'กรอกจำนวนวันนอนผู้ป่วยของเดือนที่เลือก':loadingSummaryData?'กำลังตรวจสอบข้อมูลเวรบ่าย…':daySummary&&<>
+                    <strong>{daySummary.complete?`ข้อมูลครบ ${daySummary.valid_days}/${daySummary.expected_days} วัน รวม ${daySummary.total} วันนอน`:`ข้อมูลไม่ครบ/ต้องแก้ไข ${daySummary.valid_days}/${daySummary.expected_days} วัน`}</strong>
+                    {daySummary.missing_dates.length>0&&<p className="mt-1 break-words">วันที่ขาด: {daySummary.missing_dates.join(', ')}</p>}
+                    {daySummary.duplicate_dates.length>0&&<p className="mt-1 break-words">วันที่เวรบ่ายซ้ำ: {daySummary.duplicate_dates.join(', ')}</p>}
+                    {daySummary.invalid_dates.length>0&&<p className="mt-1 break-words">วันที่ยอดคงพยาบาลไม่ถูกต้อง: {daySummary.invalid_dates.join(', ')}</p>}
+                  </>}
+                  {!manualDays&&<p className="mt-2">ดึงผลรวมคงพยาบาลเวรบ่ายทุกวันของเดือนจากสถิติหอผู้ป่วย ไม่รวมเวรเช้า/ดึก</p>}
+                </div>
                 {/* กล่องแสดงผลสรุปข้อมูลอุบัติการณ์ที่ดึงมาจากฐานข้อมูลอัตโนมัติ */}
                 <div className="bg-white p-3 rounded-lg border border-amber-200 grid grid-cols-2 gap-4 text-center">
                   <div className="border-r border-gray-100 pr-2">
                     <span className="text-xs text-gray-500 block">จำนวนอุบัติการณ์ในเดือนนี้</span>
                     <span className="text-lg font-bold text-amber-800">
-                      {loadingSummaryData ? 'กำลังโหลด...' : `${totalIncidents} ครั้ง`}
+                      {loadingSummaryData ? 'กำลังโหลด...' : summaryError ? 'อ่านข้อมูลไม่สำเร็จ' : `${totalIncidents} ครั้ง`}
                     </span>
                   </div>
                   <div>
                     <span className="text-xs text-gray-500 block">อุบัติการณ์ระดับรุนแรง (&gt; E)</span>
                     <span className="text-lg font-bold text-red-600">
-                      {loadingSummaryData ? 'กำลังโหลด...' : `${severeIncidents} ครั้ง`}
+                      {loadingSummaryData ? 'กำลังโหลด...' : summaryError ? 'อ่านข้อมูลไม่สำเร็จ' : `${severeIncidents} ครั้ง`}
                     </span>
                   </div>
                 </div>
@@ -406,7 +379,7 @@ export default function FallCareModal({
 
               <div className="flex justify-end gap-3 pt-4 border-t">
                 <button type="button" onClick={onClose} className="px-5 py-2 border rounded-lg text-gray-700 hover:bg-gray-100 text-sm font-medium">ยกเลิก</button>
-                <button type="submit" disabled={saving} className="px-6 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-bold shadow disabled:opacity-50">
+                <button type="submit" disabled={saving || loadingSummaryData || !!summaryError || (manualDays ? patientDays==='' : !daySummary?.complete)} className="px-6 py-2 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-sm font-bold shadow disabled:opacity-50">
                   {saving ? 'กำลังบันทึก...' : 'บันทึกข้อมูลสรุปรายเดือน'}
                 </button>
               </div>
@@ -415,6 +388,6 @@ export default function FallCareModal({
         </div>
 
       </div>
-    </div>
+    </div>, document.body
   );
 }

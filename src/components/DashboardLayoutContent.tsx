@@ -34,9 +34,14 @@ const TAB_ROUTES: Record<string, string> = {
   productivity: '/dashboard/productivity',
   'wp-qa': '/dashboard/wp-qa',
   'audit-chart': '/dashboard/audit-chart',
+  'readmit-report': '/dashboard/readmit-report',
+  'fall-report': '/dashboard/fall-report',
+  'pressure-sore-report': '/dashboard/pressure-sore-report',
+  'ama-report': '/dashboard/ama-report',
   'iv-care': '/dashboard/iv-care',
   rm: '/dashboard/rm',
   staffing: '/dashboard/staffing',
+  p4p: '/dashboard/p4p',
   nursing: '/dashboard/nursing',
   committee: '/dashboard/committee/executive',
 };
@@ -50,9 +55,14 @@ function getActiveTab(pathname: string): string {
   if (pathname.startsWith('/dashboard/strategy')) return 'strategy';
   if (pathname.startsWith('/dashboard/productivity')) return 'productivity';
   if (pathname.startsWith('/dashboard/wp-qa')) return 'wp-qa';
+  if (pathname.startsWith('/dashboard/readmit-report')) return 'readmit-report';
+  if (pathname.startsWith('/dashboard/fall-report')) return 'fall-report';
+  if (pathname.startsWith('/dashboard/pressure-sore-report')) return 'pressure-sore-report';
+  if (pathname.startsWith('/dashboard/ama-report')) return 'ama-report';
   if (pathname.startsWith('/dashboard/audit-chart')) return 'audit-chart';
   if (pathname.startsWith('/dashboard/iv-care')) return 'iv-care';
   if (pathname.startsWith('/dashboard/rm')) return 'rm';
+  if (pathname.startsWith('/dashboard/p4p')) return 'p4p';
   if (pathname.startsWith('/dashboard/staffing')) return 'staffing';
   if (pathname.startsWith('/dashboard/nursing')) return 'nursing';
   if (pathname.startsWith('/dashboard/committee')) return 'committee';
@@ -74,7 +84,7 @@ export default function DashboardLayoutContent({
     if (path.startsWith('/dashboard/nso-strategy')) return 'nso';
     if (path.startsWith('/dashboard/nursing-dashboard')) return 'dashboard';
     if (path === '/dashboard') return null;
-    if (['/dashboard/category','/dashboard/strategy','/dashboard/rm','/dashboard/productivity','/dashboard/wp-qa','/dashboard/iv-care','/dashboard/audit-chart'].some(p => path === p || path.startsWith(p+'/'))) return 'report';
+    if (['/dashboard/category','/dashboard/strategy','/dashboard/rm','/dashboard/productivity','/dashboard/wp-qa','/dashboard/iv-care','/dashboard/audit-chart','/dashboard/fall-report','/dashboard/pressure-sore-report','/dashboard/readmit-report','/dashboard/ama-report','/dashboard/readmit-ama'].some(p => path === p || path.startsWith(p+'/'))) return 'report';
     return 'work';
   };
   const [selectedSidebar, setSelectedSidebar] = useState<string | null>(() => sectionFromPath(pathname));
@@ -83,6 +93,9 @@ export default function DashboardLayoutContent({
     setSelectedSidebar(sectionFromPath(pathname));
     setReportExpanded(false);
   }, [pathname]);
+  const [navigationTarget,setNavigationTarget]=useState<{from:string;to:string}|null>(null);
+  const pageContent=navigationTarget&&pathname===navigationTarget.from&&pathname!==navigationTarget.to?<div role="status" className="rounded-2xl border border-teal-100 bg-white p-8 text-center text-sm text-teal-800">กำลังเปิดหน้า…</div>:children;
+  useEffect(()=>{if(navigationTarget&&pathname!==navigationTarget.from)setNavigationTarget(null);},[pathname,navigationTarget]);
   const isReport = selectedSidebar === 'report';
 
   const handleTabChange = useCallback((tabName: string) => {
@@ -95,6 +108,8 @@ export default function DashboardLayoutContent({
     <div className="min-h-screen w-full min-w-0 max-w-full overflow-x-hidden bg-gray-50 px-3 pb-4 pt-0 sm:px-4 md:px-6 md:pb-6">
       <div className="relative z-30 w-full rounded-2xl border border-gray-100 bg-white shadow-sm">
         <DashboardHeader
+          departmentId={profile?.department_id}
+          onNavigate={(section,href)=>{setSelectedSidebar(section);if(pathname!==href){setNavigationTarget({from:pathname,to:href});router.push(href);}}}
           title="กลุ่มภารกิจด้านการพยาบาล"
           activeTab={activeTab}
           onTabChange={handleTabChange}
@@ -108,7 +123,7 @@ export default function DashboardLayoutContent({
       </div>
 
       {selectedSidebar !== null ? (
-        <div className="relative z-0 mt-4 flex w-full min-w-0 max-w-full flex-col items-start gap-4 lg:mt-6 lg:flex-row lg:gap-5">
+        <div className="relative mt-4 flex w-full min-w-0 max-w-full flex-col items-start gap-4 lg:mt-6 lg:flex-row lg:gap-5">
           {!reportExpanded && (
             <div className="w-full min-w-0 shrink-0 lg:w-64">
               <UniversalDashboardSidebar
@@ -143,13 +158,13 @@ export default function DashboardLayoutContent({
               </button>
             )}
             <div className="w-full min-w-0 max-w-full overflow-x-auto overscroll-x-contain">
-              {children}
+              {pageContent}
             </div>
           </main>
         </div>
       ) : (
-        <main className="relative z-0 mt-4 w-full min-w-0 max-w-full overflow-x-auto md:mt-6">
-          {children}
+        <main className="relative mt-4 w-full min-w-0 max-w-full overflow-x-auto md:mt-6">
+          {pageContent}
         </main>
       )}
 

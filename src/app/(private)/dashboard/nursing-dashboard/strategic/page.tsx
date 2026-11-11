@@ -28,10 +28,10 @@ export default function StrategicDashboardPage() {
           name: 'พัฒนาระบบบริการพยาบาลตามมาตรฐานวิชาชีพ',
           progress: 92,
           kpis: [
-            { name: 'ร้อยละหน่วยงานที่มี CNPG/Care Map ครอบคลุมโรคหรือกระบวนการสำคัญ', target: '100%', status: 'ผ่าน', years: [2565, 2566, 2567, 2568, 2569], history: [90, 93, 96, 98, 100] },
-            { name: 'ร้อยละการปฏิบัติตาม CNPG/Care Map', target: '>=90%', status: 'ผ่าน', years: [2565, 2566, 2567, 2568, 2569], history: [82, 85, 89, 92, 94.2] },
-            { name: 'ร้อยละความสมบูรณ์ของบันทึกทางการพยาบาลตามเกณฑ์ 4C', target: '>90%', status: 'ผ่าน', years: [2565, 2566, 2567, 2568, 2569], history: [84, 87, 88, 90, 91.5] },
-            { name: 'ร้อยละหน่วยงานที่ผ่านการตรวจประเมินคุณภาพบริการพยาบาลภายใน', target: '>90%', status: 'ผ่าน', years: [2565, 2566, 2567, 2568, 2569], history: [85, 88, 90, 91, 92.0] }
+            { name: 'ร้อยละหน่วยงานที่มี CNPG/Care Map ครอบคลุมโรคหรือกระบวนการสำคัญ', target: '100%', status: 'ผ่าน', years: [2565, 2566, 2567, 2568, 2569, 2570], history: [90, 93, 96, 98, 100] },
+            { name: 'ร้อยละการปฏิบัติตาม CNPG/Care Map', target: '>=90%', status: 'ผ่าน', years: [2565, 2566, 2567, 2568, 2569, 2570], history: [82, 85, 89, 92, 94.2] },
+            { name: 'ร้อยละความสมบูรณ์ของบันทึกทางการพยาบาลตามเกณฑ์ 4C', target: '>90%', status: 'ผ่าน', years: [2565, 2566, 2567, 2568, 2569, 2570], history: [84, 87, 88, 90, 91.5] },
+            { name: 'ร้อยละหน่วยงานที่ผ่านการตรวจประเมินคุณภาพบริการพยาบาลภายใน', target: '>90%', status: 'ผ่าน', years: [2565, 2566, 2567, 2568, 2569, 2570], history: [85, 88, 90, 91, 92.0] }
           ]
         },
         {
@@ -39,10 +39,10 @@ export default function StrategicDashboardPage() {
           name: 'พัฒนาระบบความปลอดภัยของผู้ป่วย (Patient Safety & HRO)',
           progress: 88,
           kpis: [
-            { name: 'ร้อยละผู้ป่วยได้รับการประเมิน NEWS/EWS ครบถ้วนตามเกณฑ์', target: '>=95%', status: 'เฝ้าระวัง', years: [2565, 2566, 2567, 2568, 2569], history: [85, 88, 90, 91, 92.5] },
-            { name: 'ร้อยละผู้ป่วยที่มีคะแนนเตือนผิดปกติได้รับการรายงานและตอบสนอง', target: '>=90%', status: 'ผ่าน', years: [2565, 2566, 2567, 2568, 2569], history: [82, 85, 88, 90, 92.0] },
-            { name: 'จำนวน Medication error ระดับ E–I', target: '0 ครั้ง', status: 'ผ่าน', years: [2565, 2566, 2567, 2568, 2569], history: [5, 3, 2, 1, 0] },
-            { name: 'อัตราการเกิดแผลกดทับระดับ 2-4 ในโรงพยาบาล', target: '<2', status: 'ผ่าน', years: [2565, 2566, 2567, 2568, 2569], history: [3.5, 2.8, 2.2, 1.8, 1.2] }
+            { name: 'ร้อยละผู้ป่วยได้รับการประเมิน NEWS/EWS ครบถ้วนตามเกณฑ์', target: '>=95%', status: 'เฝ้าระวัง', years: [2565, 2566, 2567, 2568, 2569, 2570], history: [85, 88, 90, 91, 92.5] },
+            { name: 'ร้อยละผู้ป่วยที่มีคะแนนเตือนผิดปกติได้รับการรายงานและตอบสนอง', target: '>=90%', status: 'ผ่าน', years: [2565, 2566, 2567, 2568, 2569, 2570], history: [82, 85, 88, 90, 92.0] },
+            { name: 'จำนวน Medication error ระดับ E–I', target: '0 ครั้ง', status: 'ผ่าน', years: [2565, 2566, 2567, 2568, 2569, 2570], history: [5, 3, 2, 1, 0] },
+            { name: 'อัตราการเกิดแผลกดทับระดับ 2-4 ในโรงพยาบาล', target: '<2', status: 'ผ่าน', years: [2565, 2566, 2567, 2568, 2569, 2570], history: [3.5, 2.8, 2.2, 1.8, 1.2] }
           ]
         },
         {
@@ -50,8 +50,8 @@ export default function StrategicDashboardPage() {
           name: 'พัฒนาระบบการพยาบาลผู้ป่วยโรคสำคัญ (Service Plan Nursing)',
           progress: 89,
           kpis: [
-            { name: 'ร้อยละตัวชี้วัดด้านความรวดเร็วในการเข้าถึงหรือได้รับการรักษา', target: '>=80%', status: 'ผ่าน', years: [2565, 2566, 2567, 2568, 2569], history: [72, 76, 80, 84, 88.0] },
-            { name: 'ร้อยละตัวชี้วัดด้านการคัดกรองและเฝ้าระวังผู้ป่วยโรคสำคัญ', target: '>=80%', status: 'ผ่าน', years: [2565, 2566, 2567, 2568, 2569], history: [75, 78, 82, 85, 89.0] }
+            { name: 'ร้อยละตัวชี้วัดด้านความรวดเร็วในการเข้าถึงหรือได้รับการรักษา', target: '>=80%', status: 'ผ่าน', years: [2565, 2566, 2567, 2568, 2569, 2570], history: [72, 76, 80, 84, 88.0] },
+            { name: 'ร้อยละตัวชี้วัดด้านการคัดกรองและเฝ้าระวังผู้ป่วยโรคสำคัญ', target: '>=80%', status: 'ผ่าน', years: [2565, 2566, 2567, 2568, 2569, 2570], history: [75, 78, 82, 85, 89.0] }
           ]
         },
         {
@@ -59,8 +59,8 @@ export default function StrategicDashboardPage() {
           name: 'พัฒนาระบบการดูแลผู้ป่วยแบบไร้รอยต่อ (Seamless Care)',
           progress: 90,
           kpis: [
-            { name: 'ร้อยละผู้ป่วยได้รับการวางแผนจำหน่ายตาม D-METHOD ครบถ้วน', target: '>=90%', status: 'ผ่าน', years: [2565, 2566, 2567, 2568, 2569], history: [80, 83, 86, 89, 91.2] },
-            { name: 'อัตรา Unplanned readmission ภายใน 28 วัน', target: '<=2%', status: 'ผ่าน', years: [2565, 2566, 2567, 2568, 2569], history: [3.2, 2.8, 2.4, 2.1, 1.8] }
+            { name: 'ร้อยละผู้ป่วยได้รับการวางแผนจำหน่ายตาม D-METHOD ครบถ้วน', target: '>=90%', status: 'ผ่าน', years: [2565, 2566, 2567, 2568, 2569, 2570], history: [80, 83, 86, 89, 91.2] },
+            { name: 'อัตรา Unplanned readmission ภายใน 28 วัน', target: '<=2%', status: 'ผ่าน', years: [2565, 2566, 2567, 2568, 2569, 2570], history: [3.2, 2.8, 2.4, 2.1, 1.8] }
           ]
         },
         {
@@ -68,8 +68,8 @@ export default function StrategicDashboardPage() {
           name: 'พัฒนาคุณภาพบริการด้วยนวัตกรรมและข้อมูลสารสนเทศ (Digital Nursing)',
           progress: 85,
           kpis: [
-            { name: 'ร้อยละหน่วยงานที่บันทึกและส่งข้อมูลตัวชี้วัดครบถ้วน', target: '>=95%', status: 'เฝ้าระวัง', years: [2565, 2566, 2567, 2568, 2569], history: [86, 89, 92, 94, 94.5] },
-            { name: 'ร้อยละหน่วยงานที่มี CQI, R2R หรือนวัตกรรมอย่างน้อย 1 เรื่อง/ปี', target: '100%', status: 'ผ่าน', years: [2565, 2566, 2567, 2568, 2569], history: [80, 88, 94, 98, 100] }
+            { name: 'ร้อยละหน่วยงานที่บันทึกและส่งข้อมูลตัวชี้วัดครบถ้วน', target: '>=95%', status: 'เฝ้าระวัง', years: [2565, 2566, 2567, 2568, 2569, 2570], history: [86, 89, 92, 94, 94.5] },
+            { name: 'ร้อยละหน่วยงานที่มี CQI, R2R หรือนวัตกรรมอย่างน้อย 1 เรื่อง/ปี', target: '100%', status: 'ผ่าน', years: [2565, 2566, 2567, 2568, 2569, 2570], history: [80, 88, 94, 98, 100] }
           ]
         }
       ]
@@ -91,7 +91,7 @@ export default function StrategicDashboardPage() {
           name: 'พัฒนาต้นแบบระบบบริการพยาบาลตามมาตรฐานสากล',
           progress: 87,
           kpis: [
-            { name: 'หน่วยบริการเป้าหมายมี Nursing Service Model', target: '100%', status: 'ผ่าน', years: [2565, 2566, 2567, 2568, 2569], history: [50, 60, 75, 90, 100] }
+            { name: 'หน่วยบริการเป้าหมายมี Nursing Service Model', target: '100%', status: 'ผ่าน', years: [2565, 2566, 2567, 2568, 2569, 2570], history: [50, 60, 75, 90, 100] }
           ]
         }
       ]
@@ -113,7 +113,7 @@ export default function StrategicDashboardPage() {
           name: 'พัฒนาระบบคัดกรองและประเมินความเสี่ยง',
           progress: 91,
           kpis: [
-            { name: 'ประชาชนกลุ่มเป้าหมายได้รับการคัดกรองสุขภาพ', target: '>=90%', status: 'ผ่าน', years: [2565, 2566, 2567, 2568, 2569], history: [75, 80, 85, 88, 91] }
+            { name: 'ประชาชนกลุ่มเป้าหมายได้รับการคัดกรองสุขภาพ', target: '>=90%', status: 'ผ่าน', years: [2565, 2566, 2567, 2568, 2569, 2570], history: [75, 80, 85, 88, 91] }
           ]
         }
       ]
@@ -135,7 +135,7 @@ export default function StrategicDashboardPage() {
           name: 'พัฒนาสมรรถนะบุคลากรตาม Nursing Competency Framework',
           progress: 85,
           kpis: [
-            { name: 'บุคลากรผ่านเกณฑ์ Core & Functional Competency', target: '>=80%', status: 'ผ่าน', years: [2565, 2566, 2567, 2568, 2569], history: [72, 76, 80, 82.5, 85] }
+            { name: 'บุคลากรผ่านเกณฑ์ Core & Functional Competency', target: '>=80%', status: 'ผ่าน', years: [2565, 2566, 2567, 2568, 2569, 2570], history: [72, 76, 80, 82.5, 85] }
           ]
         }
       ]
@@ -157,7 +157,7 @@ export default function StrategicDashboardPage() {
           name: 'พัฒนาระบบ Nursing Governance และ Clinical Governance',
           progress: 92,
           kpis: [
-            { name: 'หน่วยงานถ่ายทอดยุทธศาสตร์และติดตาม KPI ครบถ้วน', target: '>=90%', status: 'ผ่าน', years: [2565, 2566, 2567, 2568, 2569], history: [78, 82, 86, 90, 92] }
+            { name: 'หน่วยงานถ่ายทอดยุทธศาสตร์และติดตาม KPI ครบถ้วน', target: '>=90%', status: 'ผ่าน', years: [2565, 2566, 2567, 2568, 2569, 2570], history: [78, 82, 86, 90, 92] }
           ]
         }
       ]
@@ -193,7 +193,7 @@ export default function StrategicDashboardPage() {
           <div className="space-y-4 max-w-2xl z-10">
             <div className="inline-flex items-center gap-2 bg-emerald-800/60 px-3 py-1 rounded-full text-emerald-200 text-xs font-semibold tracking-wide border border-emerald-700/50">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-              STRATEGY INTELLIGENCE • FY 2569
+              STRATEGY INTELLIGENCE • FY 2570
             </div>
             <h1 className="text-3xl sm:text-4xl font-black tracking-tight leading-tight text-white">
               จากแผนยุทธศาสตร์<br />สู่ตัวชี้วัดที่มองเห็นช่องว่าง
@@ -455,24 +455,24 @@ export default function StrategicDashboardPage() {
                                     </div>
                                   </div>
 
-                                  <div className="grid grid-cols-5 gap-1.5 pt-2 border-t border-gray-100 items-end h-28 px-1">
-                                    {(kpi.years || [2565, 2566, 2567, 2568, 2569]).map((yr: number, idx: number) => {
-                                      const val = historyArr[idx] !== undefined ? historyArr[idx] : 0;
+                                  <div className="grid grid-cols-6 gap-1.5 pt-2 border-t border-gray-100 items-end h-28 px-1">
+                                    {(kpi.years || [2565, 2566, 2567, 2568, 2569, 2570]).map((yr: number, idx: number) => {
+                                      const val = historyArr[idx];
                                       const numericTarget = parseFloat(String(kpi.target).replace(/[^0-9.]/g, '')) || 100;
-                                      const heightPercent = Math.min(Math.max((val / (numericTarget > 0 ? numericTarget * 1.2 : 100)) * 100, 10), 100);
+                                      const heightPercent = Math.min(Math.max(((val ?? 0) / (numericTarget > 0 ? numericTarget * 1.2 : 100)) * 100, 10), 100);
                                       const isTargetMet = typeof val === 'number' && numericTarget > 0 && val >= numericTarget * 0.9;
 
                                       return (
                                         <div key={idx} className="flex flex-col items-center h-full justify-end gap-1 group">
                                           <span className="text-[9px] font-bold text-emerald-900 opacity-0 group-hover:opacity-100 transition-opacity">
-                                            {val}
+                                            {val ?? '—'}
                                           </span>
                                           <div className="w-full bg-gray-100 rounded-t-md h-full flex items-end overflow-hidden">
                                             <div 
                                               className={`w-full rounded-t-md transition-all duration-500 ${
                                                 isTargetMet ? 'bg-emerald-600 hover:bg-emerald-500' : 'bg-amber-500 hover:bg-amber-400'
                                               }`}
-                                              style={{ height: `${heightPercent}%` }}
+                                              style={{ height: `${val == null ? 0 : heightPercent}%` }}
                                               title={`ปี ${yr}: ${val}`}
                                             ></div>
                                           </div>

@@ -1,0 +1,57 @@
+'use client';
+
+import { useActionState } from 'react';
+import { authenticate } from './actions';
+import Link from 'next/link'; // อย่าลืม import Link
+
+export default function LoginForm({callbackUrl}:{callbackUrl:string}) {
+  const [errorMessage, action, isPending] = useActionState(authenticate, undefined);
+
+  return (
+    <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50 p-4">
+      <div className="bg-white p-8 rounded-2xl shadow-sm border w-full max-w-md">
+        <h1 className="text-2xl font-bold text-center text-gray-800 mb-1">เข้าสู่ระบบ</h1>
+        <p className="text-sm text-gray-500 text-center mb-6">Dashboard กลุ่มภารกิจด้านการพยาบาล</p>
+
+        <form action={action} className="space-y-4">
+          <input type="hidden" name="callbackUrl" value={callbackUrl} />
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">อีเมล</label>
+            <input name="email" type="email" required className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">รหัสผ่าน</label>
+            <input name="password" type="password" required className="w-full px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500" />
+            
+            {/* ย้ายลิงก์ลืมรหัสผ่านไว้ใต้ช่องรหัสผ่าน และจัดให้อยู่ชิดขวา */}
+            <div className="flex justify-end mt-1">
+              <Link href="/forgot-password" className="text-sm text-purple-600 hover:underline">
+                ลืมรหัสผ่าน?
+              </Link>
+            </div>
+          </div>
+
+          {errorMessage && (
+            <p className="text-red-500 text-sm bg-red-50 p-2 rounded-lg">{errorMessage}</p>
+          )}
+
+          <button
+            type="submit"
+            disabled={isPending}
+            className="w-full bg-purple-600 hover:bg-purple-700 text-white font-medium py-2.5 rounded-lg transition disabled:bg-purple-300"
+          >
+            {isPending ? 'กำลังตรวจสอบข้อมูล...' : 'เข้าสู่ระบบด้วยรหัสผ่าน'}
+          </button>
+        </form>
+
+        <div className="mt-6 text-center text-sm text-gray-600">
+          ยังไม่มีบัญชีใช่ไหมหรอ?{' '}
+          <a href="/register" className="text-purple-600 font-bold hover:underline">
+            สมัครสมาชิกที่นี่
+          </a>
+        </div>
+      </div>
+    </div>
+  );
+}

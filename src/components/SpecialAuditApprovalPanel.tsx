@@ -1,5 +1,6 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
+import {requiresReview} from '@/lib/review/period';
 import BatchDetailModal from '@/components/BatchDetailModal';
 import { specialUnitAuditForms, isSpecialUnitForm } from '@/lib/specialUnitAuditForms';
 const unitName=(type:string)=>isSpecialUnitForm(type)?specialUnitAuditForms[type].name:'ห้องคลอด';
@@ -7,7 +8,7 @@ type Item = {id:string;department_id:number;form_type:string;audit_month:string;
 export default function SpecialAuditApprovalPanel({departmentId,onCountsChange}:{departmentId:string|number;onCountsChange?:(counts:{pending:number;total:number})=>void}) {
  const [items,setItems]=useState<Item[]>([]),[selected,setSelected]=useState<Item|null>(null);
  const [canApprove,setCanApprove]=useState(false),[userId,setUserId]=useState('');
- const [loading,setLoading]=useState(false),[message,setMessage]=useState('');
+ const [,setLoading]=useState(false),[message,setMessage]=useState('');
  const generation=useRef(0);
  const load=useCallback(async()=>{
   const token=++generation.current;setLoading(true);
@@ -17,7 +18,7 @@ export default function SpecialAuditApprovalPanel({departmentId,onCountsChange}:
     const body=await response.json();if(!response.ok)throw new Error(body.error||`HTTP ${response.status}`);return body;
    }));
    if(token!==generation.current)return;
-   setItems(responses.flatMap(b=>b.items||[]).filter((i:Item)=>['lr','dialysis','er','anesthesia','hbot'].includes(i.form_type)));
+   setItems(responses.flatMap(b=>b.items||[]).filter((i:Item)=>requiresReview(i)&&['lr','dialysis','er','anesthesia','hbot'].includes(i.form_type)));
    setCanApprove(responses[0].can_approve===true);setUserId(responses[0].user_id||'');
   }catch(e){if(token===generation.current)setMessage(e instanceof Error?e.message:'โหลดรายการไม่สำเร็จ');}
   finally{if(token===generation.current)setLoading(false);}
@@ -34,7 +35,6 @@ export default function SpecialAuditApprovalPanel({departmentId,onCountsChange}:
    <td className="p-3 text-center"><span className="rounded-full bg-amber-100 px-3 py-1 font-semibold text-amber-800">{i.status==='pending'?'รออนุมัติ':'ฉบับร่าง'}</span></td>
    <td className="p-3 text-center"><button type="button" onClick={()=>setSelected(i)} className="rounded-lg bg-sky-600 px-3 py-2 text-white">ตรวจสอบ</button></td>
   </tr>)}
-  <tr><td colSpan={6} className="p-2 text-right"><button type="button" onClick={()=>void load()} disabled={loading} className="rounded-lg border px-3 py-2 text-xs">{loading?'กำลังโหลด Audit เฉพาะหน่วยงาน…':'โหลด Audit เฉพาะหน่วยงานใหม่'}</button></td></tr>
   {selected&&<tr><td colSpan={6}>
     <BatchDetailModal
       isOpen={true}

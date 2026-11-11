@@ -1,6 +1,7 @@
 'use server';
 
 import { signIn } from "@/auth";
+import { dashboardReturnPath, isRedirectSignal } from "@/lib/auth/returnPath";
 import { createClient } from "@supabase/supabase-js";
 import bcrypt from "bcryptjs";
 import { AuthError } from "next-auth";
@@ -32,9 +33,10 @@ export async function authenticate(prevState: any, formData: FormData) {
     await signIn("credentials", {
       email: formData.get("email"),
       password: formData.get("password"),
-      redirectTo: "/dashboard",
+      redirectTo: dashboardReturnPath(formData.get("callbackUrl")),
     });
   } catch (error) {
+    if (isRedirectSignal(error)) throw error;
     // 🔥 เพิ่มการดักจับ Error ที่ส่งมาจาก auth.ts ตรงนี้ก่อนครับ
     if (error instanceof Error) {
       if (error.message === "UNAPPROVED_USER") {

@@ -2,7 +2,18 @@
 
 import React, { useState, useEffect } from 'react';
 import { Calendar, Printer } from 'lucide-react';
-import { createClient } from '@/utils/supabase/client';
+import {INSPECTION_WARDS} from '@/lib/inspectionWards';
+
+
+const reportHeaderCss = `
+.inspection-table{table-layout:fixed;width:100%}
+.inspection-table th{vertical-align:middle;text-align:center;overflow:visible}
+.inspection-table .vertical-heading{position:relative;height:92px;padding:0!important}
+.inspection-table .vertical-heading span{position:absolute;left:50%;top:50%;display:block;white-space:nowrap;word-break:normal;transform:translate(-50%,-50%) rotate(-90deg);line-height:1.2}
+.inspection-table .heading-group{padding:4px 2px;white-space:nowrap;font-size:10px}
+.inspection-table .patient-category{font-size:8px}
+.inspection-table .category-heading{height:28px;padding:3px 1px}
+`;
 
 export default function NursingInspectionReportPage() {
   const getTodayDate = () => {
@@ -16,6 +27,7 @@ export default function NursingInspectionReportPage() {
   const [selectedShift, setSelectedShift] = useState('เวรเช้า');
   const [selectedDate, setSelectedDate] = useState(getTodayDate());
 
+  const [errorMessage, setErrorMessage] = useState('');
   const [loading, setLoading] = useState(false);
   const [reportData, setReportData] = useState<any[]>([]);
   const [summaryData, setSummaryData] = useState({
@@ -37,48 +49,32 @@ export default function NursingInspectionReportPage() {
     waitingLabor: 0,      
   });
 
-  const wardOrder = [
-    "อายุรกรรม 2", "อายุรกรรม 3", "อายุรกรรม 4", "อายุรกรรม 5", "อายุรกรรม 6", "อายุรกรรม 7",
-    "พิเศษอายุรกรรม 5", "พิเศษอายุรกรรม 6", "พิเศษอายุรกรรม 7",
-    "Stroke unit", "สงฆ์อาพาธ", "รส 200 ปีล่าง", "รส 200 ปีบน", "รติพัฒน์",
-    "ศัลยกรรมประสาท", "ศัลยกรรมกระดูก", "ศัลยกรรมหญิง", "ศัลยกรรมชาย",
-    "EENT", "น้อมเกล้า 2", "น้อมเกล้า 3", "น้อมเกล้า 4",
-    "กุมารเวชกรรม 1", "กุมารเวชกรรม 2", "Sick newborn", "PICU", "NICU",
-    "SICU", "MICU", "RCU", "CCU", "ICCU",
-    "สูติกรรมหลังคลอด", "นรีเวชกรรม", "หลวงพอแช่มชั้น 2", "หลวงพ่อแช่มชั้น 3", "หลวงพ่อแช่มชั้น 4", "ห้องคลอด"
-  ];
+  const wardOrder = INSPECTION_WARDS;
 
   const formatVal = (val: number) => (val && val !== 0 ? val : '-');
 
   useEffect(() => {
+    const controller = new AbortController();
     async function fetchReportData() {
       try {
         setLoading(true);
-        const supabase = createClient();
-
-        const { data: deptData, error: deptError } = await supabase
-          .from('departments')
-          .select('id, Department');
-
-        if (deptError) {
-          console.error('Error fetching departments:', deptError);
-        }
+        setErrorMessage('');
+        setReportData([]);
+        const response = await fetch(`/api/staffing/inspection-report-view?${new URLSearchParams({date:selectedDate,shift:selectedShift})}`, {cache:'no-store',signal:controller.signal});
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'โหลดรายงานไม่สำเร็จ');
+        if (controller.signal.aborted) return;
+        const deptData = result.departments;
+        const records = result.records || [];
+        const normalizeWard = (name:string) => name.replace(/\s/g,'').replace('หลวงพอ','หลวงพ่อ');
+        const data = (deptData || []).filter((d:any)=>wardOrder.some(name=>normalizeWard(name)===normalizeWard(d.Department||'')))
+          .map((d:any)=>records.find((row:any)=>Number(row.department_id)===Number(d.id)) || {department_id:d.id,missing:true});
 
         const deptMap = new Map();
         if (deptData) {
           deptData.forEach((d: any) => {
             deptMap.set(Number(d.id), d.Department ? d.Department.trim() : '');
           });
-        }
-
-        let { data, error } = await supabase
-          .from('daily_staffing')
-          .select('*')
-          .eq('date', selectedDate)
-          .eq('shift', selectedShift);
-
-        if (error) {
-          console.error('Error fetching inspection report:', error);
         }
 
         if (data && data.length > 0) {
@@ -112,7 +108,7 @@ export default function NursingInspectionReportPage() {
             const nurse5 = Number(item.score_5 || 0);
             const nurse4 = Number(item.score_4 || 0);
             const actualStaff = Number(item.nursing_count || 0);
-            const staffNames = item.staff_names || '-';
+            const staffNames = Array.isArray(item.staff_names) ? item.staff_names.join(', ') : item.staff_names || '-';
             
             const deptIdNum = Number(item.department_id);
             const wardName = deptMap.get(deptIdNum) || item.department_name || `หน่วยงาน ID: ${item.department_id}`;
@@ -138,6 +134,7 @@ export default function NursingInspectionReportPage() {
             pStaff += actualStaff;
 
             return {
+              missing: item.missing === true,
               no: idx + 1,
               ward: wardName,
               nursingCount,
@@ -172,17 +169,37 @@ export default function NursingInspectionReportPage() {
           });
         }
       } catch (err) {
-        console.error('Error loading report:', err);
+        if (controller.signal.aborted) return;
+        setErrorMessage(err instanceof Error ? err.message : 'โหลดรายงานไม่สำเร็จ');
       } finally {
-        setLoading(false);
+        if (!controller.signal.aborted) setLoading(false);
       }
     }
 
     fetchReportData();
+    return () => controller.abort();
   }, [selectedDate, selectedShift]);
 
   const handlePrint = () => {
-    window.print();
+    const report = document.querySelector('.report-page-container');
+    if (!report) return;
+    const popup = window.open('', '_blank', 'width=1100,height=800');
+    if (!popup) {setErrorMessage('กรุณาอนุญาตหน้าต่างป๊อปอัปสำหรับพิมพ์รายงาน');return;}
+    popup.document.write(`<!doctype html><html lang="th"><head><meta charset="utf-8"><title>รายงานเวรตรวจการ</title><style>
+      @page{size:A4 portrait;margin:8mm 6mm}
+      *{box-sizing:border-box}body{margin:0;color:#000;font:11px Tahoma,sans-serif}
+      .report-page-container{width:100%;margin:0;padding:0}h2{text-align:center;font-size:15px;margin:0 0 5px}
+      .report-page-container>div:first-child{text-align:center;margin-bottom:8px}
+      .report-page-container>div:first-child>div{display:flex;justify-content:center;flex-wrap:wrap;gap:6px 12px}
+      table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:10px}
+      th,td{border:1px solid #000;padding:4px 2px;overflow-wrap:break-word;vertical-align:top;text-align:center}
+      ${reportHeaderCss}
+      tbody td:nth-child(2),tbody td:last-child{text-align:left}thead{display:table-header-group}
+      tfoot{display:table-row-group}tr{break-inside:avoid}th{background:#eee}strong{font-weight:bold}
+    </style></head><body>${report.outerHTML}</body></html>`);
+    popup.document.close();
+    popup.focus();
+    popup.print();
   };
 
   const formatThaiDate = (dateString: string) => {
@@ -201,9 +218,9 @@ export default function NursingInspectionReportPage() {
     <div className="min-h-screen bg-gray-100 text-gray-800 pt-0 px-2 pb-2 font-sans flex flex-col items-center">
       
       {/* ส่วนควบคุมด้านบน (ซ่อนตอนพิมพ์) */}
-      <div className="w-full bg-white p-3 rounded-xl border border-gray-200 mb-4 shadow-xs flex flex-wrap items-center justify-between print:hidden">
+      <div className="w-full bg-white p-3 rounded-xl border border-gray-200 mb-3 gap-3 shadow-xs flex flex-wrap items-center justify-between print:hidden">
         <div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
           <h1 className="text-sm font-bold text-emerald-900">รายงานพยาบาลเวรตรวจการ</h1>
           <a href="/dashboard/staffing" className="text-xs px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition font-medium">← กลับหน้าภาพรวม</a>
         </div>
@@ -238,6 +255,7 @@ export default function NursingInspectionReportPage() {
 
           <button 
             onClick={handlePrint}
+            disabled={loading || !!errorMessage || reportData.length === 0}
             className="flex items-center space-x-1 bg-emerald-700 text-white px-3 py-1.5 rounded-xl text-xs font-semibold hover:bg-emerald-800 transition-colors shadow-xs"
           >
             <Printer className="w-3.5 h-3.5" />
@@ -246,6 +264,7 @@ export default function NursingInspectionReportPage() {
         </div>
       </div>
 
+      <style>{reportHeaderCss}</style>
       <style jsx global>{`
         @import url('https://fonts.googleapis.com/css2?family=Sarabun:ital,wght@0,300;0,400;0,600;0,700;1,300;1,400&display=swap');
 
@@ -262,9 +281,12 @@ export default function NursingInspectionReportPage() {
             visibility: visible;
           }
           .report-page-container {
-            position: absolute;
+            position: fixed;
             left: 0;
             top: 0;
+            bottom: auto;
+            transform: none !important;
+            height: auto !important;
             width: 100% !important;
             max-width: 100% !important;
             margin: 0 !important;
@@ -276,7 +298,7 @@ export default function NursingInspectionReportPage() {
           }
           .report-page-container table {
             width: 100% !important;
-            font-size: 10.5px !important;
+            font-size: 10px !important;
             font-family: 'TH Sarabun PSK', 'Sarabun', sans-serif !important;
             border-collapse: collapse !important;
           }
@@ -286,6 +308,10 @@ export default function NursingInspectionReportPage() {
             word-break: break-word !important;
             font-family: 'TH Sarabun PSK', 'Sarabun', sans-serif !important;
           }
+          .report-page-container thead {display:table-header-group}
+          .report-page-container tr {break-inside:avoid}
+          .report-page-container td {overflow:visible !important;white-space:normal !important}
+          .report-page-container th {word-break:normal !important}
           .print-scroll-fix {
             overflow: visible !important;
           }
@@ -295,6 +321,7 @@ export default function NursingInspectionReportPage() {
         }
       `}</style>
 
+      {errorMessage && <div role="alert" className="w-full mb-3 rounded-lg bg-red-50 p-3 text-sm text-red-800 print:hidden">{errorMessage}</div>}
       {/* กรอบรายงาน */}
       <div className="report-page-container bg-white w-full p-4 rounded-xl border border-gray-300 shadow-md">
         
@@ -321,39 +348,38 @@ export default function NursingInspectionReportPage() {
         </div>
 
         <div className="w-full overflow-x-auto print-scroll-fix">
-          <table className="w-full border-collapse border border-black text-center leading-normal text-xs">
+          <table className="inspection-table w-full border-collapse border border-black text-center leading-normal text-xs">
+            <colgroup><col style={{width:'3%'}}/><col style={{width:'13%'}}/>{Array.from({length:10},(_,i)=><col key={i} style={{width:'3.3%'}}/>)}<col style={{width:'3%'}}/><col style={{width:'3%'}}/><col style={{width:'4%'}}/><col style={{width:'41%'}}/></colgroup>
             <thead>
               <tr className="bg-gray-100 text-black font-bold">
-                <th className="border border-black p-1.5 w-8" rowSpan={2}>ลำดับ</th>
-                <th className="border border-black p-1.5 text-left w-[95px] max-w-[95px]" rowSpan={2}>หอผู้ป่วย</th>
-                <th className="border border-black p-1.5" colSpan={11}>รายละเอียดข้อมูลแต่ละหน่วยงาน</th>
-                <th className="border border-black p-1.5 w-10" rowSpan={2}>คงพยาบาล</th>
-                <th className="border border-black p-1.5 text-left w-[290px]" rowSpan={2}>รายชื่อพยาบาลเวร</th>
+                <th className="border border-black p-1" rowSpan={3}>ลำดับ</th>
+                <th className="border border-black p-1" rowSpan={3}>หอผู้ป่วย</th>
+                <th className="border border-black heading-group" colSpan={13}>รายละเอียดข้อมูลแต่ละหน่วยงาน</th>
+                <th className="border border-black p-1" rowSpan={3}>รายชื่อพยาบาลเวร</th>
               </tr>
               <tr className="bg-gray-50 text-[11px] text-black font-semibold">
-                <th className="border border-black p-1 w-7">ยอดยกมา</th>
-                <th className="border border-black p-1 w-6">รับใหม่</th>
-                <th className="border border-black p-1 w-6">รับย้าย</th>
-                <th className="border border-black p-1 w-6">จำหน่าย</th>
-                <th className="border border-black p-1 w-6">ย้ายไป</th>
-                <th className="border border-black p-1 w-6">Dead</th>
-                <th className="border border-black p-1 w-6">ผ่าตัด</th>
-                <th className="border border-black p-1 w-6">ทารกป่วย</th>
-                <th className="border border-black p-1 w-8">High Flow</th>
-                <th className="border border-black p-1 w-7">Vent</th>
-                <th className="border border-black p-1 w-9">5/4</th>
+                {['ยอดยกมา','รับใหม่','รับย้าย','จำหน่าย','ย้ายไป','Dead','ผ่าตัด','ทารกป่วย','High Flow','Ventilator'].map(label=><th key={label} className="border border-black vertical-heading" rowSpan={2} style={{position:"relative",height:92,padding:0,verticalAlign:"middle"}}><span style={{position:"absolute",left:"50%",top:"50%",display:"block",width:"max-content",whiteSpace:"nowrap",wordBreak:"normal",writingMode:"horizontal-tb",transform:"translate(-50%, -50%) rotate(-90deg)",transformOrigin:"center",lineHeight:1.2}}>{label}</span></th>)}
+                <th className="border border-black heading-group patient-category" colSpan={2}>ประเภทผู้ป่วย</th>
+                <th className="border border-black vertical-heading" rowSpan={2}><span>คงพยาบาล</span></th>
+              </tr>
+              <tr className="bg-gray-50 text-black font-semibold">
+                <th className="border border-black category-heading">5</th>
+                <th className="border border-black category-heading">4</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={15} className="py-6 text-center text-gray-500 text-sm">กำลังโหลดรายงานเวรตรวจการ...</td></tr>
+                <tr><td colSpan={16} className="py-6 text-center text-gray-500 text-sm">กำลังโหลดรายงานเวรตรวจการ...</td></tr>
+              ) : errorMessage ? (
+                <tr><td colSpan={16} className="py-6 text-center text-red-700">{errorMessage}</td></tr>
               ) : reportData.length === 0 ? (
-                <tr><td colSpan={15} className="py-6 text-center text-gray-500 text-sm">ไม่พบข้อมูลรายงานในวันที่และเวรดังกล่าว</td></tr>
+                <tr><td colSpan={16} className="py-6 text-center text-gray-500 text-sm">ไม่พบข้อมูลรายงานในวันที่และเวรดังกล่าว</td></tr>
               ) : (
                 reportData.map((row, idx) => (
                   <tr key={row.no} className="text-xs">
                     <td className="border border-black p-1">{idx + 1}</td>
                     <td className="border border-black p-1 text-left font-medium truncate">{row.ward}</td>
+                    {row.missing ? <td colSpan={14} className="border border-black p-1 text-center">ไม่มีข้อมูล</td> : <>
                     <td className="border border-black p-1">{formatVal(row.nursingCount)}</td>
                     <td className="border border-black p-1">{formatVal(row.admit)}</td>
                     <td className="border border-black p-1">{formatVal(row.transferIn)}</td>
@@ -364,16 +390,17 @@ export default function NursingInspectionReportPage() {
                     <td className="border border-black p-1">{formatVal(row.sickBaby)}</td>
                     <td className="border border-black p-1">{formatVal(row.highFlow)}</td>
                     <td className="border border-black p-1">{formatVal(row.ventilator)}</td>
-                    <td className="border border-black p-1">{row.nurse5 || row.nurse4 ? `${row.nurse5}/${row.nurse4}` : '-'}</td>
+                    <td className="border border-black p-1">{formatVal(row.nurse5)}</td>
+                    <td className="border border-black p-1">{formatVal(row.nurse4)}</td>
                     <td className="border border-black p-1 font-bold">{formatVal(row.actualStaff)}</td>
-                    <td className="border border-black p-1 text-left text-xs">{row.staffNames}</td>
+                    <td className="border border-black p-1 text-left text-xs">{row.staffNames}</td></>}
                   </tr>
                 ))
               )}
             </tbody>
-            <tfoot>
+            {!loading && !errorMessage && <tfoot>
               <tr className="bg-gray-50 font-semibold text-black text-left text-xs">
-                <td className="border border-black p-2" colSpan={15}>
+                <td className="border border-black p-2" colSpan={16}>
                   <div className="flex flex-wrap gap-10 px-2">
                     <span>คลอดเอง &nbsp;<strong>{summaryData.spontaneousLabor || '-'}</strong>&nbsp; คน</span>
                     <span>สรุปรวมคลอดทั้งหมด &nbsp;<strong>{summaryData.totalLaborSum || '-'}</strong>&nbsp; คน</span>
@@ -393,11 +420,12 @@ export default function NursingInspectionReportPage() {
                 <td className="border border-black p-2">{formatVal(summaryData.sickBaby)}</td>
                 <td className="border border-black p-2">{formatVal(summaryData.highFlow)}</td>
                 <td className="border border-black p-2">{formatVal(summaryData.ventilator)}</td>
-                <td className="border border-black p-2">{summaryData.nurse5 || summaryData.nurse4 ? `${summaryData.nurse5}/${summaryData.nurse4}` : '-'}</td>
+                <td className="border border-black p-2">{formatVal(summaryData.nurse5)}</td>
+                <td className="border border-black p-2">{formatVal(summaryData.nurse4)}</td>
                 <td className="border border-black p-2">{formatVal(summaryData.totalStaff)}</td>
                 <td className="border border-black p-2"></td>
               </tr>
-            </tfoot>
+            </tfoot>}
           </table>
         </div>
 

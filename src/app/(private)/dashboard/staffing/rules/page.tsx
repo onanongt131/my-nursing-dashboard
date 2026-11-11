@@ -62,7 +62,7 @@ export default function StaffingRulesPage() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
-  const [currentUserEmail, setCurrentUserEmail] = useState<string>('');
+  const [accessError, setAccessError] = useState('');
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [userGroup, setUserGroup] = useState<string | null>(null);
   const [dayOffRules, setDayOffRules] = useState<DayOffCapacityRule[]>([]);
@@ -95,121 +95,32 @@ export default function StaffingRulesPage() {
   });
 
   // อ่านผู้ใช้ที่ login จาก NextAuth session API
-  useEffect(() => {
-    async function loadSessionUser() {
-      try {
-        const response = await fetch('/api/session-user', {
-          cache: 'no-store',
-        });
 
-        if (!response.ok) {
-          console.error('ไม่พบ session ของผู้ใช้');
-          setCurrentUserEmail('');
-          return;
-        }
-
-        const result = await response.json();
-        setCurrentUserEmail(result?.user?.email ?? '');
-      } catch (error) {
-        console.error('Load session user error:', error);
-        setCurrentUserEmail('');
-      }
-    }
-
-    loadSessionUser();
-  }, []);
 
   // โหลด profile + หน่วยงานตามสิทธิ์
   useEffect(() => {
+    const controller = new AbortController();
     async function loadAccessContext() {
-      if (!currentUserEmail) return;
-
       try {
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('id, full_name, department_id, role, email')
-          .eq('email', currentUserEmail)
-          .single();
-
-        if (profileError || !profile) {
-          console.error('Cannot load profile:', profileError);
-          setUserProfile(null);
-          setUserGroup(null);
-          setDepartments([]);
-          setSelectedDept('');
-          return;
-        }
-
-        const normalizedProfile: UserProfile = {
-          id: profile.id,
-          full_name: profile.full_name ?? null,
-          department_id: profile.department_id ?? null,
-          role: profile.role ?? null,
-          email: profile.email ?? null,
-        };
-
-        setUserProfile(normalizedProfile);
-
-        let currentUserGroup: string | null = null;
-
-        if (normalizedProfile.department_id) {
-          const { data: ownDepartment, error: ownDepartmentError } = await supabase
-            .from('departments')
-            .select('group')
-            .eq('id', normalizedProfile.department_id)
-            .single();
-
-          if (ownDepartmentError) {
-            console.error('Cannot load user group:', ownDepartmentError);
-          } else {
-            currentUserGroup = ownDepartment?.group ?? null;
-          }
-        }
-
-        setUserGroup(currentUserGroup);
-
-        const { data: departmentRows, error: departmentsError } = await supabase
-          .from('departments')
-          .select('id, Department, group')
-          .order('Department', { ascending: true });
-
-        if (departmentsError) {
-          console.error('Error fetching departments:', departmentsError.message);
-          setDepartments([]);
-          setSelectedDept('');
-          return;
-        }
-
-        const allDepartments = (departmentRows || []) as Department[];
-        setDepartments(allDepartments);
-
-        const allowedDepartments = getVisibleDepartments(
-          allDepartments,
-          normalizedProfile,
-          currentUserGroup
-        );
-
-        if (canSelectDepartment(normalizedProfile.role)) {
-          const ownDeptExists = allowedDepartments.some(
-            (dept) =>
-              Number(dept.id) === Number(normalizedProfile.department_id)
-          );
-
-          setSelectedDept(
-            ownDeptExists
-              ? Number(normalizedProfile.department_id)
-              : allowedDepartments[0]?.id ?? ''
-          );
-        } else {
-          setSelectedDept(normalizedProfile.department_id ?? '');
-        }
+        const response = await fetch('/api/staffing/access-context', {cache:'no-store',signal:controller.signal});
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'โหลดสิทธิ์ไม่สำเร็จ');
+        if (controller.signal.aborted) return;
+        const profile: UserProfile = result.profile;
+        const allowedDepartments: Department[] = result.departments || [];
+        setUserProfile(profile); setUserGroup(result.group ?? null); setDepartments(allowedDepartments);
+        const own = allowedDepartments.find(d => Number(d.id) === Number(profile.department_id));
+        setSelectedDept(own?.id ?? (canSelectDepartment(profile.role) ? allowedDepartments[0]?.id ?? '' : ''));
+        setAccessError('');
       } catch (error) {
-        console.error('Load access context error:', error);
+        if (controller.signal.aborted) return;
+        setUserProfile(null); setUserGroup(null); setDepartments([]); setSelectedDept('');
+        setAccessError(error instanceof Error ? error.message : 'โหลดสิทธิ์ไม่สำเร็จ');
       }
     }
-
     loadAccessContext();
-  }, [supabase, currentUserEmail]);
+    return () => controller.abort();
+  }, []);
 
   const visibleDepartments = getVisibleDepartments(
     departments,
@@ -585,6 +496,7 @@ export default function StaffingRulesPage() {
 
   return (
     <div className={`${sarabun.className} min-h-screen bg-slate-50 px-3 pb-4 text-[13px] text-slate-800`}>
+      {accessError && <div role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-800">{accessError}</div>}
       <div className="max-w-7xl mx-auto space-y-2.5">
 
         <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-3">
@@ -946,9 +858,9 @@ function RuleNumberCard({
 }) {
   return (
     <div className="border border-slate-200 rounded-xl px-2.5 py-2 bg-slate-50/50">
-      <div className="flex items-center justify-between gap-1.5">
+      <div className="flex flex-wrap items-center justify-between gap-1.5">
 
-        <div className="min-w-[78px] flex-1">
+        <div className="min-w-0 grow">
           <div className="whitespace-nowrap text-xs leading-4 font-semibold text-slate-800">
             {title}
             {code && (
@@ -965,21 +877,21 @@ function RuleNumberCard({
           )}
         </div>
 
-        <div className="flex w-[78px] shrink-0 items-center gap-1">
+        <div className="flex shrink-0 items-center gap-1">
           <input
             type="number"
             min={0}
             value={value}
             disabled={disabled}
             onChange={(e) => onChange(e.target.value)}
-            className={`w-[56px] text-center border border-slate-300 rounded-lg px-1.5 py-1 text-sm font-bold ${
+            className={`w-12 text-center border border-slate-300 rounded-lg px-1.5 py-1 text-sm font-bold ${
               disabled
                 ? 'bg-slate-100 text-slate-500 cursor-not-allowed'
                 : 'bg-white'
             }`}
           />
 
-          <div className="text-[10px] leading-none text-slate-500">
+          <div className="whitespace-nowrap text-[10px] leading-none text-slate-500">
             คน
           </div>
         </div>

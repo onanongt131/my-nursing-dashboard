@@ -1,7 +1,4 @@
-// src/app/dashboard/departments/page.tsx
-import { redirect } from 'next/navigation';
-
-export default function DepartmentsIndexPage() {
-  // กำหนด ID ของหน่วยงานเริ่มต้นที่ต้องการให้ระบบพาไป (เช่น ID 1 หรือหน่วยงานแรก)
-  redirect('/dashboard/departments/1');
-}
+import Link from 'next/link';
+import {redirect} from 'next/navigation';
+import {currentUser,canRead,db} from '@/lib/audits/chartServer';
+export default async function DepartmentsIndexPage(){const user=await currentUser();if(!user)redirect('/login?callbackUrl=%2Fdashboard%2Fdepartments');if(user.departmentId)redirect('/dashboard/departments/'+encodeURIComponent(String(user.departmentId)));const {data,error}=await db().from('departments').select('id,Department').order('id');if(error)return <p>อ่านรายชื่อหน่วยงานไม่สำเร็จ</p>;const allowed=(await Promise.all((data||[]).map(async(d:any)=>await canRead(user,Number(d.id))?d:null))).filter(Boolean);return <section className="rounded-xl bg-white p-5"><h1 className="font-bold text-teal-900">เลือกหน่วยงาน</h1><p className="mt-1 text-sm text-slate-500">บัญชีนี้ยังไม่ได้ระบุหน่วยงานของฉัน</p><div className="mt-4 grid gap-2 sm:grid-cols-2">{allowed.map((d:any)=><Link key={d.id} className="rounded-lg border p-3 text-sm text-teal-800" href={'/dashboard/departments/'+d.id}>{d.Department}</Link>)}</div></section>;}

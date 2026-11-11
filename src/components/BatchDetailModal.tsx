@@ -1,11 +1,13 @@
 'use client';
-
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
+import {requiresReview,reviewMonth} from '@/lib/review/period';
+import PendingRecordEditor from '@/components/PendingRecordEditor';
+import {wpSpecialCriteria,type WpFormType} from '@/lib/wpSpecialCriteria';
+import IvCareFactorDetails from '@/components/IvCareFactorDetails';
 import { lrAuditGroups } from '@/lib/lrAuditCriteria';
 import { specialUnitAuditForms, isSpecialUnitForm, groupSection } from '@/lib/specialUnitAuditForms';
 import { CheckCircleIcon, XMarkIcon } from '@heroicons/react/24/solid';
-
 interface BatchItem {
   id?: string | number;
   source_table?: string;
@@ -13,6 +15,9 @@ interface BatchItem {
   wp_name?: string;
   total_evaluated?: number;
   total_practiced?: number;
+  unpracticed_reasons?: string | null;
+  ama_count?: number | null;
+  total_discharges?: number | null;
   hn?: string;
   an?: string;
   admit_date?: string;
@@ -56,7 +61,6 @@ interface BatchItem {
   status?: string;
   [key: string]: any;
 }
-
 interface BatchGroup {
   type: string;
   audit_month: string;
@@ -65,7 +69,6 @@ interface BatchGroup {
   evaluator?: string;
   department_id?: number | string;
 }
-
 interface BatchDetailModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -74,7 +77,21 @@ interface BatchDetailModalProps {
   canApprove: boolean;
   onApprove: (type: string, audit_month: string) => void;
   onApproveSingle?: (item: BatchItem) => void;
-  supabase?: any;
+}
+function auditNotes(item: BatchItem | null) {
+  const byQuestion = new Map<string, string>();
+  const sectionNotes = new Map<number, string>();
+  if (!item) return {byQuestion, sectionNotes};
+  for (let section = 1; section <= 5; section++) {
+    const value = item['s' + section + '_notes'];
+    if (typeof value !== 'string' || !value.trim()) continue;
+    const parts = value.split(/(?:^|\r?\n)(s[1-5]_[a-z0-9_]+):[ \t]*/i);
+    if (parts[0].trim()) sectionNotes.set(section, parts[0].trim());
+    for (let i = 1; i < parts.length; i += 2) {
+      byQuestion.set(parts[i].toLowerCase(), parts[i + 1].trim());
+    }
+  }
+  return {byQuestion, sectionNotes};
 }
 
 export default function BatchDetailModal({
@@ -84,18 +101,17 @@ export default function BatchDetailModal({
   departmentName,
   canApprove,
   onApprove,
-  onApproveSingle,
-  supabase
+  onApproveSingle
 }: BatchDetailModalProps) {
+  const [editing,setEditing]=useState<BatchItem|null>(null);
   const [loading, setLoading] = useState(false);
   const [selectedAuditItem, setSelectedAuditItem] = useState<BatchItem | null>(null);
-
   if (!isOpen || !batchGroup) return null;
-
+  batchGroup={...batchGroup,items:batchGroup.items.filter(item=>requiresReview(item))};
+  if(!batchGroup.items.length)return <div className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/50"><div className="rounded-xl bg-white p-6">ข้อมูลก่อนปีงบประมาณ 2570 ไม่ต้องอนุมัติ<button onClick={onClose} className="ml-4 rounded border p-2">ปิด</button></div></div>;
   if (batchGroup.items.some(item => item.source_table === 'nso_special_audits') || batchGroup.type.toLowerCase() === 'audit_lr') {
     return <SpecialLRBatchReview batchGroup={batchGroup} departmentName={departmentName} canApprove={canApprove} onClose={onClose} onApprove={onApprove} />;
   }
-
   const typeLower = batchGroup.type.toLowerCase();
   const isNursingChartAudit = typeLower.includes('audit') || typeLower.includes('nursing_chart');
   const isWpQa = typeLower.includes('wp') || typeLower.includes('qa');
@@ -103,16 +119,29 @@ export default function BatchDetailModal({
   const isFall = typeLower.includes('fall');
   const isFallSummary = isFall && typeLower.includes('summary');
   const isAma = typeLower.includes('ama');
+  const canEdit = (item: BatchItem) => item.id != null && requiresReview(item) && ['pending', 'draft'].includes(item.status || '');
+  const editButton = (item: BatchItem) => canEdit(item) ? (
+    <button type="button" onClick={() => setEditing(item)}
+      className="whitespace-nowrap rounded-lg border border-teal-600 px-3 py-1 text-xs font-bold text-teal-800 hover:bg-teal-50">
+      แก้ไข
+    </button>
+  ) : <span className="text-slate-400">—</span>;
+  const notes = auditNotes(selectedAuditItem);
+  const questionNote = (key: string) => selectedAuditItem?.[key + '_note'] || notes.byQuestion.get(key) || '—';
+  const sectionNote = (section: number) => notes.sectionNotes.has(section) && (
+    <div className="whitespace-pre-wrap break-words rounded-lg bg-amber-50 p-3">
+      <strong>หมายเหตุหมวด {section}</strong><p>{notes.sectionNotes.get(section)}</p>
+    </div>
+  );
   const isIvCare = typeLower.includes('iv');
   const isIvCareSummary = isIvCare && typeLower.includes('summary');
   const isSummaryData = isFallSummary || isIvCareSummary || typeLower.includes('summary');
-
   const getTargetTable = (type: string): string => {
+  const source=batchGroup.items[0]?.source_table;
+  if(source&&['nursing_chart_audits','wp_qa_records','nso_special_wp_records','iv_care_complications','iv_care_monthly_summaries','fall_incident_records','fall_monthly_summary','readmit_incident_records','readmit_monthly_summary','ama_incident_records','ama_monthly_summary'].includes(source))return source;
   const t = type.toLowerCase();
-  
-  if (t.includes('nursing_chart')) return 'nursing_chart_audits';
+  if (t==='audit'||t.includes('nursing_chart')) return 'nursing_chart_audits';
   if (t.includes('wp') || t.includes('qa')) return 'wp_qa_records';
-  
   if (t.includes('readmit')) {
     return t.includes('summary') ? 'readmit_monthly_summary' : 'readmit_incident_records';
   }
@@ -125,80 +154,51 @@ export default function BatchDetailModal({
   if (t.includes('ama')) {
     return t.includes('summary') ? 'ama_monthly_summary' : 'ama_incident_records';
   }
-  
   return 'nursing_chart_audits'; // Default fallback
 };
-
-  const handleApproveAll = async () => {
-  const activeSupabase = supabase;
-  if (!activeSupabase) return;
-
-  const targetTable = getTargetTable(batchGroup.type);
-  const auditMonthStr = String(batchGroup.audit_month || '').trim();
-  
-  if (!confirm(`ยืนยันอนุมัติข้อมูลทั้งหมดในตาราง ${targetTable}?`)) return;
-
-  setLoading(true);
-  try {
-    const ids = batchGroup.items.map(item => item.id).filter(Boolean);
-
-    let query = activeSupabase.from(targetTable).update({ status: 'approved' });
-    
-    if (ids.length > 0) {
-      query = query.in('id', ids);
-    } else {
-      query = query.eq('audit_month', auditMonthStr);
+  const approveItems = async (items: BatchItem[]) => {
+    const table = getTargetTable(batchGroup.type);
+    const ids = items.map(item => item.id);
+    if (!items.length || items.some(item => item.id == null || (item.source_table && item.source_table !== table))) {
+      throw new Error('ไม่พบรหัสรายการหรือมีรายการจากคนละตาราง กรุณาโหลดใหม่');
     }
+    const response = await fetch('/api/readmit-ama-approve', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({table, ids}),
+    });
+    const result = await response.json().catch(() => null);
+    if (!response.ok || result?.approved !== new Set(ids.map(String)).size) {
+      throw new Error(result?.error || 'ยังยืนยันการบันทึกสถานะไม่ได้ กรุณาโหลดรายการใหม่');
+    }
+  };
 
-    const { error } = await query;
-    if (error) throw error;
-
-    alert('อนุมัติสำเร็จ');
-    onApprove(batchGroup.type, batchGroup.audit_month);
-    onClose();
-  } catch (err: any) {
-    alert(`เกิดข้อผิดพลาด: ${err.message}`);
-  } finally {
-    setLoading(false);
-  }
-};
-
-  const handleSingleApproval = async (item: BatchItem) => {
-  const activeSupabase = supabase;
-  if (!activeSupabase || !item.id) return;
-
-  const targetTable = getTargetTable(batchGroup?.type || '');
-
-  try {
+  const handleApproval = async (item?: BatchItem) => {
+    if (!canApprove || loading) return;
+    if (!item && !confirm('ยืนยันอนุมัติรายการชุดนี้ทั้งหมดหรือไม่?')) return;
     setLoading(true);
-    const { error } = await activeSupabase
-      .from(targetTable)
-      .update({ status: 'approved' })
-      .eq('id', item.id);
-
-    if (error) throw error;
-    
-    alert('อนุมัติรายการนี้สำเร็จ');
-    if (onApprove && batchGroup) onApprove(batchGroup.type, batchGroup.audit_month);
-    setSelectedAuditItem(null);
-  } catch (err: any) {
-    alert('เกิดข้อผิดพลาด: ' + err.message);
-  } finally {
-    setLoading(false);
-  }
-};
-
+    try {
+      await approveItems(item ? [item] : batchGroup.items);
+      alert(item ? 'อนุมัติรายการนี้สำเร็จ' : 'อนุมัติสำเร็จ');
+      setSelectedAuditItem(null);
+      onApprove(batchGroup.type, batchGroup.audit_month);
+      onClose();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : 'อนุมัติไม่สำเร็จ กรุณาลองใหม่');
+    } finally {
+      setLoading(false);
+    }
+  };
   return (
     <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4 backdrop-blur-xs">
       <div className="bg-white rounded-2xl max-w-6xl w-full p-6 space-y-5 shadow-2xl relative max-h-[90vh] flex flex-col">
-        
         {/* หัวข้อ Modal หลัก */}
         <div className="flex justify-between items-center border-b pb-3">
           <div>
             <span className="text-xs font-bold text-emerald-600 uppercase">
               รายละเอียดผลการประเมิน ({batchGroup.type.toUpperCase()})
             </span>
-            <h3 className="text-lg font-bold text-gray-900">ประจำเดือน / วันที่: {batchGroup.audit_month}</h3>
+            <h3 className="text-lg font-bold text-gray-900">ประจำเดือน / วันที่: {reviewMonth(batchGroup.items[0]||{})||batchGroup.audit_month}</h3>
           </div>
           <button 
             onClick={onClose} 
@@ -208,21 +208,23 @@ export default function BatchDetailModal({
             <XMarkIcon className="w-5 h-5" />
           </button>
         </div>
-
         {/* ข้อมูลสรุปย่อ */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm bg-gray-50 p-4 rounded-xl border border-gray-200">
           <div><span className="font-semibold text-gray-500">หน่วยงาน:</span> {departmentName}</div>
           <div><span className="font-semibold text-gray-500">ผู้ประเมิน:</span> {batchGroup.auditor_name || batchGroup.evaluator || '-'}</div>
           <div><span className="font-semibold text-gray-500">สถานะรวม:</span> <span className="text-amber-600 font-bold bg-amber-50 px-2 py-0.5 rounded border border-amber-200">รออนุมัติ</span></div>
         </div>
-
+        {!isNursingChartAudit && !isWpQa && !isAma && !isReadmit && <div className="flex flex-wrap gap-2">{batchGroup.items.filter(canEdit).map((item,index)=><button key={String(item.id||index)} type="button" onClick={()=>setEditing(item)} className="rounded-lg border border-teal-600 px-3 py-2 text-sm font-bold text-teal-800">แก้ไขรายการ {index+1}{item.hn?' · HN '+item.hn:''}</button>)}</div>}
+        {editing&&<PendingRecordEditor table={editing.source_table||getTargetTable(batchGroup.type)} id={editing.id!} onClose={()=>setEditing(null)} onSaved={()=>{setEditing(null);onApprove(batchGroup.type,batchGroup.audit_month);onClose();}}/>}
         {/* ตารางแสดงรายการ */}
         <div className="space-y-2 flex-1 overflow-hidden flex flex-col">
           <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">
             รายการข้อมูล ({batchGroup.items.length} รายการ)
           </h4>
           <div className="border border-gray-200 rounded-xl overflow-y-auto flex-1 max-h-96">
-            {isWpQa ? (
+            {batchGroup.items.some(item=>item.source_table==='nso_special_wp_records') ? (
+              <div className="space-y-4 p-3">{batchGroup.items.map((item,index)=><section key={String(item.id||index)} className="rounded-xl border p-3"><h4 className="mb-2 font-bold text-teal-900">รายการ {index+1} · {item.auditor_name||'-'} · {item.audit_month}</h4><table className="w-full text-left text-xs"><thead><tr><th className="p-2">ข้อประเมิน</th><th className="p-2">ประเมิน</th><th className="p-2">ปฏิบัติ</th><th className="p-2">เหตุผล / หมายเหตุ</th><th className="p-2 text-center">แก้ไข</th></tr></thead><tbody>{Object.entries(item.answers||{}).filter(([key])=>key!=='_general_note').map(([key,value],rowIndex,answers)=>{const a=value as {total_evaluated?:number;total_practiced?:number;unpracticed_reasons?:string};const label=wpSpecialCriteria[item.form_type as WpFormType]?.flatMap(g=>g.items).find(i=>i.id===key)?.label||key;return <tr key={key} className="border-t"><td className="p-2">{label}</td><td className="p-2">{a.total_evaluated}</td><td className="p-2">{a.total_practiced}</td><td className="whitespace-pre-wrap p-2">{a.unpracticed_reasons||'—'}</td>{rowIndex===0&&<td rowSpan={answers.length} className="p-2 text-center align-top">{editButton(item)}</td>}</tr>;})}</tbody></table>{typeof item.answers?._general_note==='string'&&<p className="mt-2 whitespace-pre-wrap text-sm">หมายเหตุ: {item.answers._general_note}</p>}</section>)}</div>
+            ) : isWpQa ? (
               <table className="w-full text-left text-xs border-collapse">
                 <thead className="bg-emerald-100 text-emerald-900 sticky top-0 z-10">
                   <tr>
@@ -230,6 +232,8 @@ export default function BatchDetailModal({
                     <th className="p-2.5">หัวข้อ WP</th>
                     <th className="p-2.5 text-center">ประเมินแล้ว</th>
                     <th className="p-2.5 text-center">ปฏิบัติจริง</th>
+                    <th className="p-2.5">สิ่งที่ไม่ได้ปฏิบัติ / หมายเหตุ</th>
+                    <th className="p-2.5 text-center">แก้ไข</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 bg-white">
@@ -239,6 +243,29 @@ export default function BatchDetailModal({
                       <td className="p-2.5 text-gray-800">{item.wp_name}</td>
                       <td className="p-2.5 text-center font-semibold">{item.total_evaluated}</td>
                       <td className="p-2.5 text-center font-semibold text-emerald-600">{item.total_practiced}</td>
+                      <td className="whitespace-pre-wrap break-words p-2.5">{item.unpracticed_reasons || '—'}</td>
+                      <td className="p-2.5 text-center">{editButton(item)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : isReadmit && isSummaryData ? (
+              <table className="w-full border-collapse text-left text-xs">
+                <thead className="sticky top-0 z-10 bg-teal-100 text-teal-900">
+                  <tr>
+                    <th className="p-2.5">เดือน</th>
+                    <th className="p-2.5 text-center">จำนวน Re-admit</th>
+                    <th className="p-2.5 text-center">ยอดจำหน่ายเดือนที่แล้ว</th>
+                    <th className="p-2.5 text-center">แก้ไข</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 bg-white">
+                  {batchGroup.items.map((item, index) => (
+                    <tr key={item.id ?? index}>
+                      <td className="p-2.5">{reviewMonth(item) ?? '—'}</td>
+                      <td className="p-2.5 text-center tabular-nums">{item.readmit_count ?? '—'}</td>
+                      <td className="p-2.5 text-center tabular-nums">{item.prev_month_discharges ?? '—'}</td>
+                      <td className="p-2.5 text-center">{editButton(item)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -257,6 +284,7 @@ export default function BatchDetailModal({
                     <th className="p-2.5">สาเหตุ (ผู้ป่วย)</th>
                     <th className="p-2.5">สาเหตุ (D/C Plan)</th>
                     <th className="p-2.5">สาเหตุ (ตัวโรค)</th>
+                    <th className="p-2.5 text-center">แก้ไข</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 bg-white">
@@ -272,6 +300,7 @@ export default function BatchDetailModal({
                       <td className="p-2.5 font-medium text-emerald-700">{item.cause_patient || '-'}</td>
                       <td className="p-2.5 font-medium text-blue-700">{item.cause_discharge_planning || '-'}</td>
                       <td className="p-2.5 font-medium text-purple-700">{item.cause_disease_condition || '-'}</td>
+                      <td className="p-2.5 text-center">{editButton(item)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -301,6 +330,27 @@ export default function BatchDetailModal({
                   ))}
                 </tbody>
               </table>
+            ) : isAma && isSummaryData ? (
+              <table className="w-full border-collapse text-left text-xs">
+                <thead className="sticky top-0 z-10 bg-rose-100 text-rose-900">
+                  <tr>
+                    <th className="p-2.5">เดือน</th>
+                    <th className="p-2.5 text-center">จำนวนไม่สมัครอยู่</th>
+                    <th className="p-2.5 text-center">จำนวนจำหน่าย</th>
+                    <th className="p-2.5 text-center">แก้ไข</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100 bg-white">
+                  {batchGroup.items.map((item, idx) => (
+                    <tr key={item.id ?? idx} className="hover:bg-gray-50">
+                      <td className="p-2.5 font-semibold">{reviewMonth(item) ?? '—'}</td>
+                      <td className="p-2.5 text-center tabular-nums">{item.ama_count ?? '—'}</td>
+                      <td className="p-2.5 text-center tabular-nums">{item.total_discharges ?? '—'}</td>
+                      <td className="p-2.5 text-center">{editButton(item)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             ) : isAma ? (
               <table className="w-full text-left text-xs border-collapse">
                 <thead className="bg-rose-100 text-rose-900 sticky top-0 z-10">
@@ -311,6 +361,7 @@ export default function BatchDetailModal({
                     <th className="p-2.5">วันที่เกิดเหตุ</th>
                     <th className="p-2.5">สิทธิการรักษา</th>
                     <th className="p-2.5">สาเหตุที่ไม่สมัครอยู่</th>
+                    <th className="p-2.5 text-center">แก้ไข</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 bg-white">
@@ -322,6 +373,7 @@ export default function BatchDetailModal({
                       <td className="p-2.5">{item.incident_date || item.discharge_date || '-'}</td>
                       <td className="p-2.5">{item.treatment_right || '-'}</td>
                       <td className="p-2.5 font-medium text-gray-800">{item.ama_reason || item.reason || item.cause || '-'}</td>
+                      <td className="p-2.5 text-center">{editButton(item)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -361,11 +413,8 @@ export default function BatchDetailModal({
                         <div className="font-medium text-gray-800">{item.site ? `ตำแหน่ง: ${item.site}` : '-'}</div>
                         <div className="text-gray-500 text-[11px]">{item.route ? `Route: ${item.route}` : ''}</div>
                       </td>
-                      <td className="p-2.5 space-y-0.5 text-gray-600">
-                        {item.factor_drug && <div className="text-indigo-700">ยา: {item.factor_drug}</div>}
-                        {item.factor_patient && <div>ผู้ป่วย: {item.factor_patient}</div>}
-                        {item.factor_personnel && <div>บุคลากร: {item.factor_personnel}</div>}
-                        {item.detail && <div>{item.detail}</div>}
+                      <td className="min-w-72 p-2.5 text-gray-600">
+                        <IvCareFactorDetails value={item.contributing_factors} legacy={item}/>
                       </td>
                     </tr>
                   ))}
@@ -446,7 +495,8 @@ export default function BatchDetailModal({
                     <th className="p-2.5">ประจำเดือน / งวด</th>
                     <th className="p-2.5">HN ผู้ป่วย / วันที่ประเมิน</th>
                     <th className="p-2.5 text-center">สถานะ</th>
-                    <th className="p-2.5 text-center">จัดการ (ส่วนปลาย)</th>
+                    <th className="p-2.5 text-center">รายละเอียด</th>
+                    <th className="p-2.5 text-center">แก้ไข</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100 bg-white">
@@ -470,6 +520,7 @@ export default function BatchDetailModal({
                           ดูรายละเอียด
                         </button>
                       </td>
+                      <td className="p-2.5 text-center">{editButton(item)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -477,29 +528,25 @@ export default function BatchDetailModal({
             ) : null}
           </div>
         </div>
-
         {/* ปุ่มปิดและอนุมัติทั้งหมดด้านล่าง */}
         <div className="flex justify-between items-center pt-4 border-t">
           <button onClick={onClose} className="px-4 py-2 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-xl text-sm font-bold transition cursor-pointer">
             ปิดหน้าต่าง
           </button>
           {canApprove && (
-            <button onClick={handleApproveAll} disabled={loading} className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold shadow transition flex items-center gap-1.5 cursor-pointer">
+            <button onClick={() => void handleApproval()} disabled={loading} className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-bold shadow transition flex items-center gap-1.5 cursor-pointer">
               <CheckCircleIcon className="w-5 h-5" />
               <span>อนุมัติรายการชุดนี้ทั้งหมด</span>
             </button>
           )}
         </div>
-
       </div>
-
       {/* ========================================================= */}
       {/* Sub-Modal: แสดงฟอร์มรายละเอียดรายข้อ พร้อมคะแนนครบทุกหมวด (1-5) */}
       {/* ========================================================= */}
       {selectedAuditItem && (
         <div className="fixed inset-0 bg-black/60 z-60 flex items-center justify-center p-4">
           <div className="bg-white rounded-2xl max-w-3xl w-full p-6 space-y-4 shadow-2xl relative max-h-[85vh] flex flex-col">
-            
             <div className="flex justify-between items-center border-b pb-3">
               <h3 className="text-md font-bold text-gray-800">
                 📝 ฟอร์มรายละเอียดคะแนนประเมิน (HN: {selectedAuditItem.patient_hn || selectedAuditItem.hn || '-'})
@@ -511,7 +558,6 @@ export default function BatchDetailModal({
                 <XMarkIcon className="w-5 h-5" />
               </button>
             </div>
-
             {/* ส่วนแสดงคะแนนรายข้อจัดกลุ่มตามฟอร์ม */}
             <div className="space-y-6 overflow-y-auto flex-1 pr-2 text-xs">
               <div className="bg-blue-50 p-3 rounded-lg border border-blue-100 grid grid-cols-2 gap-2 text-gray-700">
@@ -520,14 +566,12 @@ export default function BatchDetailModal({
                 <div><strong>งวดประจำเดือน:</strong> {selectedAuditItem.audit_month || '-'}</div>
                 <div><strong>สถานะรายการ:</strong> <span className="font-bold text-amber-600">{selectedAuditItem.status || 'pending'}</span></div>
               </div>
-
               {/* ================= หมวดที่ 1 ================= */}
               <div className="space-y-4">
                 <h3 className="font-bold text-gray-900 text-sm border-b-2 border-emerald-600 pb-1.5 flex items-center gap-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>
                   1. การประเมินแรกรับ
                 </h3>
-
                 {(() => {
                   const formStructure1 = [
                     {
@@ -565,7 +609,6 @@ export default function BatchDetailModal({
                       ]
                     }
                   ];
-
                   return formStructure1.map((group, gIdx) => (
                     <div key={gIdx} className="space-y-2 pl-2">
                       <h4 className="font-bold text-emerald-700 text-xs border-l-4 border-emerald-500 pl-2 py-0.5">
@@ -573,15 +616,18 @@ export default function BatchDetailModal({
                       </h4>
                       <div className="space-y-1.5 pl-2">
                         {group.items.map((subItem, sIdx) => {
-                          const scoreValue = selectedAuditItem[subItem.key];
+                          const scoreValue = selectedAuditItem[subItem.key] ?? (Array.isArray(selectedAuditItem.audit_na_keys) && selectedAuditItem.audit_na_keys.includes(subItem.key) ? 'NA' : undefined);
                           if (scoreValue === undefined) return null;
-
                           return (
-                            <div key={sIdx} className="flex justify-between items-center p-3 bg-white rounded-xl border border-gray-200 shadow-xs hover:border-gray-300 transition">
+                            <div key={sIdx} className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2 p-3 sm:grid-cols-[minmax(0,1fr)_3rem_minmax(8rem,30%)] bg-white rounded-xl border border-gray-200 shadow-xs hover:border-gray-300 transition">
                               <span className="text-gray-800 font-medium pr-4">{subItem.label}</span>
                               <span className="bg-gray-50 px-3 py-1.5 rounded-lg font-bold text-gray-800 border border-gray-300 min-w-12 text-center">
                                 {String(scoreValue)}
                               </span>
+                              <div className="col-span-2 min-w-0 whitespace-pre-wrap break-words text-slate-600 sm:col-span-1">
+                                <span className="block text-[10px] font-semibold">หมายเหตุ</span>
+                                {questionNote(subItem.key)}
+                              </div>
                             </div>
                           );
                         })}
@@ -589,15 +635,14 @@ export default function BatchDetailModal({
                     </div>
                   ));
                 })()}
+                {sectionNote(1)}
               </div>
-                
               {/* ================= หมวดที่ 2 ================= */}
               <div className="space-y-4 pt-2">
                 <h3 className="font-bold text-gray-900 text-sm border-b-2 border-emerald-600 pb-1.5 flex items-center gap-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>
                   2. การประเมินต่อเนื่อง (รวมถึงการวางแผนจำหน่าย และการให้สารน้ำ)
                 </h3>
-
                 {(() => {
                   const formStructure2 = [
                     {
@@ -648,15 +693,18 @@ export default function BatchDetailModal({
                       </h4>
                       <div className="space-y-1.5 pl-2">
                         {group.items.map((subItem, sIdx) => {
-                          const scoreValue = selectedAuditItem[subItem.key];
+                          const scoreValue = selectedAuditItem[subItem.key] ?? (Array.isArray(selectedAuditItem.audit_na_keys) && selectedAuditItem.audit_na_keys.includes(subItem.key) ? 'NA' : undefined);
                           if (scoreValue === undefined) return null;
-
                           return (
-                            <div key={sIdx} className="flex justify-between items-center p-3 bg-white rounded-xl border border-gray-200 shadow-xs hover:border-gray-300 transition">
+                            <div key={sIdx} className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2 p-3 sm:grid-cols-[minmax(0,1fr)_3rem_minmax(8rem,30%)] bg-white rounded-xl border border-gray-200 shadow-xs hover:border-gray-300 transition">
                               <span className="text-gray-800 font-medium pr-4">{subItem.label}</span>
                               <span className="bg-gray-50 px-3 py-1.5 rounded-lg font-bold text-gray-800 border border-gray-300 min-w-12 text-center">
                                 {String(scoreValue)}
                               </span>
+                              <div className="col-span-2 min-w-0 whitespace-pre-wrap break-words text-slate-600 sm:col-span-1">
+                                <span className="block text-[10px] font-semibold">หมายเหตุ</span>
+                                {questionNote(subItem.key)}
+                              </div>
                             </div>
                           );
                         })}
@@ -664,15 +712,14 @@ export default function BatchDetailModal({
                     </div>
                   ));
                 })()}
+                {sectionNote(2)}
               </div>
-            
               {/* ================= หมวดที่ 3 ================= */}
               <div className="space-y-4 pt-2">
                 <h3 className="font-bold text-gray-900 text-sm border-b-2 border-emerald-600 pb-1.5 flex items-center gap-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>
                   3. การวางแผนจำหน่าย
                 </h3>
-
                 {(() => {
                   const items = [
                     { key: 's3_a', label: 'A : มีการเตรียมความพร้อมในการจำหน่ายโดยมีการคาดการณ์ ภาวะสุขภาพของผู้ป่วยก่อนจำหน่ายในด้านความสามารถ ทั้งด้านร่างกาย จิตใจ วิญญาณและสังคม' },
@@ -681,34 +728,35 @@ export default function BatchDetailModal({
                     { key: 's3_e', label: 'E : ประเมินผลตามความสามารถของผู้ป่วยและญาติในการดูแลตนเอง' },
                     { key: 's3_name', label: 'ชื่อผู้บันทึกพร้อมตำแหน่ง' },
                   ];
-
                   return (
                     <div className="space-y-1.5 pl-2">
                       {items.map((subItem, sIdx) => {
-                        const scoreValue = selectedAuditItem[subItem.key];
+                        const scoreValue = selectedAuditItem[subItem.key] ?? (Array.isArray(selectedAuditItem.audit_na_keys) && selectedAuditItem.audit_na_keys.includes(subItem.key) ? 'NA' : undefined);
                         if (scoreValue === undefined) return null;
-
                         return (
-                          <div key={sIdx} className="flex justify-between items-center p-3 bg-white rounded-xl border border-gray-200 shadow-xs hover:border-gray-300 transition">
+                          <div key={sIdx} className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2 p-3 sm:grid-cols-[minmax(0,1fr)_3rem_minmax(8rem,30%)] bg-white rounded-xl border border-gray-200 shadow-xs hover:border-gray-300 transition">
                             <span className="text-gray-800 font-medium pr-4">{subItem.label}</span>
                             <span className="bg-gray-50 px-3 py-1.5 rounded-lg font-bold text-gray-800 border border-gray-300 min-w-12 text-center">
                               {String(scoreValue)}
                             </span>
+                              <div className="col-span-2 min-w-0 whitespace-pre-wrap break-words text-slate-600 sm:col-span-1">
+                                <span className="block text-[10px] font-semibold">หมายเหตุ</span>
+                                {questionNote(subItem.key)}
+                              </div>
                           </div>
                         );
                       })}
                     </div>
                   );
                 })()}
+                {sectionNote(3)}
               </div>
-
               {/* ================= หมวดที่ 4 ================= */}
               <div className="space-y-4 pt-2">
                 <h3 className="font-bold text-gray-900 text-sm border-b-2 border-emerald-600 pb-1.5 flex items-center gap-2">
                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>
                   4. การบันทึกวันจำหน่าย
                 </h3>
-
                 {(() => {
                   const items = [
                     { key: 's4_1', label: '4.1 มีการบันทึกสัญญาณชีพก่อนการจำหน่าย' },
@@ -721,23 +769,26 @@ export default function BatchDetailModal({
                   return (
                     <div className="space-y-1.5 pl-2">
                       {items.map((subItem, sIdx) => {
-                        const scoreValue = selectedAuditItem[subItem.key];
+                        const scoreValue = selectedAuditItem[subItem.key] ?? (Array.isArray(selectedAuditItem.audit_na_keys) && selectedAuditItem.audit_na_keys.includes(subItem.key) ? 'NA' : undefined);
                         if (scoreValue === undefined) return null;
-
                         return (
-                          <div key={sIdx} className="flex justify-between items-center p-3 bg-white rounded-xl border border-gray-200 shadow-xs hover:border-gray-300 transition">
+                          <div key={sIdx} className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2 p-3 sm:grid-cols-[minmax(0,1fr)_3rem_minmax(8rem,30%)] bg-white rounded-xl border border-gray-200 shadow-xs hover:border-gray-300 transition">
                             <span className="text-gray-800 font-medium pr-4">{subItem.label}</span>
                             <span className="bg-gray-50 px-3 py-1.5 rounded-lg font-bold text-gray-800 border border-gray-300 min-w-12 text-center">
                               {String(scoreValue)}
                             </span>
+                              <div className="col-span-2 min-w-0 whitespace-pre-wrap break-words text-slate-600 sm:col-span-1">
+                                <span className="block text-[10px] font-semibold">หมายเหตุ</span>
+                                {questionNote(subItem.key)}
+                              </div>
                           </div>
                         );
                       })}
                     </div>
                   );
                 })()}
+                {sectionNote(4)}
               </div>
-                
               {/* ================= หมวดที่ 5 ================= */}
               <div className="space-y-4 pt-2">
                 <h3 className="font-bold text-gray-900 text-sm border-b-2 border-emerald-600 pb-1.5 flex items-center gap-2">
@@ -751,25 +802,31 @@ export default function BatchDetailModal({
                   return (
                     <div className="space-y-1.5 pl-2">
                       {items.map((subItem, sIdx) => {
-                        const scoreValue = selectedAuditItem[subItem.key];
+                        const scoreValue = selectedAuditItem[subItem.key] ?? (Array.isArray(selectedAuditItem.audit_na_keys) && selectedAuditItem.audit_na_keys.includes(subItem.key) ? 'NA' : undefined);
                         if (scoreValue === undefined) return null;
-
                         return (
-                          <div key={sIdx} className="flex justify-between items-center p-3 bg-white rounded-xl border border-gray-200 shadow-xs hover:border-gray-300 transition">
+                          <div key={sIdx} className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2 p-3 sm:grid-cols-[minmax(0,1fr)_3rem_minmax(8rem,30%)] bg-white rounded-xl border border-gray-200 shadow-xs hover:border-gray-300 transition">
                             <span className="text-gray-800 font-medium pr-4">{subItem.label}</span>
                             <span className="bg-gray-50 px-3 py-1.5 rounded-lg font-bold text-gray-800 border border-gray-300 min-w-12 text-center">
                               {String(scoreValue)}
                             </span>
+                              <div className="col-span-2 min-w-0 whitespace-pre-wrap break-words text-slate-600 sm:col-span-1">
+                                <span className="block text-[10px] font-semibold">หมายเหตุ</span>
+                                {questionNote(subItem.key)}
+                              </div>
                           </div>
                         );
                       })}
                     </div>
                   );
                 })()}
+                {sectionNote(5)}
               </div>
-
+              <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+                <strong>หมายเหตุ / ข้อเสนอแนะเพิ่มเติมภาพรวม</strong>
+                <p className="mt-1 whitespace-pre-wrap break-words">{selectedAuditItem.notes || '—'}</p>
+              </div>
             </div>
-
             {/* ปุ่มกดอนุมัติเฉพาะในหน้าต่างดูรายละเอียด */}
             <div className="flex justify-end items-center pt-3 border-t gap-2">
               <button
@@ -778,30 +835,30 @@ export default function BatchDetailModal({
               >
                 ปิดหน้าต่างนี้
               </button>
-              {canApprove && selectedAuditItem.status !== 'approved' && (
+              {canApprove && selectedAuditItem.status === 'pending' && (
                 <button
                   onClick={() => {
-                    handleSingleApproval(selectedAuditItem);
+                    void handleApproval(selectedAuditItem);
                   }}
+                  disabled={loading}
                   className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold shadow cursor-pointer flex items-center gap-1"
                 >
                   <CheckCircleIcon className="w-4 h-4" /> อนุมัติรายการนี้
                 </button>
               )}
             </div>
-
           </div>
         </div>
       )}
     </div>
   );
 }
-
 // Special Audit records have JSON answers and must use the authorized server API.
 function SpecialLRBatchReview({batchGroup,departmentName,canApprove,onClose,onApprove}: {
  batchGroup:BatchGroup;departmentName:string;canApprove:boolean;onClose:()=>void;
  onApprove:(type:string,month:string)=>void;
 }) {
+ const [editing,setEditing]=useState(false);
  const [busy,setBusy]=useState(false),[message,setMessage]=useState('');
  const busyRef=React.useRef(false);
  const [selectedId,setSelectedId]=useState(()=>String(batchGroup.items[0]?.id||''));
@@ -867,10 +924,11 @@ function SpecialLRBatchReview({batchGroup,departmentName,canApprove,onClose,onAp
     })}
     {item.notes&&<div className="rounded-xl bg-slate-50 p-4 text-sm text-slate-700"><strong>โรค / หมายเหตุ</strong><p className="mt-1 whitespace-pre-wrap">{String(item.notes).replace(/^\[(?:LR|DIALYSIS|ER|ANESTHESIA|HBOT)_DISEASE\]\s*/, 'โรค: ')}</p></div>}
    </div>
+   {editing&&<PendingRecordEditor table="nso_special_audits" id={item.id!} onClose={()=>setEditing(false)} onSaved={()=>{setEditing(false);onApprove(batchGroup.type,batchGroup.audit_month);onClose();}}/>}
    <footer className="shrink-0 border-t border-slate-700 py-4">
     <p role="status" aria-live="polite" className="mb-2 text-sm text-red-700">{message}</p>
     {item.status==='pending'&&!canApprove&&<p className="mb-3 text-sm text-amber-700">รอหัวหน้าผู้มีสิทธิ์อนุมัติ ผู้บันทึกอนุมัติรายการตนเองไม่ได้</p>}
-    <div className="flex flex-wrap items-center justify-end gap-3">
+    <div className="flex flex-wrap items-center justify-end gap-3">{['pending','draft'].includes(item.status||'')&&<button type="button" disabled={busy} onClick={()=>setEditing(true)} className="rounded-xl border border-teal-700 px-4 py-3 text-sm font-bold text-teal-800">แก้ไขรายการนี้</button>}
      <button type="button" disabled={busy} onClick={onClose} className="rounded-2xl bg-slate-100 px-5 py-3 text-sm font-bold text-slate-700 hover:bg-slate-200 disabled:opacity-50">ปิดหน้าต่างนี้</button>
      {(item.status==='draft'||(item.status==='pending'&&canApprove))&&<button type="button" disabled={busy} onClick={()=>void action(item)} className="inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-sm hover:bg-emerald-700 disabled:opacity-50"><CheckCircleIcon className="h-5 w-5" />{busy?'กำลังดำเนินการ…':item.status==='draft'?'ส่งรออนุมัติ':'อนุมัติรายการนี้'}</button>}
     </div>

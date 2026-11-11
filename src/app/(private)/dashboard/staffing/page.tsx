@@ -1,12 +1,10 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
-import { createClient } from '@/utils/supabase/client';
+
 
 export default function StaffingDashboardPage() {
-  const router = useRouter();
-  const pathname = usePathname();
+  const [dataError,setDataError]=useState('');
   const [loading, setLoading] = useState(true);
 
   // กำหนดค่าเริ่มต้นเป็นวันปัจจุบันในรูปแบบ YYYY-MM-DD
@@ -23,30 +21,16 @@ export default function StaffingDashboardPage() {
 
   const [departmentStaffing, setDepartmentStaffing] = useState<any[]>([]);
 
-  // รายการ Tabs สำหรับสลับหน้า
-  const tabs = [
-    { label: 'บุคลากรและสมรรถนะ', path: '/dashboard/staffing' },
-    { label: 'Ward Command Center', path: '/dashboard/staffing/command-center' },
-    { label: 'ตารางเวร', path: '/dashboard/staffing/schedule' },
-    { label: 'ภาพรวมอัตรากำลัง', path: '/dashboard/staffing/overview' },
-    { label: 'รายงานเวรตรวจการ', path: '/dashboard/staffing/inspection-report' }, // หน้าใหม่ที่เพิ่มเข้ามา
-  ];
-
   useEffect(() => {
+    const controller=new AbortController();
     async function fetchDailyStaffing() {
       try {
-        setLoading(true);
-        const supabase = createClient();
-
-        // 1. ดึงข้อมูลรายชื่อหน่วยงานทั้งหมดจากตาราง departments
-        const { data: deptData, error: deptError } = await supabase
-          .from('departments')
-          .select('*');
-
-        if (deptError) {
-          console.error('Error fetching departments:', deptError);
-        }
-
+        setLoading(true);setDataError('');
+        const response=await fetch(`/api/staffing/inspection-report?${new URLSearchParams({date:selectedDate,shift:selectedShift||'all'})}`,{cache:'no-store',signal:controller.signal});
+        const result=await response.json();
+        if(controller.signal.aborted)return;
+        if(!response.ok)throw new Error(result.error);
+        const deptData=result.departments, staffingData=result.records;
         const deptMap = new Map();
         if (deptData) {
           deptData.forEach((d: any) => {
@@ -55,22 +39,6 @@ export default function StaffingDashboardPage() {
             deptMap.set(deptId, deptName);
             deptMap.set(String(d.id), deptName);
           });
-        }
-
-        // 2. ดึงข้อมูล daily_staffing ตามวันที่และเวรที่เลือก
-        let query = supabase.from('daily_staffing').select('*');
-
-        if (selectedDate) {
-          query = query.eq('date', selectedDate);
-        }
-        if (selectedShift && selectedShift !== 'all') {
-          query = query.eq('shift', selectedShift);
-        }
-
-        const { data: staffingData, error: staffingError } = await query;
-
-        if (staffingError) {
-          console.error('Supabase error:', staffingError);
         }
 
         let totalActual = 0;
@@ -134,48 +102,23 @@ export default function StaffingDashboardPage() {
         }));
 
       } catch (error) {
-        console.error('Error fetching data:', error);
+        if(controller.signal.aborted)return;
+        setDepartmentStaffing([]);setDataError(error instanceof Error?error.message:'อ่าน daily_staffing ไม่สำเร็จ');
       } finally {
-        setLoading(false);
+        if(!controller.signal.aborted)setLoading(false);
       }
     }
 
     fetchDailyStaffing();
+    return ()=>controller.abort();
   }, [selectedDate, selectedShift]);
 
   return (
     <div className="space-y-4">
-      {/* ส่วนหัวข้อหน้าเว็บ พร้อมแถบ Tabs สลับหน้า */}
-      <div className="bg-white p-6 rounded-2xl shadow-sm border border-emerald-100">
-        <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
-          
-          {/* หัวข้อและคำอธิบาย */}
-          <div>
-            <h1 className="text-xl md:text-2xl font-bold text-emerald-900">บุคลากรและสมรรถนะ (Staffing Overview)</h1>
-            <p className="text-sm text-gray-500 mt-1">ติดตามข้อมูลอัตรากำลัง กำลังคนจริง และสถานการณ์การปฏิบัติงานภาพรวม</p>
-          </div>
-
-         {/* แถบ Tabs สลับหน้า */}
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
-            {tabs.map((tab) => {
-              const isActive = pathname === tab.path;
-              return (
-                <button
-                  key={tab.path}
-                  onClick={() => router.push(tab.path)}
-                  className={`px-3 py-2 rounded-xl text-xs font-medium transition-all shadow-xs whitespace-nowrap ${
-                    isActive
-                      ? 'bg-emerald-800 text-white shadow-emerald-900/20'
-                      : 'bg-white text-emerald-800 border border-emerald-200 hover:bg-emerald-50'
-                  }`}
-                >
-                  {tab.label}
-                </button>
-              );
-            })}
-          </div>
-
-        </div>
+      {dataError && <div role="alert" className="p-3 bg-red-50 text-red-800">{dataError}</div>}
+      <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 rounded-2xl border border-emerald-100 bg-white p-5 shadow-sm">
+        <h1 className="text-xl font-bold text-emerald-900">บุคลากรและสมรรถนะ (Staffing Overview)</h1>
+        <p className="text-sm text-gray-500">ติดตามข้อมูลอัตรากำลัง กำลังคนจริง และสถานการณ์การปฏิบัติงานภาพรวม</p>
       </div>
 
       {/* Cards สรุปข้อมูลตัวเลขสำคัญ */}
@@ -231,7 +174,7 @@ export default function StaffingDashboardPage() {
 
       {/* ตารางแสดงรายละเอียดกำลังพลแยกตามหน่วยงาน */}
       <div className="bg-white rounded-2xl shadow-xs border border-emerald-100 overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="px-2 py-1.5 border-b border-gray-100 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
           <h3 className="font-bold text-emerald-900">สถานะอัตรากำลังรายหน่วยงาน / หอผู้ป่วย</h3>
           
           {/* แถบตัวกรองวันที่และเวร */}
@@ -262,19 +205,19 @@ export default function StaffingDashboardPage() {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse">
+          <table className="w-full text-left border-collapse text-xs leading-5 [&_th]:whitespace-nowrap [&_td:last-child]:whitespace-nowrap">
             <thead>
               <tr className="bg-emerald-900/5 text-emerald-900 text-xs uppercase tracking-wider font-semibold">
-                <th className="px-6 py-3">หน่วยงาน / กลุ่มงาน</th>
-                <th className="px-6 py-3 text-center">ยอดผู้ป่วย</th>
-                <th className="px-6 py-3 text-center">ประเภท 4+5</th>
-                <th className="px-6 py-3 text-center">High Flow</th>
-                <th className="px-6 py-3 text-center">Ventilator</th>
-                <th className="px-6 py-3 text-center">NP</th>
-                <th className="px-6 py-3 text-center">ปฏิบัติงานจริง</th>
-                <th className="px-6 py-3 text-center">อัตราตามเกณฑ์</th>
-                <th className="px-6 py-3 text-center">ขาด / เกิน</th>
-                <th className="px-6 py-3 text-center">สถานะ</th>
+                <th className="px-2 py-2">หน่วยงาน / กลุ่มงาน</th>
+                <th className="px-2 py-2 text-center">ยอดผู้ป่วย</th>
+                <th className="px-2 py-2 text-center">ประเภท 4+5</th>
+                <th className="px-2 py-2 text-center">High Flow</th>
+                <th className="px-2 py-2 text-center">Ventilator</th>
+                <th className="px-2 py-2 text-center">NP</th>
+                <th className="px-2 py-2 text-center">ปฏิบัติงานจริง</th>
+                <th className="px-2 py-2 text-center">อัตราตามเกณฑ์</th>
+                <th className="px-2 py-2 text-center">ขาด / เกิน</th>
+                <th className="px-2 py-2 text-center">สถานะ</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100 text-sm">
@@ -291,22 +234,22 @@ export default function StaffingDashboardPage() {
               ) : (
                 departmentStaffing.map((item, index) => (
                   <tr key={index} className="hover:bg-emerald-50/40 transition-colors">
-                    <td className="px-6 py-4 font-medium text-gray-800">{item.name}</td>
-                    <td className="px-6 py-4 text-center text-gray-700">{item.patientCount}</td>
-                    <td className="px-6 py-4 text-center text-gray-700">{item.category}</td>
-                    <td className="px-6 py-4 text-center text-gray-700">{item.highFlow}</td>
-                    <td className="px-6 py-4 text-center text-gray-700">{item.ventilator}</td>
-                    <td className="px-6 py-4 text-center text-gray-700">{item.np}</td>
-                    <td className="px-6 py-4 text-center font-semibold text-emerald-900">{item.actual}</td>
-                    <td className="px-6 py-4 text-center text-gray-600">{item.required}</td>
-                    <td className="px-6 py-4 text-center">
+                    <td className="px-2 py-1.5 font-medium text-gray-800 whitespace-nowrap">{item.name}</td>
+                    <td className="px-2 py-1.5 text-center text-gray-700">{item.patientCount}</td>
+                    <td className="px-2 py-1.5 text-center text-gray-700">{item.category}</td>
+                    <td className="px-2 py-1.5 text-center text-gray-700">{item.highFlow}</td>
+                    <td className="px-2 py-1.5 text-center text-gray-700">{item.ventilator}</td>
+                    <td className="px-2 py-1.5 text-center text-gray-700">{item.np}</td>
+                    <td className="px-2 py-1.5 text-center font-semibold text-emerald-900">{item.actual}</td>
+                    <td className="px-2 py-1.5 text-center text-gray-600">{item.required}</td>
+                    <td className="px-2 py-1.5 text-center">
                       {item.shortage > 0 ? (
                         <span className="text-rose-600 font-bold">ขาด {item.shortage}</span>
                       ) : (
                         <span className="text-emerald-600 font-medium">ปกติ</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 text-center">
+                    <td className="px-2 py-1.5 text-center">
                       {item.status === 'warning' ? (
                         <span className="px-2.5 py-1 text-xs font-semibold bg-rose-100 text-rose-700 rounded-full">ต้องเฝ้าระวัง</span>
                       ) : (

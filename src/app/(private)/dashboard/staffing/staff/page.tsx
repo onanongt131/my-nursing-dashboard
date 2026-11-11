@@ -35,7 +35,7 @@ export default function StaffingStaffPage() {
 
   const [editingId, setEditingId] = useState<number | null>(null);
   const [message, setMessage] = useState('');
-  const [currentUserEmail, setCurrentUserEmail] = useState<string>('');
+  const [accessError, setAccessError] = useState('');
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [userGroup, setUserGroup] = useState<string | null>(null);
 
@@ -48,121 +48,32 @@ export default function StaffingStaffPage() {
   });
 
   // อ่านผู้ใช้ที่ login จาก NextAuth session API
-  useEffect(() => {
-    async function loadSessionUser() {
-      try {
-        const response = await fetch('/api/session-user', {
-          cache: 'no-store',
-        });
 
-        if (!response.ok) {
-          console.error('ไม่พบ session ของผู้ใช้');
-          setCurrentUserEmail('');
-          return;
-        }
-
-        const result = await response.json();
-        setCurrentUserEmail(result?.user?.email ?? '');
-      } catch (error) {
-        console.error('Load session user error:', error);
-        setCurrentUserEmail('');
-      }
-    }
-
-    loadSessionUser();
-  }, []);
 
   // โหลด profile + หน่วยงานตามสิทธิ์
   useEffect(() => {
+    const controller = new AbortController();
     async function loadAccessContext() {
-      if (!currentUserEmail) return;
-
       try {
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('id, full_name, department_id, role, email')
-          .eq('email', currentUserEmail)
-          .single();
-
-        if (profileError || !profile) {
-          console.error('Cannot load profile:', profileError);
-          setUserProfile(null);
-          setUserGroup(null);
-          setDepartments([]);
-          setSelectedDept('');
-          return;
-        }
-
-        const normalizedProfile: UserProfile = {
-          id: profile.id,
-          full_name: profile.full_name ?? null,
-          department_id: profile.department_id ?? null,
-          role: profile.role ?? null,
-          email: profile.email ?? null,
-        };
-
-        setUserProfile(normalizedProfile);
-
-        let currentUserGroup: string | null = null;
-
-        if (normalizedProfile.department_id) {
-          const { data: ownDepartment, error: ownDepartmentError } = await supabase
-            .from('departments')
-            .select('group')
-            .eq('id', normalizedProfile.department_id)
-            .single();
-
-          if (ownDepartmentError) {
-            console.error('Cannot load user group:', ownDepartmentError);
-          } else {
-            currentUserGroup = ownDepartment?.group ?? null;
-          }
-        }
-
-        setUserGroup(currentUserGroup);
-
-        const { data: departmentRows, error: departmentsError } = await supabase
-          .from('departments')
-          .select('id, Department, group')
-          .order('Department', { ascending: true });
-
-        if (departmentsError) {
-          console.error('Error fetching departments:', departmentsError.message);
-          setDepartments([]);
-          setSelectedDept('');
-          return;
-        }
-
-        const allDepartments = (departmentRows || []) as Department[];
-        setDepartments(allDepartments);
-
-        const allowedDepartments = getVisibleDepartments(
-          allDepartments,
-          normalizedProfile,
-          currentUserGroup
-        );
-
-        if (canSelectDepartment(normalizedProfile.role)) {
-          const ownDeptExists = allowedDepartments.some(
-            (dept) =>
-              Number(dept.id) === Number(normalizedProfile.department_id)
-          );
-
-          setSelectedDept(
-            ownDeptExists
-              ? Number(normalizedProfile.department_id)
-              : allowedDepartments[0]?.id ?? ''
-          );
-        } else {
-          setSelectedDept(normalizedProfile.department_id ?? '');
-        }
+        const response = await fetch('/api/staffing/access-context', {cache:'no-store',signal:controller.signal});
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'โหลดสิทธิ์ไม่สำเร็จ');
+        if (controller.signal.aborted) return;
+        const profile: UserProfile = result.profile;
+        const allowedDepartments: Department[] = result.departments || [];
+        setUserProfile(profile); setUserGroup(result.group ?? null); setDepartments(allowedDepartments);
+        const own = allowedDepartments.find(d => Number(d.id) === Number(profile.department_id));
+        setSelectedDept(own?.id ?? (canSelectDepartment(profile.role) ? allowedDepartments[0]?.id ?? '' : ''));
+        setAccessError('');
       } catch (error) {
-        console.error('Load access context error:', error);
+        if (controller.signal.aborted) return;
+        setUserProfile(null); setUserGroup(null); setDepartments([]); setSelectedDept('');
+        setAccessError(error instanceof Error ? error.message : 'โหลดสิทธิ์ไม่สำเร็จ');
       }
     }
-
     loadAccessContext();
-  }, [supabase, currentUserEmail]);
+    return () => controller.abort();
+  }, []);
 
   const visibleDepartments = getVisibleDepartments(
     departments,
@@ -178,26 +89,12 @@ export default function StaffingStaffPage() {
 
     setLoading(true);
 
-    const { data, error } = await supabase
-      .from('staff')
-      .select(`
-        id,
-        full_name,
-        position,
-        department_id,
-        active,
-        competency_level,
-        can_be_shift_leader
-      `)
-      .eq('department_id', Number(selectedDept))
-      .order('id');
-
-    if (error) {
-      console.error(error);
-      setMessage(`โหลดข้อมูลไม่สำเร็จ: ${error.message}`);
-    } else {
-      setStaffList(data || []);
-    }
+    try {
+      const response=await fetch(`/api/staffing/staff?department_id=${selectedDept}`,{cache:'no-store'});
+      const result=await response.json();
+      if(!response.ok)throw new Error(result.error);
+      setStaffList(result.records || []);
+    }catch(error){setStaffList([]);setMessage(error instanceof Error?error.message:'อ่าน staff ไม่สำเร็จ');}
 
     setLoading(false);
   };
@@ -305,11 +202,12 @@ export default function StaffingStaffPage() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 px-4 pb-8">
+    <div className="min-h-screen bg-slate-50 pt-0 px-2 pb-3">
+      {accessError && <div role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-800">{accessError}</div>}
       <div className="max-w-6xl mx-auto space-y-4">
 
-        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-3">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
 
             <div>
               <div className="flex items-center gap-3">
@@ -367,7 +265,7 @@ export default function StaffingStaffPage() {
 
         {allowEdit && (
           <>
-        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5">
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-3">
             <h2 className="font-bold text-slate-900 mb-4">
               {editingId ? 'แก้ไขข้อมูลบุคลากร' : 'เพิ่มบุคลากร'}
             </h2>

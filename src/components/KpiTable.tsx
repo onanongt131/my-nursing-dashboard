@@ -105,7 +105,7 @@ export default function WpQaDashboard() {
 
   const availableYears = useMemo(() => {
     const years = rawData.map(item => String(item.fiscal_year));
-    return Array.from(new Set(years)).sort().reverse();
+    return Array.from(new Set([...years, '2570'])).sort().reverse();
   }, [rawData]);
 
   // ฟังก์ชันแปลงชื่อหน่วยงานสำหรับปี 2567 และ 2568

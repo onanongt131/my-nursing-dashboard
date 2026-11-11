@@ -150,7 +150,7 @@ export default function CategoryPage() {
 
       rowsHTML += `
         <tr style="background-color: #f3e8ff; font-weight: bold; color: #3b0764;">
-          <td colspan="11" style="border: 1px solid #cbd5e1; padding: 10px; font-size: 13px;">
+          <td colspan="12" style="border: 1px solid #cbd5e1; padding: 10px; font-size: 13px;">
             ${cat.icon} ${cat.prefix} ${cat.name}
           </td>
         </tr>
@@ -163,6 +163,7 @@ export default function CategoryPage() {
         const entry2567 = entries.find((e: any) => e.year === 2567)?.value ?? '-';
         const entry2568 = entries.find((e: any) => e.year === 2568)?.value ?? '-';
         const entry2569 = entries.find((e: any) => e.year === 2569)?.value ?? '-';
+        const entry2570 = entries.find((e: any) => e.year === 2570)?.value ?? '-';
         const latestEntry = [...entries].sort((a, b) => b.year - a.year)[0];
         const isPassed = latestEntry ? checkStatus(Number(latestEntry.value), kpi.target_value, kpi.operator, kpi.is_higher_better) : false;
         const leValue = latestEntry ? (isPassed ? "Pass" : "Fail") : "-";
@@ -180,6 +181,8 @@ export default function CategoryPage() {
             <td style="border: 1px solid #cbd5e1; padding: 8px; text-align: center;">${entry2567}</td>
             <td style="border: 1px solid #cbd5e1; padding: 8px; text-align: center;">${entry2568}</td>
             <td style="border: 1px solid #cbd5e1; padding: 8px; text-align: center;">${entry2569}</td>
+            <td style="border: 1px solid #cbd5e1; padding: 8px; text-align: center;">${entry2570}</td>
+            <td style="border: 1px solid #cbd5e1; padding: 8px; text-align: center;">${entry2570}</td>
             <td style="border: 1px solid #cbd5e1; padding: 8px; text-align: center; font-weight: bold; color: ${leColor};">${leValue}</td>
             <td style="border: 1px solid #cbd5e1; padding: 8px; text-align: center; font-weight: bold; color: #e11d48;">${tValue}</td>
             <td style="border: 1px solid #cbd5e1; padding: 8px; text-align: center; font-weight: bold; color: #6b21a8; background: #faf5ff;">${cValue}</td>
@@ -207,7 +210,7 @@ export default function CategoryPage() {
       </head>
       <body>
         <h2>สรุปผลการดำเนินงานตัวชี้วัด กลุ่มภารกิจด้านการพยาบาล</h2>
-        <p>ประจำปีงบประมาณ 2569</p>
+        <p>ประจำปีงบประมาณ 2570</p>
         <table>
           <thead>
             <tr>
@@ -217,7 +220,7 @@ export default function CategoryPage() {
               <th style="width: 6%;">2566</th>
               <th style="width: 6%;">2567</th>
               <th style="width: 6%;">2568</th>
-              <th style="width: 6%;">2569</th>
+              <th style="width: 6%;">2569</th><th style="width: 6%;">2570</th>
               <th style="width: 6%;">Le</th>
               <th style="width: 6%;">T</th>
               <th style="width: 10%;">C</th>
@@ -374,7 +377,7 @@ export default function CategoryPage() {
             <div className="min-h-0 flex-1 space-y-6 overflow-y-auto bg-white p-3 text-xs sm:p-6">
               <div className="text-center mb-6">
                 <h2 className="text-xl font-bold text-slate-800">สรุปผลการดำเนินงานตัวชี้วัด กลุ่มภารกิจด้านการพยาบาล</h2>
-                <p className="text-sm text-slate-500 mt-1">ประจำปีงบประมาณ 2569</p>
+                <p className="text-sm text-slate-500 mt-1">ประจำปีงบประมาณ 2570</p>
               </div>
 
               <div className="w-full min-w-0 max-w-full overflow-x-auto overscroll-x-contain">
@@ -388,6 +391,7 @@ export default function CategoryPage() {
                       <th className="border border-slate-300 p-2 text-center w-[6%]">2567</th>
                       <th className="border border-slate-300 p-2 text-center w-[6%]">2568</th>
                       <th className="border border-slate-300 p-2 text-center w-[6%]">2569</th>
+                      <th className="border border-slate-300 p-2 text-center w-[6%]">2570</th>
                       <th className="border border-slate-300 p-2 text-center w-[6%]">Le</th>
                       <th className="border border-slate-300 p-2 text-center w-[6%]">T</th>
                       <th className="border border-slate-300 p-2 text-center w-[10%]">C</th>
@@ -403,7 +407,7 @@ export default function CategoryPage() {
                       return (
                         <Fragment key={cat.id}>
                           <tr className="bg-purple-100/90 font-bold text-purple-950">
-                            <td colSpan={11} className="border border-slate-300 p-2.5 text-sm">
+                            <td colSpan={12} className="border border-slate-300 p-2.5 text-sm">
                               {cat.icon} {cat.prefix} {cat.name}
                             </td>
                           </tr>
@@ -414,6 +418,7 @@ export default function CategoryPage() {
                             const entry2567 = entries.find((e: any) => e.year === 2567)?.value ?? '-';
                             const entry2568 = entries.find((e: any) => e.year === 2568)?.value ?? '-';
                             const entry2569 = entries.find((e: any) => e.year === 2569)?.value ?? '-';
+        const entry2570 = entries.find((e: any) => e.year === 2570)?.value ?? '-';
                             const latestEntry = [...entries].sort((a, b) => b.year - a.year)[0];
                             const isPassed = latestEntry ? checkStatus(Number(latestEntry.value), kpi.target_value, kpi.operator, kpi.is_higher_better) : false;
                             const leValue = latestEntry ? (isPassed ? "Pass" : "Fail") : "-";

@@ -62,13 +62,6 @@ function getDayOffStaffGroup(position: string | null | undefined): DayOffStaffGr
   return 'employee';
 }
 
-function getDayOffGroupLabel(group: DayOffStaffGroup) {
-  if (group === 'nurse') return 'พยาบาล';
-  if (group === 'pn') return 'PN';
-  if (group === 'na') return 'NA';
-  return 'พนง.';
-}
-
 const statusLabel: Record<DayOffStatus, string> = {
   pending: 'รออนุมัติ',
   approved: 'อนุมัติ',
@@ -78,23 +71,6 @@ const statusLabel: Record<DayOffStatus, string> = {
 function getDaysInMonth(monthValue: string) {
   const [year, month] = monthValue.split('-').map(Number);
   return new Date(year, month, 0).getDate();
-}
-
-function buildDateRange(startDate: string, endDate: string) {
-  const dates: string[] = [];
-  const current = new Date(`${startDate}T00:00:00`);
-  const end = new Date(`${endDate}T00:00:00`);
-
-  while (current <= end) {
-    const yyyy = current.getFullYear();
-    const mm = String(current.getMonth() + 1).padStart(2, '0');
-    const dd = String(current.getDate()).padStart(2, '0');
-
-    dates.push(`${yyyy}-${mm}-${dd}`);
-    current.setDate(current.getDate() + 1);
-  }
-
-  return dates;
 }
 
 function formatThaiDate(date: string) {
@@ -124,8 +100,16 @@ function getCalendarDays(monthValue: string) {
   });
 }
 
+async function dayOffApi(url: string, options?: RequestInit) {
+  const response = await fetch(url, { cache: 'no-store', ...options });
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error || 'ดำเนินการคำขอหยุดไม่สำเร็จ');
+  return result;
+}
+
 export default function StaffingDayOffPage() {
   const supabase = createClient();
+  const [requestRevision, setRequestRevision] = useState(0);
 
   const [departments, setDepartments] = useState<Department[]>([]);
   const [selectedDept, setSelectedDept] = useState<number | string>('');
@@ -133,10 +117,12 @@ export default function StaffingDayOffPage() {
     new Date().toISOString().slice(0, 7)
   );
 
-  const [currentUserEmail, setCurrentUserEmail] = useState('');
+  const [accessError, setAccessError] = useState('');
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [userGroup, setUserGroup] = useState<string | null>(null);
 
+  const [staffLoading, setStaffLoading] = useState(false);
+  const [staffError, setStaffError] = useState('');
   const [staffList, setStaffList] = useState<Staff[]>([]);
   const [requests, setRequests] = useState<DayOffRequest[]>([]);
   const [capacityRules, setCapacityRules] = useState<DayOffCapacityRule[]>([]);
@@ -161,126 +147,32 @@ export default function StaffingDayOffPage() {
   const [selectedCalendarDate, setSelectedCalendarDate] = useState<string | null>(null);
 
   // อ่านผู้ใช้ปัจจุบันจาก NextAuth session API
-  useEffect(() => {
-    async function loadSessionUser() {
-      try {
-        const response = await fetch('/api/session-user', {
-          cache: 'no-store',
-        });
 
-        if (!response.ok) {
-          console.error('ไม่พบ session ของผู้ใช้');
-          setCurrentUserEmail('');
-          return;
-        }
-
-        const result = await response.json();
-        setCurrentUserEmail(result?.user?.email ?? '');
-      } catch (error) {
-        console.error('Load session user error:', error);
-        setCurrentUserEmail('');
-      }
-    }
-
-    loadSessionUser();
-  }, []);
 
   // โหลด profile + หน่วยงานตามสิทธิ์
   useEffect(() => {
+    const controller = new AbortController();
     async function loadAccessContext() {
-      if (!currentUserEmail) return;
-
       try {
-        const { data: profile, error: profileError } = await supabase
-          .from('profiles')
-          .select('id, full_name, department_id, role, email')
-          .eq('email', currentUserEmail)
-          .single();
-
-        if (profileError || !profile) {
-          console.error('Cannot load profile:', profileError);
-          setUserProfile(null);
-          setUserGroup(null);
-          setDepartments([]);
-          setSelectedDept('');
-          return;
-        }
-
-        const normalizedProfile: UserProfile = {
-          id: profile.id,
-          full_name: profile.full_name ?? null,
-          department_id: profile.department_id ?? null,
-          role: profile.role ?? null,
-          email: profile.email ?? null,
-        };
-
-        setUserProfile(normalizedProfile);
-
-        let currentUserGroup: string | null = null;
-
-        if (normalizedProfile.department_id) {
-          const { data: ownDepartment, error: ownDepartmentError } =
-            await supabase
-              .from('departments')
-              .select('group')
-              .eq('id', normalizedProfile.department_id)
-              .single();
-
-          if (ownDepartmentError) {
-            console.error('Cannot load user group:', ownDepartmentError);
-          } else {
-            currentUserGroup = ownDepartment?.group ?? null;
-          }
-        }
-
-        setUserGroup(currentUserGroup);
-
-        const { data: departmentRows, error: departmentsError } =
-          await supabase
-            .from('departments')
-            .select('id, Department, group')
-            .order('Department', { ascending: true });
-
-        if (departmentsError) {
-          console.error(
-            'Error fetching departments:',
-            departmentsError.message
-          );
-          setDepartments([]);
-          setSelectedDept('');
-          return;
-        }
-
-        const allDepartments = (departmentRows || []) as Department[];
-        setDepartments(allDepartments);
-
-        const allowedDepartments = getVisibleDepartments(
-          allDepartments,
-          normalizedProfile,
-          currentUserGroup
-        );
-
-        if (canSelectDepartment(normalizedProfile.role)) {
-          const ownDeptExists = allowedDepartments.some(
-            (dept) =>
-              Number(dept.id) === Number(normalizedProfile.department_id)
-          );
-
-          setSelectedDept(
-            ownDeptExists
-              ? Number(normalizedProfile.department_id)
-              : allowedDepartments[0]?.id ?? ''
-          );
-        } else {
-          setSelectedDept(normalizedProfile.department_id ?? '');
-        }
+        const response = await fetch('/api/staffing/access-context', {cache:'no-store',signal:controller.signal});
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'โหลดสิทธิ์ไม่สำเร็จ');
+        if (controller.signal.aborted) return;
+        const profile: UserProfile = result.profile;
+        const allowedDepartments: Department[] = result.departments || [];
+        setUserProfile(profile); setUserGroup(result.group ?? null); setDepartments(allowedDepartments);
+        const own = allowedDepartments.find(d => Number(d.id) === Number(profile.department_id));
+        setSelectedDept(own?.id ?? (canSelectDepartment(profile.role) ? allowedDepartments[0]?.id ?? '' : ''));
+        setAccessError('');
       } catch (error) {
-        console.error('Load access context error:', error);
+        if (controller.signal.aborted) return;
+        setUserProfile(null); setUserGroup(null); setDepartments([]); setSelectedDept('');
+        setAccessError(error instanceof Error ? error.message : 'โหลดสิทธิ์ไม่สำเร็จ');
       }
     }
-
     loadAccessContext();
-  }, [supabase, currentUserEmail]);
+    return () => controller.abort();
+  }, []);
 
   const visibleDepartments = getVisibleDepartments(
     departments,
@@ -312,42 +204,18 @@ export default function StaffingDayOffPage() {
   const isStaffRole = userProfile?.role === 'staff';
 
   const getRequestWindow = () => {
-    const now = new Date();
-
-    const currentYear = now.getFullYear();
-    const currentMonth = now.getMonth(); // 0-11
-    const currentDay = now.getDate();
-
-    const targetStart = new Date(
-      currentYear,
-      currentMonth + 1,
-      1
-    );
-
-    const targetEnd = new Date(
-      currentYear,
-      currentMonth + 2,
-      0
-    );
-
-    const toLocalDateString = (date: Date) => {
-      const year = date.getFullYear();
-      const month = String(
-        date.getMonth() + 1
-      ).padStart(2, '0');
-      const day = String(date.getDate()).padStart(2, '0');
-
-      return `${year}-${month}-${day}`;
-    };
-
+    const now = new Date(Date.now() + 7 * 3600000);
+    const year = now.getUTCFullYear();
+    const month = now.getUTCMonth();
+    const currentDay = now.getUTCDate();
+    const targetStartDate = new Date(Date.UTC(year, month + 1, 1)).toISOString().slice(0, 10);
+    const targetEndDate = new Date(Date.UTC(year, month + 2, 0)).toISOString().slice(0, 10);
     return {
-      isOpen: currentDay >= 1 && currentDay <= 10,
+      isOpen: currentDay <= 10,
       currentDay,
-      targetMonth: `${targetStart.getFullYear()}-${String(
-        targetStart.getMonth() + 1
-      ).padStart(2, '0')}`,
-      targetStartDate: toLocalDateString(targetStart),
-      targetEndDate: toLocalDateString(targetEnd),
+      targetMonth: targetStartDate.slice(0, 7),
+      targetStartDate,
+      targetEndDate,
     };
   };
 
@@ -366,7 +234,7 @@ export default function StaffingDayOffPage() {
       )
       .sort((a, b) => b.start_date.localeCompare(a.start_date))[0];
 
-    if (!matched) return DEFAULT_MAX_OFF_PER_GROUP;
+    if (!matched) return group === 'nurse' ? DEFAULT_MAX_OFF_PER_GROUP : 1;
 
     if (group === 'nurse') {
       return matched.max_nurse_off_per_day ?? DEFAULT_MAX_OFF_PER_GROUP;
@@ -377,6 +245,7 @@ export default function StaffingDayOffPage() {
   };
 
   useEffect(() => {
+    const controller = new AbortController();
     async function loadCapacityAndUsage() {
       if (!selectedDept || !calendarMonth) {
         setCapacityRules([]);
@@ -390,27 +259,13 @@ export default function StaffingDayOffPage() {
         new Date(year, month, 0).getDate()
       ).padStart(2, '0')}`;
 
-      const [{ data: rules }, { data: usedRequests }] = await Promise.all([
-        supabase
-          .from('day_off_capacity_rules')
-          .select(
-            'id, start_date, end_date, max_nurse_off_per_day, max_pn_off_per_day, max_na_off_per_day, max_employee_off_per_day, active'
-          )
-          .eq('department_id', Number(selectedDept))
-          .eq('active', true)
-          .lte('start_date', endDate)
-          .gte('end_date', startDate),
-        supabase
-          .from('staff_requests')
-          .select('staff_id, request_date')
-          .eq('department_id', Number(selectedDept))
-          .eq('request_type', 'OFF')
-          .in('status', ['pending', 'approved'])
-          .gte('request_date', startDate)
-          .lte('request_date', endDate),
-      ]);
-
-      setCapacityRules((rules || []) as DayOffCapacityRule[]);
+      const { rules, records } = await dayOffApi(
+        `/api/staffing/day-off?department_id=${selectedDept}&start=${startDate}&end=${endDate}`,
+        { signal: controller.signal }
+      );
+      if (controller.signal.aborted) return;
+      setCapacityRules(rules);
+      const usedRequests = (records as DayOffRequest[]).filter(item => item.status !== 'rejected');
 
       const staffById = new Map(
         staffList.map((staff) => [Number(staff.id), staff])
@@ -438,9 +293,14 @@ export default function StaffingDayOffPage() {
       setCalendarUsage(usage);
     }
 
-    loadCapacityAndUsage();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [calendarMonth, selectedDept, staffList]);
+    void loadCapacityAndUsage().catch((error: unknown) => {
+      if (controller.signal.aborted) return;
+      setCapacityRules([]);
+      setCalendarUsage({});
+      setMessage(error instanceof Error ? error.message : 'โหลดโควตาขอหยุดไม่สำเร็จ');
+    });
+    return () => controller.abort();
+  }, [calendarMonth, selectedDept, staffList, requestRevision]);
 
   const selectRequestDate = (date: string) => {
     // คลิกแรกเป็นคำขอ 1 วันทันที และคลิกวันที่ถัดไปเพื่อขยายเป็นช่วง
@@ -472,42 +332,37 @@ export default function StaffingDayOffPage() {
   const canStaffSubmitRequest =
     !isStaffRole || requestWindow.isOpen;
 
-  // โหลดบุคลากรในหน่วยงาน
+  // ใช้ API เดียวกับตารางเวรเพื่ออ่านรายชื่อด้วยสิทธิ์จาก NextAuth
   useEffect(() => {
+    const controller = new AbortController();
+    setStaffList([]);
+    setSelectedStaffId('');
+    setStaffError('');
+    setStaffLoading(Boolean(selectedDept));
+    if (!selectedDept) return;
+
     async function loadStaff() {
-      if (!selectedDept) {
-        setStaffList([]);
-        setSelectedStaffId('');
-        return;
+      try {
+        const response = await fetch(`/api/staffing/staff?department_id=${selectedDept}`, {
+          cache: 'no-store',
+          signal: controller.signal,
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'อ่านรายชื่อบุคลากรไม่สำเร็จ');
+        if (controller.signal.aborted) return;
+        const rows = (result.records as Staff[]).filter(staff => staff.active === true);
+        setStaffList(rows);
+        setSelectedStaffId(rows[0]?.id ?? '');
+      } catch (error) {
+        if (!controller.signal.aborted) setStaffError(error instanceof Error ? error.message : 'อ่านรายชื่อบุคลากรไม่สำเร็จ');
+      } finally {
+        if (!controller.signal.aborted) setStaffLoading(false);
       }
-
-      const { data, error } = await supabase
-        .from('staff')
-        .select('id, full_name, position, department_id, active')
-        .eq('department_id', Number(selectedDept))
-        .eq('active', true)
-        .order('id', { ascending: true });
-
-      if (error) {
-        console.error('Load staff error:', error);
-        setStaffList([]);
-        setSelectedStaffId('');
-        return;
-      }
-
-      const rows = (data || []) as Staff[];
-      setStaffList(rows);
-
-      setSelectedStaffId((current) => {
-        const stillExists = rows.some(
-          (staff) => Number(staff.id) === Number(current)
-        );
-        return stillExists ? current : rows[0]?.id ?? '';
-      });
     }
 
-    loadStaff();
-  }, [supabase, selectedDept]);
+    void loadStaff();
+    return () => controller.abort();
+  }, [selectedDept]);
 
   const staffMap = useMemo(() => {
     return new Map(staffList.map((staff) => [Number(staff.id), staff]));
@@ -601,116 +456,31 @@ export default function StaffingDayOffPage() {
   );
 
   // โหลดคำขอหยุดของเดือนที่เลือก
-  const loadRequests = async () => {
-    if (!selectedDept || !selectedMonth) {
-      setRequests([]);
-      return;
-    }
-
-    setLoading(true);
-
-    const startDate = `${selectedMonth}-01`;
-    const endDate = `${selectedMonth}-${String(
-      getDaysInMonth(selectedMonth)
-    ).padStart(2, '0')}`;
-
-    const { data, error } = await supabase
-      .from('staff_requests')
-      .select(`
-        id,
-        department_id,
-        staff_id,
-        request_date,
-        request_type,
-        requested_shift,
-        status,
-        note,
-        created_at,
-        updated_at
-      `)
-      .eq('department_id', Number(selectedDept))
-      .eq('request_type', 'OFF')
-      .gte('request_date', startDate)
-      .lte('request_date', endDate)
-      .order('request_date', { ascending: true });
-
-    if (error) {
-      console.error('Load day-off requests error:', error);
-      setMessage(`โหลดคำขอหยุดไม่สำเร็จ: ${error.message}`);
-      setRequests([]);
-    } else {
-      setRequests((data || []) as DayOffRequest[]);
-    }
-
-    setLoading(false);
-  };
-
   useEffect(() => {
-    loadRequests();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedDept, selectedMonth]);
-
-  const findCapacityConflicts = async (dates: string[], targetStaffId: number) => {
-    if (!selectedDept || dates.length === 0) return [] as string[];
-
-    const [{ data: rules, error: rulesError }, { data: used, error: usedError }] =
-      await Promise.all([
-        supabase
-          .from('day_off_capacity_rules')
-          .select(
-            'start_date, end_date, max_nurse_off_per_day, max_pn_off_per_day, max_na_off_per_day, max_employee_off_per_day, active'
-          )
-          .eq('department_id', Number(selectedDept))
-          .eq('active', true)
-          .lte('start_date', dates[dates.length - 1])
-          .gte('end_date', dates[0]),
-        supabase
-          .from('staff_requests')
-          .select('staff_id, request_date')
-          .eq('department_id', Number(selectedDept))
-          .eq('request_type', 'OFF')
-          .in('status', ['pending', 'approved'])
-          .in('request_date', dates),
-      ]);
-
-    if (rulesError) throw new Error(`โหลดกติกาการขอหยุดไม่สำเร็จ: ${rulesError.message}`);
-    if (usedError) throw new Error(`ตรวจสอบจำนวนผู้ขอหยุดไม่สำเร็จ: ${usedError.message}`);
-
-    const ruleRows = (rules || []) as DayOffCapacityRule[];
-    const targetStaff = staffMap.get(Number(targetStaffId));
-    const targetGroup = getDayOffStaffGroup(targetStaff?.position);
-
-    return dates.filter((date) => {
-      const matched = ruleRows
-        .filter((rule) => date >= rule.start_date && date <= rule.end_date)
-        .sort((a, b) => b.start_date.localeCompare(a.start_date))[0];
-      const maximum = matched
-        ? targetGroup === 'nurse'
-          ? matched.max_nurse_off_per_day ?? DEFAULT_MAX_OFF_PER_GROUP
-          : targetGroup === 'pn'
-          ? matched.max_pn_off_per_day ?? 1
-          : targetGroup === 'na'
-          ? matched.max_na_off_per_day ?? 1
-          : matched.max_employee_off_per_day ?? 1
-        : targetGroup === 'nurse'
-        ? DEFAULT_MAX_OFF_PER_GROUP
-        : 1;
-      const otherStaff = new Set(
-        (used || [])
-          .filter(
-            (item: any) =>
-              item.request_date === date &&
-              Number(item.staff_id) !== Number(targetStaffId) &&
-              getDayOffStaffGroup(
-                staffMap.get(Number(item.staff_id))?.position
-              ) === targetGroup
-          )
-          .map((item: any) => String(item.staff_id))
-      ).size;
-
-      return maximum === 0 || otherStaff + 1 > maximum;
+    const controller = new AbortController();
+    setRequests([]);
+    setLoading(Boolean(selectedDept && selectedMonth));
+    if (!selectedDept || !selectedMonth) return;
+    const startDate = `${selectedMonth}-01`;
+    const endDate = `${selectedMonth}-${String(getDaysInMonth(selectedMonth)).padStart(2, '0')}`;
+    void dayOffApi(
+      `/api/staffing/day-off?department_id=${selectedDept}&start=${startDate}&end=${endDate}`,
+      { signal: controller.signal }
+    ).then(result => {
+      if (!controller.signal.aborted) setRequests(result.records);
+    }).catch((error: unknown) => {
+      if (!controller.signal.aborted) setMessage(error instanceof Error ? error.message : 'โหลดคำขอหยุดไม่สำเร็จ');
+    }).finally(() => {
+      if (!controller.signal.aborted) setLoading(false);
     });
-  };
+    return () => controller.abort();
+  }, [selectedDept, selectedMonth, requestRevision]);
+
+  const saveDayOff = (payload: Record<string, unknown>) => dayOffApi('/api/staffing/day-off', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ department_id: Number(selectedDept), ...payload }),
+  });
 
   const handleCreateRequest = async () => {
     if (!canCreateRequest) {
@@ -770,57 +540,21 @@ export default function StaffingDayOffPage() {
       }
     }
 
-    const dates = buildDateRange(requestStartDate, effectiveEndDate);
-
-    if (dates.length === 0) {
-      setMessage('ไม่พบช่วงวันที่ที่ต้องการขอหยุด');
-      return;
-    }
-
     setSaving(true);
     setMessage('');
 
     try {
-      const fullDates = await findCapacityConflicts(
-        dates,
-        Number(selectedStaffId)
-      );
-
-      if (fullDates.length > 0) {
-        setMessage(
-          `ไม่สามารถบันทึกได้: วันที่ปิดรับหรือจำนวนผู้ขอหยุดเต็มแล้ว ${fullDates
-            .map(formatThaiDate)
-            .join(', ')}`
-        );
-        return;
-      }
-
-      const records = dates.map((date) => ({
-        department_id: Number(selectedDept),
-        staff_id: Number(selectedStaffId),
-        request_date: date,
-        request_type: 'OFF',
-        requested_shift: null,
-        status: 'pending' as DayOffStatus,
-        note: note.trim() || null,
-        updated_at: new Date().toISOString(),
-      }));
-
-      const { error } = await supabase
-        .from('staff_requests')
-        .upsert(records, {
-          onConflict: 'staff_id,request_date',
-        });
-
-      if (error) {
-        throw new Error(error.message);
-      }
-
-      setMessage(`บันทึกคำขอหยุด ${records.length} วัน เรียบร้อยแล้ว`);
+      const { saved, existing } = await saveDayOff({
+        action: 'create', staff_id: Number(selectedStaffId),
+        start: requestStartDate, end: effectiveEndDate, note,
+      });
+      setMessage(saved
+        ? `บันทึกคำขอหยุด ${saved} วัน เรียบร้อยแล้ว${existing ? ` (มีรายการอยู่แล้ว ${existing} วัน)` : ''}`
+        : 'มีรายการสำหรับวันที่เลือกอยู่แล้ว');
       setRequestStartDate('');
       setRequestEndDate('');
       setNote('');
-      await loadRequests();
+      setRequestRevision(revision => revision + 1);
     } catch (error: any) {
       console.error('Create day-off request error:', error);
       setMessage(
@@ -842,56 +576,13 @@ export default function StaffingDayOffPage() {
       return;
     }
 
-    const request = requests.find((item) => item.id === requestId);
-
-    if (!request) return;
-
-    if (status === 'approved') {
-      try {
-        const fullDates = await findCapacityConflicts(
-          [request.request_date],
-          request.staff_id
-        );
-        if (fullDates.length > 0) {
-          const group = getDayOffStaffGroup(
-            staffMap.get(Number(request.staff_id))?.position
-          );
-          setMessage(
-            `อนุมัติไม่ได้: กลุ่ม${getDayOffGroupLabel(group)}ขอหยุดเต็มตามกติกาแล้วในวันที่ ${formatThaiDate(
-              request.request_date
-            )}`
-          );
-          return;
-        }
-      } catch (error: any) {
-        setMessage(error?.message || 'ตรวจสอบจำนวนผู้ขอหยุดไม่สำเร็จ');
-        return;
-      }
+    try {
+      await saveDayOff({ action: 'status', id: requestId, status });
+      setMessage(status === 'approved' ? 'อนุมัติคำขอหยุดเรียบร้อยแล้ว' : 'ไม่อนุมัติคำขอหยุดเรียบร้อยแล้ว');
+      setRequestRevision(revision => revision + 1);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'ปรับสถานะไม่สำเร็จ');
     }
-
-    const { error } = await supabase
-      .from('staff_requests')
-      .update({
-        status,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', requestId);
-
-    if (error) {
-      console.error('Update request status error:', error);
-      setMessage(`ปรับสถานะไม่สำเร็จ: ${error.message}`);
-      return;
-    }
-
-    setMessage(
-      status === 'approved'
-        ? 'อนุมัติคำขอหยุดเรียบร้อยแล้ว'
-        : status === 'rejected'
-        ? 'ไม่อนุมัติคำขอหยุดเรียบร้อยแล้ว'
-        : 'ปรับสถานะเรียบร้อยแล้ว'
-    );
-
-    await loadRequests();
   };
 
   const handleDeleteRequest = async (requestId: number) => {
@@ -899,31 +590,23 @@ export default function StaffingDayOffPage() {
       setMessage('บัญชีนี้ไม่มีสิทธิ์ลบคำขอหยุด');
       return;
     }
-
-    const confirmed = window.confirm('ยืนยันลบคำขอหยุดรายการนี้?');
-    if (!confirmed) return;
-
-    const { error } = await supabase
-      .from('staff_requests')
-      .delete()
-      .eq('id', requestId);
-
-    if (error) {
-      console.error('Delete request error:', error);
-      setMessage(`ลบคำขอหยุดไม่สำเร็จ: ${error.message}`);
-      return;
+    if (!window.confirm('ยืนยันลบคำขอหยุดรายการนี้?')) return;
+    try {
+      await saveDayOff({ action: 'delete', id: requestId });
+      setMessage('ลบคำขอหยุดเรียบร้อยแล้ว');
+      setRequestRevision(revision => revision + 1);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : 'ลบคำขอหยุดไม่สำเร็จ');
     }
-
-    setMessage('ลบคำขอหยุดเรียบร้อยแล้ว');
-    await loadRequests();
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 px-4 pb-8">
+    <div className="min-h-screen bg-slate-50 pt-0 px-2 pb-3">
+      {accessError && <div role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-800">{accessError}</div>}
       <div className="max-w-6xl mx-auto space-y-4">
         {/* Header */}
-        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5">
-          <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+        <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-3">
+          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
               <h1 className="text-xl font-bold text-slate-900">ขอหยุด</h1>
 
@@ -951,12 +634,12 @@ export default function StaffingDayOffPage() {
               )}
             </div>
 
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="flex flex-nowrap shrink-0 items-center gap-2">
               <select
                 value={selectedDept}
                 onChange={(e) => setSelectedDept(e.target.value)}
                 disabled={!allowDepartmentSelect}
-                className={`border border-slate-300 rounded-xl px-4 py-2 text-sm ${
+                className={`min-w-0 max-w-[55%] lg:max-w-56 border border-slate-300 rounded-xl px-3 py-2 text-sm ${
                   allowDepartmentSelect
                     ? 'bg-white cursor-pointer'
                     : 'bg-slate-100 text-slate-600 cursor-not-allowed'
@@ -992,9 +675,11 @@ export default function StaffingDayOffPage() {
           </div>
         )}
 
+        {staffError && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{staffError}</p>}
+
         {/* Request form */}
         {canCreateRequest && (
-          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5">
+          <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-3">
             {isStaffRole && (
               <div
                 className={`mb-4 rounded-xl border px-4 py-3 text-xs font-semibold ${
@@ -1021,9 +706,11 @@ export default function StaffingDayOffPage() {
 
                 <select
                   value={selectedStaffId}
+                  disabled={staffLoading || staffList.length === 0}
                   onChange={(e) => setSelectedStaffId(e.target.value)}
                   className="mt-1 w-full border border-slate-300 rounded-xl px-3 py-2 bg-white"
                 >
+                  {!staffList.length && <option value="">{staffLoading ? 'กำลังโหลดรายชื่อ…' : staffError ? 'โหลดรายชื่อไม่สำเร็จ' : 'ไม่มีบุคลากรที่ใช้งานในหน่วยงานนี้'}</option>}
                   {staffList.map((staff) => (
                     <option key={staff.id} value={staff.id}>
                       {staff.full_name}

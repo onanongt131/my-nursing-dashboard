@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { AUDIT_COLUMNS, canApprove, canCreate, canRead, cleanText, currentUser, db, fail, isRecord, safeAnswers, unexpected, validDate, validDept, validForm, validateLRSubmission, validateSpecialUnitAnswers } from '@/lib/audits/chartServer';
+import { AUDIT_COLUMNS, canCreate, canRead, cleanText, currentUser, db, fail, isRecord, safeAnswers, unexpected, validDate, validDept, validForm, validateLRDraft } from '@/lib/audits/chartServer';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
     if (status) query = query.eq('status', status);
     const { data, error } = await query;
     if (error) return unexpected(error);
-    return NextResponse.json({ items: data ?? [], can_approve: dept ? canApprove(user, dept) : false, user_id: user.id }, { headers: { 'Cache-Control': 'no-store' } });
+    return NextResponse.json({ items: data ?? [] }, { headers: { 'Cache-Control': 'no-store' } });
   } catch (e) { return unexpected(e); }
 }
 
@@ -39,10 +39,9 @@ export async function POST(request: NextRequest) {
     const departmentId = body.department_id;
     if (!validDept(departmentId) || !validForm(body.form_type) || !validDate(body.audit_date) || !safeAnswers(body.answers)) return fail('รูปแบบข้อมูล Audit ไม่ถูกต้อง');
     if (body.form_type === 'lr') {
-      const issue = validateLRSubmission(body.answers as Record<string, unknown>);
+      const issue = validateLRDraft(body.answers as Record<string, unknown>);
       if (issue) return fail(issue);
     }
-    if (['dialysis','er','anesthesia','hbot'].includes(body.form_type)){const issue=validateSpecialUnitAnswers(body.form_type,body.answers as Record<string,unknown>,true);if(issue)return fail(issue);}
     if (!canCreate(user, departmentId)) return fail('ไม่มีสิทธิ์บันทึกหน่วยงานนี้', 403);
     // Confirm department exists. Do not trust department ID supplied by client.
     const { data: dept, error: de } = await db().from('departments').select('id').eq('id', departmentId).maybeSingle();
@@ -52,7 +51,7 @@ export async function POST(request: NextRequest) {
       form_version: cleanText(body.form_version, 32) ?? '1.0', audit_date: body.audit_date,
       audit_month: String(body.audit_date).slice(0, 7), reference_number: cleanText(body.reference_number, 100),
       auditor_name: cleanText(body.auditor_name, 200), answers: body.answers,
-      notes: cleanText(body.notes, 3000), status: ['lr','dialysis','er','anesthesia','hbot'].includes(body.form_type) ? 'pending' : 'draft', created_by: user.id,
+      notes: cleanText(body.notes, 3000), status: 'draft', created_by: user.id,
       // Scores deliberately NOT accepted from browser.
     };
     const { data, error } = await db().from('nso_special_audits').insert(payload).select(AUDIT_COLUMNS).single();

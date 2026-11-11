@@ -1,0 +1,1325 @@
+{
+  "ศัลยกรรมประสาท": {
+    "all": [
+      {
+        "year": 2567,
+        "days": 11729,
+        "cases": 38,
+        "rate": 3.24
+      },
+      {
+        "year": 2568,
+        "days": 13112,
+        "cases": 77,
+        "rate": 5.87
+      },
+      {
+        "year": 2569,
+        "days": 12867,
+        "cases": 60,
+        "rate": 4.663092
+      }
+    ],
+    "risk": [
+      {
+        "year": 2567,
+        "days": 7303,
+        "cases": 38,
+        "rate": 5.2
+      },
+      {
+        "year": 2568,
+        "days": 8109,
+        "cases": 77,
+        "rate": 9.5
+      },
+      {
+        "year": 2569,
+        "days": 7381,
+        "cases": 60,
+        "rate": 8
+      }
+    ]
+  },
+  "ศัลยกรรมกระดูก": {
+    "all": [
+      {
+        "year": 2567,
+        "days": 10182,
+        "cases": 10,
+        "rate": 0.98
+      },
+      {
+        "year": 2568,
+        "days": 10384,
+        "cases": 15,
+        "rate": 1.44
+      },
+      {
+        "year": 2569,
+        "days": 9974,
+        "cases": 10,
+        "rate": 1.002607
+      }
+    ],
+    "risk": [
+      {
+        "year": 2567,
+        "days": 1596,
+        "cases": 10,
+        "rate": 6.27
+      },
+      {
+        "year": 2568,
+        "days": 1429,
+        "cases": 15,
+        "rate": 10.5
+      },
+      {
+        "year": 2569,
+        "days": 1482,
+        "cases": 10,
+        "rate": 7
+      }
+    ]
+  },
+  "ศัลยกรรมชาย": {
+    "all": [
+      {
+        "year": 2567,
+        "days": 10188,
+        "cases": 1,
+        "rate": 0.1
+      },
+      {
+        "year": 2568,
+        "days": 10915,
+        "cases": 1,
+        "rate": 0.09
+      },
+      {
+        "year": 2569,
+        "days": 10826,
+        "cases": 8,
+        "rate": 0.738962
+      }
+    ],
+    "risk": [
+      {
+        "year": 2567,
+        "days": 2203,
+        "cases": 1,
+        "rate": 0.45
+      },
+      {
+        "year": 2568,
+        "days": 606,
+        "cases": 1,
+        "rate": 1.65
+      },
+      {
+        "year": 2569,
+        "days": 612,
+        "cases": 8,
+        "rate": 13
+      }
+    ]
+  },
+  "ศัลยกรรมหญิง": {
+    "all": [
+      {
+        "year": 2567,
+        "days": 8876,
+        "cases": 10,
+        "rate": 1.13
+      },
+      {
+        "year": 2568,
+        "days": 9756,
+        "cases": 4,
+        "rate": 0.41
+      },
+      {
+        "year": 2569,
+        "days": 9516,
+        "cases": 5,
+        "rate": 0.525431
+      }
+    ],
+    "risk": [
+      {
+        "year": 2567,
+        "days": 1347,
+        "cases": 10,
+        "rate": 7.42
+      },
+      {
+        "year": 2568,
+        "days": 1043,
+        "cases": 4,
+        "rate": 3.84
+      },
+      {
+        "year": 2569,
+        "days": 890,
+        "cases": 5,
+        "rate": 6
+      }
+    ]
+  },
+  "น้อมเกล้า 2": {
+    "all": [
+      {
+        "year": 2567,
+        "days": 3980,
+        "cases": 2,
+        "rate": 0.5
+      },
+      {
+        "year": 2568,
+        "days": 4024,
+        "cases": 4,
+        "rate": 0.99
+      },
+      {
+        "year": 2569,
+        "days": 3712,
+        "cases": 0,
+        "rate": 0
+      }
+    ],
+    "risk": [
+      {
+        "year": 2567,
+        "days": 531,
+        "cases": 2,
+        "rate": 3.77
+      },
+      {
+        "year": 2568,
+        "days": 685,
+        "cases": 4,
+        "rate": 5.84
+      },
+      {
+        "year": 2569,
+        "days": 642,
+        "cases": 0,
+        "rate": 0
+      }
+    ]
+  },
+  "น้อมเกล้า 3": {
+    "all": [
+      {
+        "year": 2567,
+        "days": 3920,
+        "cases": 3,
+        "rate": 0.77
+      },
+      {
+        "year": 2568,
+        "days": 3957,
+        "cases": 1,
+        "rate": 0.25
+      },
+      {
+        "year": 2569,
+        "days": 3729,
+        "cases": 0,
+        "rate": 0
+      }
+    ],
+    "risk": [
+      {
+        "year": 2567,
+        "days": 809,
+        "cases": 3,
+        "rate": 3.71
+      },
+      {
+        "year": 2568,
+        "days": 623,
+        "cases": 1,
+        "rate": 1.61
+      },
+      {
+        "year": 2569,
+        "days": 454,
+        "cases": 0,
+        "rate": 0
+      }
+    ]
+  },
+  "น้อมเกล้า 4": {
+    "all": [
+      {
+        "year": 2567,
+        "days": 3629,
+        "cases": 1,
+        "rate": 0.28
+      },
+      {
+        "year": 2568,
+        "days": 3334,
+        "cases": 0,
+        "rate": 0
+      },
+      {
+        "year": 2569,
+        "days": 3052,
+        "cases": 1,
+        "rate": 0.327654
+      }
+    ],
+    "risk": [
+      {
+        "year": 2567,
+        "days": 699,
+        "cases": 1,
+        "rate": 1.43
+      },
+      {
+        "year": 2568,
+        "days": 512,
+        "cases": 0,
+        "rate": 0
+      },
+      {
+        "year": 2569,
+        "days": 349,
+        "cases": 1,
+        "rate": 3
+      }
+    ]
+  },
+  "รส 200 ปีบน": {
+    "all": [
+      {
+        "year": 2567,
+        "days": 2469,
+        "cases": 3,
+        "rate": 1.22
+      },
+      {
+        "year": 2568,
+        "days": 1804,
+        "cases": 0,
+        "rate": 0
+      },
+      {
+        "year": 2569,
+        "days": 2123,
+        "cases": 1,
+        "rate": 0.471032
+      }
+    ],
+    "risk": [
+      {
+        "year": 2567,
+        "days": 711,
+        "cases": 3,
+        "rate": 4.22
+      },
+      {
+        "year": 2568,
+        "days": 328,
+        "cases": 0,
+        "rate": 0
+      },
+      {
+        "year": 2569,
+        "days": 47,
+        "cases": 1,
+        "rate": 21
+      }
+    ]
+  },
+  "รส 200 ปีล่าง": {
+    "all": [
+      {
+        "year": 2567,
+        "days": 2362,
+        "cases": 5,
+        "rate": 2.12
+      },
+      {
+        "year": 2568,
+        "days": 2106,
+        "cases": 1,
+        "rate": 0.47
+      },
+      {
+        "year": 2569,
+        "days": 2158,
+        "cases": 0,
+        "rate": 0
+      }
+    ],
+    "risk": [
+      {
+        "year": 2567,
+        "days": 269,
+        "cases": 5,
+        "rate": 18.59
+      },
+      {
+        "year": 2568,
+        "days": 108,
+        "cases": 1,
+        "rate": 9.26
+      },
+      {
+        "year": 2569,
+        "days": 453,
+        "cases": 0,
+        "rate": 0
+      }
+    ]
+  },
+  "สูติกรรมหลังคลอด": {
+    "all": [
+      {
+        "year": 2569,
+        "days": 6637,
+        "cases": 0,
+        "rate": 0
+      }
+    ],
+    "risk": []
+  },
+  "Sick newborn": {
+    "all": [
+      {
+        "year": 2567,
+        "days": 7104,
+        "cases": 0,
+        "rate": 0
+      },
+      {
+        "year": 2568,
+        "days": 8348,
+        "cases": 1,
+        "rate": 0.12
+      },
+      {
+        "year": 2569,
+        "days": 8373,
+        "cases": 0,
+        "rate": 0
+      }
+    ],
+    "risk": [
+      {
+        "year": 2567,
+        "days": 1417,
+        "cases": 0,
+        "rate": 0
+      },
+      {
+        "year": 2568,
+        "days": 1870,
+        "cases": 1,
+        "rate": 0.53
+      },
+      {
+        "year": 2569,
+        "days": 2166,
+        "cases": 0,
+        "rate": 0
+      }
+    ]
+  },
+  "กุมารเวชกรรม 1": {
+    "all": [
+      {
+        "year": 2567,
+        "days": 7791,
+        "cases": 2,
+        "rate": 0.26
+      },
+      {
+        "year": 2568,
+        "days": 7465,
+        "cases": 0,
+        "rate": 0
+      },
+      {
+        "year": 2569,
+        "days": 6171,
+        "cases": 0,
+        "rate": 0
+      }
+    ],
+    "risk": [
+      {
+        "year": 2567,
+        "days": 11,
+        "cases": 2,
+        "rate": 181.82
+      },
+      {
+        "year": 2568,
+        "days": 12,
+        "cases": 0,
+        "rate": 0
+      },
+      {
+        "year": 2569,
+        "days": 78,
+        "cases": 0,
+        "rate": 0
+      }
+    ]
+  },
+  "กุมารเวชกรรม 2": {
+    "all": [
+      {
+        "year": 2567,
+        "days": 6245,
+        "cases": 0,
+        "rate": 0
+      },
+      {
+        "year": 2568,
+        "days": 6761,
+        "cases": 0,
+        "rate": 0
+      },
+      {
+        "year": 2569,
+        "days": 7121,
+        "cases": 0,
+        "rate": 0
+      }
+    ],
+    "risk": [
+      {
+        "year": 2568,
+        "days": 38,
+        "cases": 0,
+        "rate": 0
+      }
+    ]
+  },
+  "นรีเวชกรรม": {
+    "all": [
+      {
+        "year": 2567,
+        "days": 5813,
+        "cases": 0,
+        "rate": 0
+      },
+      {
+        "year": 2568,
+        "days": 6271,
+        "cases": 0,
+        "rate": 0
+      },
+      {
+        "year": 2569,
+        "days": 6777,
+        "cases": 7,
+        "rate": 1.032905
+      }
+    ],
+    "risk": [
+      {
+        "year": 2567,
+        "days": 203,
+        "cases": 0,
+        "rate": 0
+      },
+      {
+        "year": 2568,
+        "days": 227,
+        "cases": 0,
+        "rate": 0
+      },
+      {
+        "year": 2569,
+        "days": 410,
+        "cases": 7,
+        "rate": 17
+      }
+    ]
+  },
+  "หลวงพ่อแช่มชั้น 2": {
+    "all": [
+      {
+        "year": 2567,
+        "days": 4423,
+        "cases": 0,
+        "rate": 0
+      },
+      {
+        "year": 2568,
+        "days": 3853,
+        "cases": 4,
+        "rate": 1.04
+      },
+      {
+        "year": 2569,
+        "days": 3502,
+        "cases": 1,
+        "rate": 0.285551
+      }
+    ],
+    "risk": [
+      {
+        "year": 2567,
+        "days": 246,
+        "cases": 0,
+        "rate": 0
+      },
+      {
+        "year": 2568,
+        "days": 92,
+        "cases": 4,
+        "rate": 43.48
+      },
+      {
+        "year": 2569,
+        "days": 110,
+        "cases": 1,
+        "rate": 9
+      }
+    ]
+  },
+  "หลวงพ่อแช่มชั้น 3": {
+    "all": [
+      {
+        "year": 2567,
+        "days": 4430,
+        "cases": 1,
+        "rate": 0.23
+      },
+      {
+        "year": 2568,
+        "days": 3979,
+        "cases": 0,
+        "rate": 0
+      },
+      {
+        "year": 2569,
+        "days": 3870,
+        "cases": 0,
+        "rate": 0
+      }
+    ],
+    "risk": [
+      {
+        "year": 2567,
+        "days": 379,
+        "cases": 1,
+        "rate": 2.64
+      },
+      {
+        "year": 2568,
+        "days": 337,
+        "cases": 0,
+        "rate": 0
+      },
+      {
+        "year": 2569,
+        "days": 389,
+        "cases": 0,
+        "rate": 0
+      }
+    ]
+  },
+  "หลวงพ่อแช่มชั้น 4": {
+    "all": [
+      {
+        "year": 2567,
+        "days": 4598,
+        "cases": 0,
+        "rate": 0
+      },
+      {
+        "year": 2568,
+        "days": 4471,
+        "cases": 0,
+        "rate": 0
+      },
+      {
+        "year": 2569,
+        "days": 3982,
+        "cases": 0,
+        "rate": 0
+      }
+    ],
+    "risk": [
+      {
+        "year": 2567,
+        "days": 351,
+        "cases": 0,
+        "rate": 0
+      },
+      {
+        "year": 2568,
+        "days": 1007,
+        "cases": 0,
+        "rate": 0
+      },
+      {
+        "year": 2569,
+        "days": 1422,
+        "cases": 0,
+        "rate": 0
+      }
+    ]
+  },
+  "Stroke unit": {
+    "all": [
+      {
+        "year": 2567,
+        "days": 1821,
+        "cases": 0,
+        "rate": 0
+      },
+      {
+        "year": 2568,
+        "days": 1749,
+        "cases": 3,
+        "rate": 1.72
+      },
+      {
+        "year": 2569,
+        "days": 1717,
+        "cases": 1,
+        "rate": 0.582411
+      }
+    ],
+    "risk": [
+      {
+        "year": 2567,
+        "days": 637,
+        "cases": 0,
+        "rate": 0
+      },
+      {
+        "year": 2568,
+        "days": 662,
+        "cases": 3,
+        "rate": 4.53
+      },
+      {
+        "year": 2569,
+        "days": 570,
+        "cases": 1,
+        "rate": 2
+      }
+    ]
+  },
+  "รติพัฒน์": {
+    "all": [
+      {
+        "year": 2567,
+        "days": 2588,
+        "cases": 1,
+        "rate": 0.39
+      },
+      {
+        "year": 2568,
+        "days": 2477,
+        "cases": 2,
+        "rate": 0.81
+      },
+      {
+        "year": 2569,
+        "days": 1963,
+        "cases": 1,
+        "rate": 0.509424
+      }
+    ],
+    "risk": [
+      {
+        "year": 2567,
+        "days": 14,
+        "cases": 1,
+        "rate": 71.43
+      },
+      {
+        "year": 2568,
+        "days": 17,
+        "cases": 2,
+        "rate": 117.65
+      },
+      {
+        "year": 2569,
+        "days": 50,
+        "cases": 1,
+        "rate": 20
+      }
+    ]
+  },
+  "EENT": {
+    "all": [
+      {
+        "year": 2567,
+        "days": 8637,
+        "cases": 5,
+        "rate": 0.58
+      },
+      {
+        "year": 2568,
+        "days": 5599,
+        "cases": 0,
+        "rate": 0
+      },
+      {
+        "year": 2569,
+        "days": 5319,
+        "cases": 2,
+        "rate": 0.376011
+      }
+    ],
+    "risk": [
+      {
+        "year": 2567,
+        "days": 244,
+        "cases": 5,
+        "rate": 20.49
+      },
+      {
+        "year": 2568,
+        "days": 452,
+        "cases": 0,
+        "rate": 0
+      },
+      {
+        "year": 2569,
+        "days": 411,
+        "cases": 2,
+        "rate": 5
+      }
+    ]
+  },
+  "อายุรกรรม 3": {
+    "all": [
+      {
+        "year": 2569,
+        "days": 2827,
+        "cases": 10,
+        "rate": 3.537319
+      }
+    ],
+    "risk": [
+      {
+        "year": 2569,
+        "days": 575,
+        "cases": 10,
+        "rate": 17.391304
+      }
+    ]
+  },
+  "อายุรกรรม 7": {
+    "all": [
+      {
+        "year": 2569,
+        "days": 1108,
+        "cases": 1,
+        "rate": 0.902527
+      }
+    ],
+    "risk": [
+      {
+        "year": 2567,
+        "days": 1766,
+        "cases": 8,
+        "rate": 4.53
+      },
+      {
+        "year": 2568,
+        "days": 1325,
+        "cases": 7,
+        "rate": 5.28
+      },
+      {
+        "year": 2569,
+        "days": 230,
+        "cases": 1,
+        "rate": 4
+      }
+    ]
+  },
+  "พิเศษอายุรกรรม 7": {
+    "all": [
+      {
+        "year": 2569,
+        "days": 519,
+        "cases": 0,
+        "rate": 0
+      }
+    ]
+  },
+  "SICU": {
+    "all": [
+      {
+        "year": 2567,
+        "days": 2276,
+        "cases": 9,
+        "rate": 3.95
+      },
+      {
+        "year": 2568,
+        "days": 2475,
+        "cases": 14,
+        "rate": 6.06
+      },
+      {
+        "year": 2569,
+        "days": 2073,
+        "cases": 7,
+        "rate": 3.376749
+      }
+    ],
+    "risk": [
+      {
+        "year": 2567,
+        "days": 2274,
+        "cases": 9,
+        "rate": 3.96
+      },
+      {
+        "year": 2568,
+        "days": 2298,
+        "cases": 14,
+        "rate": 6.09
+      },
+      {
+        "year": 2569,
+        "days": 1022,
+        "cases": 7,
+        "rate": 7
+      }
+    ]
+  },
+  "MICU": {
+    "all": [
+      {
+        "year": 2567,
+        "days": 3133,
+        "cases": 58,
+        "rate": 18.51
+      },
+      {
+        "year": 2568,
+        "days": 3088,
+        "cases": 32,
+        "rate": 10.36
+      },
+      {
+        "year": 2569,
+        "days": 3224,
+        "cases": 35,
+        "rate": 10.856079
+      }
+    ],
+    "risk": [
+      {
+        "year": 2567,
+        "days": 3133,
+        "cases": 58,
+        "rate": 18.51
+      },
+      {
+        "year": 2568,
+        "days": 3088,
+        "cases": 32,
+        "rate": 10.36
+      },
+      {
+        "year": 2569,
+        "days": 3224,
+        "cases": 35,
+        "rate": 11
+      }
+    ]
+  },
+  "CCU": {
+    "all": [
+      {
+        "year": 2567,
+        "days": 2350,
+        "cases": 8,
+        "rate": 3.4
+      },
+      {
+        "year": 2568,
+        "days": 2395,
+        "cases": 7,
+        "rate": 2.92
+      },
+      {
+        "year": 2569,
+        "days": 2455,
+        "cases": 22,
+        "rate": 8.961303
+      }
+    ],
+    "risk": [
+      {
+        "year": 2567,
+        "days": 1766,
+        "cases": 8,
+        "rate": 4.53
+      },
+      {
+        "year": 2568,
+        "days": 1325,
+        "cases": 7,
+        "rate": 5.28
+      },
+      {
+        "year": 2569,
+        "days": 1488,
+        "cases": 22,
+        "rate": 15
+      }
+    ]
+  },
+  "RCU": {
+    "all": [
+      {
+        "year": 2567,
+        "days": 4689,
+        "cases": 58,
+        "rate": 12.37
+      },
+      {
+        "year": 2568,
+        "days": 4438,
+        "cases": 45,
+        "rate": 10.14
+      },
+      {
+        "year": 2569,
+        "days": 4724,
+        "cases": 88,
+        "rate": 18.628281
+      }
+    ],
+    "risk": [
+      {
+        "year": 2567,
+        "days": 4493,
+        "cases": 58,
+        "rate": 12.91
+      },
+      {
+        "year": 2568,
+        "days": 4218,
+        "cases": 45,
+        "rate": 10.67
+      },
+      {
+        "year": 2569,
+        "days": 4464,
+        "cases": 88,
+        "rate": 20
+      }
+    ]
+  },
+  "NICU": {
+    "all": [
+      {
+        "year": 2567,
+        "days": 4339,
+        "cases": 9,
+        "rate": 2.07
+      },
+      {
+        "year": 2568,
+        "days": 4521,
+        "cases": 6,
+        "rate": 1.33
+      },
+      {
+        "year": 2569,
+        "days": 3619,
+        "cases": 4,
+        "rate": 1.105278
+      }
+    ],
+    "risk": [
+      {
+        "year": 2567,
+        "days": 1815,
+        "cases": 9,
+        "rate": 4.96
+      },
+      {
+        "year": 2568,
+        "days": 1450,
+        "cases": 6,
+        "rate": 4.14
+      },
+      {
+        "year": 2569,
+        "days": 1335,
+        "cases": 4,
+        "rate": 3
+      }
+    ]
+  },
+  "PICU": {
+    "all": [
+      {
+        "year": 2567,
+        "days": 1946,
+        "cases": 1,
+        "rate": 0.51
+      },
+      {
+        "year": 2568,
+        "days": 1686,
+        "cases": 4,
+        "rate": 2.37
+      },
+      {
+        "year": 2569,
+        "days": 1472,
+        "cases": 5,
+        "rate": 3.396739
+      }
+    ],
+    "risk": [
+      {
+        "year": 2567,
+        "days": 1803,
+        "cases": 1,
+        "rate": 0.55
+      },
+      {
+        "year": 2568,
+        "days": 1557,
+        "cases": 4,
+        "rate": 2.57
+      },
+      {
+        "year": 2569,
+        "days": 1380,
+        "cases": 5,
+        "rate": 4
+      }
+    ]
+  },
+  "ICCU": {
+    "all": [
+      {
+        "year": 2567,
+        "days": 2899,
+        "cases": 7,
+        "rate": 2.41
+      },
+      {
+        "year": 2568,
+        "days": 2917,
+        "cases": 0,
+        "rate": 0
+      },
+      {
+        "year": 2569,
+        "days": 3046,
+        "cases": 10,
+        "rate": 3.282994
+      }
+    ],
+    "risk": [
+      {
+        "year": 2567,
+        "days": 815,
+        "cases": 7,
+        "rate": 8.59
+      },
+      {
+        "year": 2568,
+        "days": 891,
+        "cases": 0,
+        "rate": 0
+      },
+      {
+        "year": 2569,
+        "days": 993,
+        "cases": 10,
+        "rate": 10
+      }
+    ]
+  },
+  "อายุรกรรม 4": {
+    "all": [
+      {
+        "year": 2569,
+        "days": 11757,
+        "cases": 54,
+        "rate": 4.593008
+      }
+    ],
+    "risk": [
+      {
+        "year": 2569,
+        "days": 4526,
+        "cases": 54,
+        "rate": 12
+      }
+    ]
+  },
+  "อายุรกรรม 5": {
+    "all": [
+      {
+        "year": 2569,
+        "days": 14333,
+        "cases": 25,
+        "rate": 1.744227
+      }
+    ],
+    "risk": [
+      {
+        "year": 2569,
+        "days": 4456,
+        "cases": 25,
+        "rate": 6
+      }
+    ]
+  },
+  "อายุรกรรม 6": {
+    "all": [
+      {
+        "year": 2569,
+        "days": 8453,
+        "cases": 7,
+        "rate": 0.828108
+      }
+    ],
+    "risk": [
+      {
+        "year": 2569,
+        "days": 3552,
+        "cases": 7,
+        "rate": 7
+      }
+    ]
+  },
+  "อายุรกรรม 2": {
+    "all": [
+      {
+        "year": 2567,
+        "days": 5339,
+        "cases": 21,
+        "rate": 3.93
+      },
+      {
+        "year": 2568,
+        "days": 5390,
+        "cases": 38,
+        "rate": 7.05
+      },
+      {
+        "year": 2569,
+        "days": 10863,
+        "cases": 15,
+        "rate": 1.380834
+      }
+    ],
+    "risk": [
+      {
+        "year": 2567,
+        "days": 2893,
+        "cases": 21,
+        "rate": 7.26
+      },
+      {
+        "year": 2568,
+        "days": 2541,
+        "cases": 38,
+        "rate": 14.95
+      },
+      {
+        "year": 2569,
+        "days": 3196,
+        "cases": 15,
+        "rate": 5
+      }
+    ]
+  },
+  "สงฆ์อาพาธ": {
+    "all": [
+      {
+        "year": 2567,
+        "days": 2499,
+        "cases": 4,
+        "rate": 1.6
+      },
+      {
+        "year": 2568,
+        "days": 2342,
+        "cases": 3,
+        "rate": 1.28
+      },
+      {
+        "year": 2569,
+        "days": 2875,
+        "cases": 0,
+        "rate": 0
+      }
+    ],
+    "risk": [
+      {
+        "year": 2567,
+        "days": 318,
+        "cases": 4,
+        "rate": 12.58
+      },
+      {
+        "year": 2568,
+        "days": 364,
+        "cases": 3,
+        "rate": 8.24
+      },
+      {
+        "year": 2569,
+        "days": 380,
+        "cases": 0,
+        "rate": 0
+      }
+    ]
+  },
+  "พิเศษอายุรกรรม 5": {
+    "all": [
+      {
+        "year": 2569,
+        "days": 508,
+        "cases": 1,
+        "rate": 1.968504
+      }
+    ],
+    "risk": [
+      {
+        "year": 2569,
+        "days": 141,
+        "cases": 1,
+        "rate": 7.092199
+      }
+    ]
+  },
+  "พิเศษอายุรกรรม 6": {
+    "all": [
+      {
+        "year": 2569,
+        "days": 803,
+        "cases": 0,
+        "rate": 0.0
+      }
+    ],
+    "risk": [
+      {
+        "year": 2569,
+        "days": 121,
+        "cases": 0,
+        "rate": 0.0
+      }
+    ]
+  }
+}

@@ -71,7 +71,12 @@ export default function SingleDepartmentPage() {
   const [userDepartmentId, setUserDepartmentId] = useState<number | string>(0);
   const [allPendingRows, setAllPendingRows] = useState<any[]>([]);
   const [specialAuditCounts, setSpecialAuditCounts] = useState({pending:0,total:0});
-  const [pendingLoading, setPendingLoading] = useState(false);
+  const [pendingLoading, setPendingLoading] = useState(false); // ใช้กับการโหลดจำนวนเท่านั้น
+  const [pendingCountError, setPendingCountError] = useState('');
+  const [pendingDetailsLoading, setPendingDetailsLoading] = useState(false);
+  const [pendingRevision, setPendingRevision] = useState(0);
+  const pendingCountSeq = useRef(0);
+  const pendingDetailsSeq = useRef(0);
   // โหลดประวัติ 11 ตารางเฉพาะเมื่อต้องใช้ (ไม่โหลดทันทีที่เปิด Dashboard/P4P)
   const [monthlyLoadedDept, setMonthlyLoadedDept] = useState<string>('');
   const [monthlyLoading, setMonthlyLoading] = useState(false);
@@ -80,6 +85,7 @@ export default function SingleDepartmentPage() {
 
   const [showPendingTable, setShowPendingTable] = useState(false);
   const [showEditorModal, setShowEditorModal] = useState(false);
+  const [pendingCount, setPendingCount] = useState<number | null>(null);
 
   const [detailModalData, setDetailModalData] = useState<{
     kpi: any;
@@ -104,7 +110,7 @@ export default function SingleDepartmentPage() {
     status?: string;
   } | null>(null);
 
-  useEffect(()=>{setActiveTab('dashboard');setActiveModal(null);setDepartmentData(null);setMappingWarning('');setAllPendingRows([]);setReadmitLoadError('');setPendingLoadError('');setMonthlyLoadedDept('');setMonthlyFailedKeys([]);setMonthlyLoading(false);monthlyRequestRef.current=null;setMonthlyRecords(previous=>Object.fromEntries(Object.keys(previous).map(key=>[key,[]])));},[deptId]);
+  useEffect(()=>{setActiveTab('dashboard');setActiveModal(null);setDepartmentData(null);setMappingWarning('');setAllPendingRows([]);setReadmitLoadError('');setPendingLoadError('');setPendingCount(null);setPendingCountError('');setShowPendingTable(false);setMonthlyLoadedDept('');setMonthlyFailedKeys([]);setMonthlyLoading(false);monthlyRequestRef.current=null;setMonthlyRecords(previous=>Object.fromEntries(Object.keys(previous).map(key=>[key,[]])));},[deptId]);
   const supabase = useMemo(() => createClient(), []);
 
   const fetchUserPermissions = useCallback(async () => {
@@ -180,9 +186,34 @@ export default function SingleDepartmentPage() {
     return 'ตรวจสอบสถานะการส่งข้อมูลแล้ว';
   };
 
+  const fetchPendingCount = useCallback(async (targetDeptId:string|number) => {
+    const id=String(targetDeptId);
+    const seq=++pendingCountSeq.current;
+    setPendingLoading(true);
+    setPendingCountError('');
+    try {
+      const q=new URLSearchParams({department_id:id,mode:'pending-count'});
+      const response=await fetch('/api/department-records?'+q.toString(),{cache:'no-store'});
+      const payload=await response.json();
+      if(!response.ok)throw new Error(payload.error||'อ่านยอดรออนุมัติไม่สำเร็จ');
+      if(!Number.isSafeInteger(payload.total)||payload.total<0)throw new Error('รูปแบบยอดรออนุมัติไม่ถูกต้อง');
+      if(id!==String(activeDepartment.current)||seq!==pendingCountSeq.current)return;
+      setPendingCount(payload.total);
+    }catch(e){
+      if(id===String(activeDepartment.current)&&seq===pendingCountSeq.current){
+        setPendingCount(null);
+        setPendingCountError(e instanceof Error?e.message:'อ่านยอดรออนุมัติไม่สำเร็จ');
+      }
+    }finally{
+      if(id===String(activeDepartment.current)&&seq===pendingCountSeq.current)setPendingLoading(false);
+    }
+  },[]);
+
   const fetchPendingApproval = useCallback(async (targetDeptId:string|number) => {
     const id = String(targetDeptId);
-    setPendingLoading(true);
+    const seq=++pendingDetailsSeq.current;
+    setPendingDetailsLoading(true);
+    setPendingLoadError('');
     try {
       // 1 Vercel invocation แทน 11 requests แบบเดิม
       const q = new URLSearchParams({department_id:id,mode:'pending-batch'});
@@ -190,7 +221,7 @@ export default function SingleDepartmentPage() {
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error || 'อ่านรายการรออนุมัติไม่สำเร็จ');
       if (!Array.isArray(payload.results)) throw new Error('ผลรายการรออนุมัติไม่ถูกต้อง');
-      if (id !== String(activeDepartment.current)) return;
+      if (id !== String(activeDepartment.current) || seq !== pendingDetailsSeq.current) return;
 
       const results: Array<{table:string;items:any[]|null;error:string}> = payload.results;
       const failures = results.filter(r => r.error || !Array.isArray(r.items));
@@ -226,11 +257,11 @@ export default function SingleDepartmentPage() {
       ]);
       setPendingLoadError(failures.map(r => r.error || `อ่าน ${r.table} ไม่สำเร็จ`).join(' • '));
     } catch (e) {
-      if (id === String(activeDepartment.current)) {
+      if (id === String(activeDepartment.current) && seq === pendingDetailsSeq.current) {
         setPendingLoadError(e instanceof Error ? e.message : 'อ่านรายการรออนุมัติไม่สำเร็จ');
       }
     } finally {
-      if (id === String(activeDepartment.current)) setPendingLoading(false);
+      if (id === String(activeDepartment.current) && seq === pendingDetailsSeq.current) setPendingDetailsLoading(false);
     }
   }, []);
 
@@ -239,16 +270,24 @@ export default function SingleDepartmentPage() {
     fetchDepartmentData();
   }, [fetchUserPermissions, fetchDepartmentData]);
 
+  // เปิดหน้าโหลดเฉพาะยอด จำนวนเล็ก ๆ จาก RPC
   useEffect(() => {
-    if (deptId) void fetchPendingApproval(deptId);
-  }, [deptId, fetchPendingApproval]);
+    if(deptId)void fetchPendingCount(deptId);
+  },[deptId,pendingRevision,fetchPendingCount]);
+
+  // รายการจริงโหลดเมื่อผู้ใช้เปิดแผงตรวจสอบเท่านั้น
+  useEffect(() => {
+    if(deptId&&showPendingTable)void fetchPendingApproval(deptId);
+  },[deptId,showPendingTable,pendingRevision,fetchPendingApproval]);
+
+  const refreshPendingApproval=()=>setPendingRevision(v=>v+1);
 
   useEffect(() => {
     // ประวัติจำนวนมากโหลดเมื่อเปิด KPI หรือฟอร์มกรอกข้อมูลที่ใช้สถานะย้อนหลัง
-    if (deptId && (activeTab === 'kpi' || activeModal !== null)) {
+    if (deptId && ((activeTab === 'kpi' && !showPendingTable) || activeModal !== null)) {
       void fetchMonthlyRecords(deptId);
     }
-  }, [deptId, activeTab, activeModal, fetchMonthlyRecords]);
+  }, [deptId, activeTab, activeModal, showPendingTable, fetchMonthlyRecords]);
 
   const hasSubmittedPreviousMonth = (records: any[]) => {
     if (!Array.isArray(records)) return false;
@@ -277,7 +316,7 @@ export default function SingleDepartmentPage() {
     return 'stable';
   };
 
-  const totalPendingCount = (allPendingRows.reduce((sum, batch: any) => sum + (batch.items?.length || 0), 0) + specialAuditCounts.pending) + pressureSoreCounts.pending;
+  const totalPendingCount = (pendingCount ?? 0) + specialAuditCounts.pending + pressureSoreCounts.pending;
 
   const canAccessDepartment = () => {
     if (userRole === 'admin') return true;
@@ -377,15 +416,15 @@ export default function SingleDepartmentPage() {
               <PrinterIcon className="w-4 h-4" /> พิมพ์รายงาน
             </button>
             <button
-              onClick={() => { if(totalPendingCount > 0 || (specialAuditCounts.total + pressureSoreCounts.total) > 0){setActiveTab('kpi');setShowPendingTable(true);} }}
+              onClick={() => {setActiveTab('kpi');setShowPendingTable(true);}}
               className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all ${
-                (totalPendingCount > 0 || (specialAuditCounts.total + pressureSoreCounts.total) > 0)
+                (totalPendingCount > 0 || pendingCountError || (specialAuditCounts.total + pressureSoreCounts.total) > 0)
                   ? 'bg-red-500 text-white hover:bg-red-600 cursor-pointer animate-bounce'
                   : 'bg-slate-800 text-slate-400 cursor-not-allowed opacity-60'
               }`}
-              disabled={totalPendingCount === 0 && (specialAuditCounts.total + pressureSoreCounts.total) === 0}
+              disabled={pendingLoading}
             >
-              <span>รออนุมัติ ({pendingLoading?'กำลังโหลด…':pendingLoadError?'อ่านไม่ครบ':totalPendingCount})</span>
+              <span>รออนุมัติ ({pendingLoading?'กำลังตรวจ…':pendingCountError?'ตรวจไม่สำเร็จ':totalPendingCount})</span>
             </button>
           </div>
         </div>
@@ -462,7 +501,8 @@ export default function SingleDepartmentPage() {
 
       {mappingWarning&&<p role="alert" className="rounded-xl bg-amber-50 p-3 text-sm text-amber-900">{mappingWarning}</p>}
       {departmentLoadError&&<p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-800">{departmentLoadError}</p>}
-      {pendingLoadError&&<p role="alert" className="mb-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">อ่านรายการรออนุมัติไม่ครบ • {pendingLoadError} <button type="button" className="ml-2 underline" disabled={pendingLoading} onClick={()=>fetchPendingApproval(deptId)}>ลองโหลดใหม่</button></p>}
+      {pendingCountError&&<p role="alert" className="mb-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">อ่านยอดรออนุมัติไม่สำเร็จ • {pendingCountError} <button type="button" className="ml-2 underline" disabled={pendingLoading} onClick={()=>fetchPendingCount(deptId)}>ลองโหลดใหม่</button></p>}
+      {pendingLoadError&&<p role="alert" className="mb-3 rounded-xl border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">อ่านรายการรออนุมัติไม่ครบ • {pendingLoadError} <button type="button" className="ml-2 underline" disabled={pendingDetailsLoading} onClick={()=>fetchPendingApproval(deptId)}>ลองโหลดใหม่</button></p>}
       {readmitLoadError&&<p role="alert" className="mb-3 rounded-xl bg-red-50 p-3 text-sm text-red-800">{readmitLoadError}</p>}
       {/* แถบสลับ Tab เมนู (ระหว่างตัวชี้วัด และ สถิติหอผู้ป่วย) */}
       <div className="flex flex-wrap border-b border-slate-200 gap-6 print:hidden">
@@ -530,7 +570,8 @@ export default function SingleDepartmentPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {allPendingRows.map((batch: any, index: number) => (
+                      {pendingDetailsLoading && <tr><td colSpan={6} className="p-3 text-slate-600">กำลังโหลดรายละเอียดรออนุมัติ…</td></tr>}
+                      {!pendingDetailsLoading && allPendingRows.map((batch: any, index: number) => (
                         <tr key={index} className="hover:bg-slate-50">
                           <td className="p-3 font-bold text-slate-800 uppercase">{batch.type}</td>
                           <td className="p-3 font-semibold text-slate-700">{batch.audit_month}</td>
@@ -830,7 +871,7 @@ export default function SingleDepartmentPage() {
           canApprove={canApprove}
           onApprove={() => {
             setViewingBatchGroup(null);
-            fetchPendingApproval(deptId);
+            refreshPendingApproval();
             fetchMonthlyRecords(deptId,true);
           }}
         />
@@ -847,18 +888,18 @@ export default function SingleDepartmentPage() {
           supabase={supabase}
           onSuccess={() => {
             setActiveModal(null);
-            fetchPendingApproval(deptId);
+            refreshPendingApproval();
             fetchMonthlyRecords(deptId,true);
           }}
         />
       )}
 
       <PressureSoreModal isOpen={pressureSoreOpen && departmentData?.pressure_sore_enabled === true} onClose={()=>setPressureSoreOpen(false)} departmentId={deptId} departmentName={departmentData?.Department} />
-<UnitWpQaModal isOpen={activeModal === 'wp_qa'} onClose={() => setActiveModal(null)} departmentId={deptId} departmentName={departmentData?.Department} supabase={supabase} onSuccess={() => { fetchDepartmentData(); fetchPendingApproval(deptId); fetchMonthlyRecords(deptId,true); }} />
-      <IvCareModal isOpen={activeModal === 'iv_care'} onClose={() => setActiveModal(null)} departmentId={deptId} departmentName={departmentData?.Department} supabase={supabase} onSuccess={() => { fetchDepartmentData(); fetchPendingApproval(deptId); fetchMonthlyRecords(deptId,true); }} />
-      <FallCareModal isOpen={activeModal === 'fall'} onClose={() => setActiveModal(null)} departmentId={deptId} departmentName={departmentData?.Department} supabase={supabase} onSuccess={() => { fetchDepartmentData(); fetchPendingApproval(deptId); fetchMonthlyRecords(deptId,true); }} />
-      <ReadmitModal isOpen={activeModal === 'readmit'} onClose={() => setActiveModal(null)} departmentId={deptId} departmentName={departmentData?.Department} supabase={supabase} onSuccess={() => { fetchDepartmentData(); fetchPendingApproval(deptId); fetchMonthlyRecords(deptId,true); }} />
-      <AgainstMedicalAdviceModal isOpen={activeModal === 'ama'} onClose={() => setActiveModal(null)} departmentId={deptId} departmentName={departmentData?.Department} supabase={supabase} onSuccess={() => { fetchDepartmentData(); fetchPendingApproval(deptId); fetchMonthlyRecords(deptId,true); }} />
+<UnitWpQaModal isOpen={activeModal === 'wp_qa'} onClose={() => setActiveModal(null)} departmentId={deptId} departmentName={departmentData?.Department} supabase={supabase} onSuccess={() => { fetchDepartmentData(); refreshPendingApproval(); fetchMonthlyRecords(deptId,true); }} />
+      <IvCareModal isOpen={activeModal === 'iv_care'} onClose={() => setActiveModal(null)} departmentId={deptId} departmentName={departmentData?.Department} supabase={supabase} onSuccess={() => { fetchDepartmentData(); refreshPendingApproval(); fetchMonthlyRecords(deptId,true); }} />
+      <FallCareModal isOpen={activeModal === 'fall'} onClose={() => setActiveModal(null)} departmentId={deptId} departmentName={departmentData?.Department} supabase={supabase} onSuccess={() => { fetchDepartmentData(); refreshPendingApproval(); fetchMonthlyRecords(deptId,true); }} />
+      <ReadmitModal isOpen={activeModal === 'readmit'} onClose={() => setActiveModal(null)} departmentId={deptId} departmentName={departmentData?.Department} supabase={supabase} onSuccess={() => { fetchDepartmentData(); refreshPendingApproval(); fetchMonthlyRecords(deptId,true); }} />
+      <AgainstMedicalAdviceModal isOpen={activeModal === 'ama'} onClose={() => setActiveModal(null)} departmentId={deptId} departmentName={departmentData?.Department} supabase={supabase} onSuccess={() => { fetchDepartmentData(); refreshPendingApproval(); fetchMonthlyRecords(deptId,true); }} />
     </div>
   );
 }

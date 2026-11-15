@@ -70,7 +70,7 @@ export async function GET(request: NextRequest) {
 
     if (
       !Number.isSafeInteger(departmentId) || departmentId < 1 ||
-      !['', 'context', 'pending-batch'].includes(mode) ||
+      !['', 'context', 'pending-count', 'pending-batch'].includes(mode) ||
       (mode === '' && !tables.includes(table as typeof tables[number])) ||
       !Number.isSafeInteger(offset) || offset < 0 || offset > 1000000
     ) return fail('คำขออ่านรายการไม่ถูกต้อง');
@@ -82,6 +82,23 @@ export async function GET(request: NextRequest) {
         { role: user.role, departmentId: user.departmentId, canApprove: canApprove(user, departmentId) },
         { headers: noStore },
       );
+    }
+
+    if (mode === 'pending-count') {
+      // Aggregate in PostgreSQL: one small response, no patient rows transferred.
+      // The RPC must be installed using the included SQL migration first.
+      const { data, error } = await db().rpc('nso_pending_review_counts', {
+        p_department_id: departmentId,
+      });
+      if (error || !data || typeof data !== 'object' || Array.isArray(data)) {
+        return fail('อ่านยอดรายการรออนุมัติไม่สำเร็จ กรุณาตรวจสอบ SQL RPC', 503);
+      }
+      const payload = data as { total?: unknown; counts?: unknown };
+      if (!Number.isSafeInteger(payload.total) || Number(payload.total) < 0 ||
+          !Array.isArray(payload.counts)) {
+        return fail('รูปแบบยอดรออนุมัติไม่ถูกต้อง', 503);
+      }
+      return Response.json({ total: payload.total, counts: payload.counts }, { headers: noStore });
     }
 
     if (mode === 'pending-batch') {

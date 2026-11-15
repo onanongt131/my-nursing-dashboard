@@ -142,7 +142,7 @@ export default function SingleDepartmentPage() {
     const task=(async()=>{
       const results=await loadRecordTables(RECORD_TABLES,table=>readDepartmentRecords(table,id));
       // ป้องกันคำขอเก่าทับข้อมูลหน่วยงานใหม่ หรือทับการ Refresh หลังบันทึก
-      if (String(activeDepartment.current) !== id) return;
+      if(String(activeDepartment.current)!==id)return;
       const failures=results.filter(r=>r.error),map:Record<string,any[]>={};
       results.forEach(r=>{if(r.items)map[r.key]=[...(map[r.key]||[]),...r.items];});
       failures.forEach(r=>{delete map[r.key];});
@@ -181,24 +181,57 @@ export default function SingleDepartmentPage() {
   };
 
   const fetchPendingApproval = useCallback(async (targetDeptId:string|number) => {
+    const id = String(targetDeptId);
     setPendingLoading(true);
     try {
-      const results=await loadRecordTables(RECORD_TABLES,table=>readDepartmentRecords(table,targetDeptId,true));
-      if(String(targetDeptId)!==String(activeDepartment.current))return;
-      const failures=results.filter(r=>r.error),failedTables=new Set(failures.map(r=>r.name)),batches:any[]=[];
-      results.forEach(r=>{
-        if(!r.items)return;
-        const grouped:Record<string,any>={};
-        r.items.filter((item:any)=>requiresReview(item)).forEach((item:any)=>{
-          const month=String(reviewMonth(item)||item.created_at||'').slice(0,7)||'ไม่ระบุเดือน';
-          const batchKey=r.key+'_'+month;
-          grouped[batchKey] ||= {type:r.key,audit_month:month,auditor_name:item.auditor_name||item.evaluator||item.staff_name||item.recorded_by||'-',items:[]};
-          grouped[batchKey].items.push({...item,source_table:r.name});
-        });batches.push(...Object.values(grouped));
+      // 1 Vercel invocation แทน 11 requests แบบเดิม
+      const q = new URLSearchParams({department_id:id,mode:'pending-batch'});
+      const response = await fetch('/api/department-records?' + q.toString(), {cache:'no-store'});
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.error || 'อ่านรายการรออนุมัติไม่สำเร็จ');
+      if (!Array.isArray(payload.results)) throw new Error('ผลรายการรออนุมัติไม่ถูกต้อง');
+      if (id !== String(activeDepartment.current)) return;
+
+      const results: Array<{table:string;items:any[]|null;error:string}> = payload.results;
+      const failures = results.filter(r => r.error || !Array.isArray(r.items));
+      const failedTables = new Set(failures.map(r => r.table));
+      const batches:any[] = [];
+
+      results.forEach(r => {
+        if (!Array.isArray(r.items)) return;
+        const definition = RECORD_TABLES.find(t => t.name === r.table);
+        if (!definition) return;
+        const grouped:Record<string,any> = {};
+        r.items.filter((item:any) => requiresReview(item)).forEach((item:any) => {
+          const month = String(reviewMonth(item) || item.created_at || '').slice(0,7) || 'ไม่ระบุเดือน';
+          const batchKey = definition.key + '_' + month;
+          grouped[batchKey] ||= {
+            type: definition.key,
+            audit_month: month,
+            auditor_name: item.auditor_name || item.evaluator || item.staff_name || item.recorded_by || '-',
+            items: [],
+          };
+          grouped[batchKey].items.push({...item, source_table:r.table});
+        });
+        batches.push(...Object.values(grouped));
       });
-      setAllPendingRows(previous=>[...previous.map(batch=>({...batch,items:batch.items.filter((item:any)=>failedTables.has(item.source_table))})).filter(batch=>batch.items.length),...batches]);
-      setPendingLoadError(failures.map(r=>r.error).join(' • '));
-    } finally {if(String(targetDeptId)===String(activeDepartment.current))setPendingLoading(false);}
+
+      // ตารางที่อ่านผิดพลาดต้องเก็บผลเดิม ไม่แสดงผิดว่าไม่มีรายการรออนุมัติ
+      setAllPendingRows(previous => [
+        ...previous.map(batch => ({
+          ...batch,
+          items: batch.items.filter((item:any) => failedTables.has(item.source_table)),
+        })).filter(batch => batch.items.length),
+        ...batches,
+      ]);
+      setPendingLoadError(failures.map(r => r.error || `อ่าน ${r.table} ไม่สำเร็จ`).join(' • '));
+    } catch (e) {
+      if (id === String(activeDepartment.current)) {
+        setPendingLoadError(e instanceof Error ? e.message : 'อ่านรายการรออนุมัติไม่สำเร็จ');
+      }
+    } finally {
+      if (id === String(activeDepartment.current)) setPendingLoading(false);
+    }
   }, []);
 
   useEffect(() => {

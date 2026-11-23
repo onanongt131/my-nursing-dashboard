@@ -5,6 +5,9 @@ export async function GET(r:NextRequest){try{const user=await currentUser();if(!
  const client=db(),{data:department,error}=await client.from('departments').select('*').eq('id',id).single();if(error)return fail('อ่านหน่วยงานไม่สำเร็จ',503);
  async function all(table:string,scoped:boolean,columns='*',order='id'){const rows:any[]=[];for(let offset=0;;offset+=1000){let q=client.from(table).select(columns);if(scoped)q=q.eq('department_id',id);const {data,error}=await q.order(order).range(offset,offset+999);if(error||!Array.isArray(data))throw new Error('อ่าน '+table+' ไม่สำเร็จ');rows.push(...data);if(data.length<1000)return rows;}}
  const [kpis,entries,maps]=await Promise.all([all('kpis',false),all('kpi_entries',true),all('kpi_department_map',true,'department_id,kpi_id','kpi_id')]);
- const formatted={...department,kpis:maps.map(m=>{const k=kpis.find(x=>String(x.id)===String(m.kpi_id));return k?{...k,entries:entries.filter(e=>String(e.kpi_id)===String(k.id))}:null;}).filter(Boolean)};
- return Response.json({department:formatted,counts:{mappedKpis:maps.length,entries:entries.length,unmappedEntries:entries.filter(e=>!maps.some(m=>String(m.kpi_id)===String(e.kpi_id))).length}},{headers:{'Cache-Control':'no-store'}});
+ // จับคู่ด้วย Map แทนลูปซ้อน (เดิม O(KPI×ผลงาน))
+ const kpiById=new Map(kpis.map(k=>[String(k.id),k])),entriesByKpi=new Map<string,any[]>(),mapped=new Set(maps.map(m=>String(m.kpi_id)));
+ for(const e of entries){const key=String(e.kpi_id),list=entriesByKpi.get(key);if(list)list.push(e);else entriesByKpi.set(key,[e]);}
+ const formatted={...department,kpis:maps.map(m=>{const k=kpiById.get(String(m.kpi_id));return k?{...k,entries:entriesByKpi.get(String(k.id))||[]}:null;}).filter(Boolean)};
+ return Response.json({department:formatted,counts:{mappedKpis:maps.length,entries:entries.length,unmappedEntries:entries.filter(e=>!mapped.has(String(e.kpi_id))).length}},{headers:{'Cache-Control':'no-store'}});
  }catch(e){return unexpected(e);}}

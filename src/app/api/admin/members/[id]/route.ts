@@ -1,6 +1,7 @@
 import {NextRequest,NextResponse} from 'next/server';
 import {isPendingMember} from '@/lib/members/status';
 import {currentUser,db,fail,unexpected,validId} from '@/lib/audits/chartServer';
+import { invalidateDepartmentKpi } from '@/lib/kpiCache'; // ← เพิ่ม
 export const dynamic='force-dynamic';
 async function handle(request:NextRequest,context:{params:Promise<{id:string}>},remove:boolean){try{
  if(request.headers.get('origin')!==new URL(request.url).origin)return fail('แหล่งที่มาคำขอไม่ถูกต้อง',403);
@@ -12,6 +13,7 @@ async function handle(request:NextRequest,context:{params:Promise<{id:string}>},
  let q=remove?db().from('profiles').delete():db().from('profiles').update({status:'approved'});
  q=q.eq('id',id);q=profile.status===null?q.is('status',null):q.eq('status',profile.status);
  const {data:changed,error:changeError}=await q.select('id');if(changeError)throw changeError;if(!changed?.length)return fail('ข้อมูลเปลี่ยนแปลงแล้ว กรุณาโหลดใหม่',409);
+ invalidateDepartmentKpi();
  return NextResponse.json({ok:true},{headers:{'Cache-Control':'no-store'}});
 }catch(e){return unexpected(e);}}
 export function PATCH(request:NextRequest,context:{params:Promise<{id:string}>}){return handle(request,context,false);}

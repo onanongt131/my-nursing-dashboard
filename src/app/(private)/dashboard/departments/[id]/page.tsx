@@ -1,5 +1,4 @@
 'use client';
-import {readDepartmentRecords,loadRecordTables} from '@/lib/departmentRecords';
 import {requiresReview,reviewMonth} from '@/lib/review/period';
 import PressureSoreModal from '@/components/PressureSoreModal';
 import PressureSorePendingRows from '@/components/PressureSorePendingRows';
@@ -93,14 +92,8 @@ export default function SingleDepartmentPage() {
     entries: any[];
   } | null>(null);
 
-  const [monthlyRecords, setMonthlyRecords] = useState<Record<string, any[]>>({
-    audit: [],
-    wp_qa: [],
-    iv_care: [],
-    fall: [],
-    readmit: [],
-    ama: []
-  });
+  // key -> ส่งข้อมูลเดือนที่แล้วแล้วหรือยัง (คำนวณบนเซิร์ฟเวอร์ ไม่โหลดทุกแถวมาที่เบราว์เซอร์)
+  const [monthlySubmitted, setMonthlySubmitted] = useState<Record<string, boolean>>({});
 
   const [viewingBatchGroup, setViewingBatchGroup] = useState<{
     type: string;
@@ -110,7 +103,7 @@ export default function SingleDepartmentPage() {
     status?: string;
   } | null>(null);
 
-  useEffect(()=>{setActiveTab('dashboard');setActiveModal(null);setDepartmentData(null);setMappingWarning('');setAllPendingRows([]);setReadmitLoadError('');setPendingLoadError('');setPendingCount(null);setPendingCountError('');setShowPendingTable(false);setMonthlyLoadedDept('');setMonthlyFailedKeys([]);setMonthlyLoading(false);monthlyRequestRef.current=null;setMonthlyRecords(previous=>Object.fromEntries(Object.keys(previous).map(key=>[key,[]])));},[deptId]);
+  useEffect(()=>{setActiveTab('dashboard');setActiveModal(null);setDepartmentData(null);setMappingWarning('');setAllPendingRows([]);setReadmitLoadError('');setPendingLoadError('');setPendingCount(null);setPendingCountError('');setShowPendingTable(false);setMonthlyLoadedDept('');setMonthlyFailedKeys([]);setMonthlyLoading(false);monthlyRequestRef.current=null;setMonthlySubmitted({});},[deptId]);
   const supabase = useMemo(() => createClient(), []);
 
   const fetchUserPermissions = useCallback(async () => {
@@ -146,15 +139,27 @@ export default function SingleDepartmentPage() {
     }
     setMonthlyLoading(true);
     const task=(async()=>{
-      const results=await loadRecordTables(RECORD_TABLES,table=>readDepartmentRecords(table,id));
+      const prev=new Date();prev.setMonth(prev.getMonth()-1);
+      const month=`${prev.getFullYear()}-${String(prev.getMonth()+1).padStart(2,'0')}`;
+      let results:Array<{key:string;submitted:boolean|null;error:string}>;
+      try{
+        const r=await fetch('/api/department-records?'+new URLSearchParams({department_id:id,mode:'monthly-status',month}),{cache:'no-store'}),body=await r.json();
+        if(!r.ok||!Array.isArray(body.results))throw new Error(body.error||'อ่านสถานะการส่งข้อมูลไม่สำเร็จ');
+        const byTable=new Map<string,{submitted:boolean|null;error:string}>(body.results.map((x:any)=>[x.table,x]));
+        results=RECORD_TABLES.map(t=>{const x=byTable.get(t.name);return{key:t.key,submitted:x?.submitted??null,error:x?x.error:'ไม่พบผล '+t.name};});
+      }catch(e){
+        const message=e instanceof Error?e.message:'อ่านสถานะการส่งข้อมูลไม่สำเร็จ';
+        results=RECORD_TABLES.map(t=>({key:t.key,submitted:null,error:message}));
+      }
       // ป้องกันคำขอเก่าทับข้อมูลหน่วยงานใหม่ หรือทับการ Refresh หลังบันทึก
       if(String(activeDepartment.current)!==id)return;
-      const failures=results.filter(r=>r.error),map:Record<string,any[]>={};
-      results.forEach(r=>{if(r.items)map[r.key]=[...(map[r.key]||[]),...r.items];});
-      failures.forEach(r=>{delete map[r.key];});
-      setMonthlyRecords(previous=>({...previous,...map}));
-      setMonthlyFailedKeys(failures.map(r=>r.key));
-      setReadmitLoadError(failures.map(r=>r.error).join(' • '));
+      const failures=results.filter(r=>r.error),map:Record<string,boolean>={};
+      results.forEach(r=>{if(r.submitted!==null)map[r.key]=!!map[r.key]||r.submitted;});
+      const failedKeys=[...new Set(failures.map(r=>r.key))];
+      failedKeys.forEach(k=>{delete map[k];});
+      setMonthlySubmitted(previous=>({...previous,...map}));
+      setMonthlyFailedKeys(failedKeys);
+      setReadmitLoadError([...new Set(failures.map(r=>r.error))].join(' • '));
       setMonthlyLoadedDept(id);
     })();
     monthlyRequestRef.current={departmentId:id,promise:task};
@@ -175,7 +180,7 @@ export default function SingleDepartmentPage() {
   const monthlyStatusClass = (key:string):string => {
     const checked=monthlyLoadedDept===String(deptId) && !monthlyLoading && !monthlyFailedKeys.includes(key);
     if(!checked)return 'bg-slate-600 text-white hover:bg-slate-500';
-    return hasSubmittedPreviousMonth(monthlyRecords[key]||[])
+    return monthlySubmitted[key]===true
       ? 'bg-emerald-700/80 text-white hover:bg-emerald-700'
       : 'bg-amber-500 text-slate-950 hover:bg-amber-400';
   };
@@ -288,22 +293,6 @@ export default function SingleDepartmentPage() {
       void fetchMonthlyRecords(deptId);
     }
   }, [deptId, activeTab, activeModal, showPendingTable, fetchMonthlyRecords]);
-
-  const hasSubmittedPreviousMonth = (records: any[]) => {
-    if (!Array.isArray(records)) return false;
-    const now = new Date();
-    now.setMonth(now.getMonth() - 1);
-    const prevYear = now.getFullYear();
-    const prevMonth = String(now.getMonth() + 1).padStart(2, '0');
-    const prevMonthStr = `${prevYear}-${prevMonth}`;
-    const thaiYearStr = `${prevYear + 543}-${prevMonth}`;
-    return records.some(item => {
-      if (!item) return false;
-      const rawMonth = item.audit_month || item.month || item.incident_date?.substring(0, 7) || item.admit_date?.substring(0, 7) || '';
-      const itemMonth = typeof rawMonth === 'string' ? rawMonth : String(rawMonth || '');
-      return itemMonth.includes(prevMonthStr) || itemMonth.includes(thaiYearStr);
-    });
-  };
 
   const calculateTrend = (entries: any[]) => {
     if (!entries || entries.length < 2) return null;

@@ -57,6 +57,35 @@ async function readPendingTable(table: typeof tables[number], departmentId: numb
   }
 }
 
+// ตรวจว่า "ส่งข้อมูลเดือนที่ระบุแล้วหรือยัง" บนเซิร์ฟเวอร์ ตรรกะเดียวกับ hasSubmittedPreviousMonth() เดิมฝั่งหน้าเว็บ
+// แต่ส่งกลับแค่ true/false แทนการส่งทุกแถวของ 11 ตารางไปให้เบราว์เซอร์
+const MONTH_COLUMNS = ['audit_month', 'month', 'incident_date', 'admit_date'] as const;
+
+function rowMonth(row: Record<string, any>): string {
+  const raw = row.audit_month || row.month || (typeof row.incident_date === 'string' ? row.incident_date.substring(0, 7) : '') ||
+    (typeof row.admit_date === 'string' ? row.admit_date.substring(0, 7) : '') || '';
+  return typeof raw === 'string' ? raw : String(raw || '');
+}
+
+async function hasSubmitted(table: typeof tables[number], departmentId: number, month: string, thaiMonth: string) {
+  // อ่าน 1 แถวเพื่อดูว่าตารางนี้มีคอลัมน์เดือนแบบไหน แล้วค่อย select เฉพาะคอลัมน์นั้น (ไม่ดึง '*')
+  const probe = await db().from(table).select('*').eq('department_id', departmentId).limit(1);
+  if (probe.error) throw probe.error;
+  if (!probe.data?.length) return false;
+  const columns = MONTH_COLUMNS.filter(c => c in probe.data[0]);
+  if (!columns.length) return false;
+  // เรียงจากแถวใหม่สุด เจอแล้วหยุดทันที ส่วนใหญ่จบในหน้าแรก
+  for (let offset = 0; offset <= 1000000; offset += pageSize) {
+    const { data, error } = await db().from(table).select(columns.join(','))
+      .eq('department_id', departmentId).order('id', { ascending: false }).range(offset, offset + pageSize - 1);
+    if (error) throw error;
+    const rows = (data || []) as unknown as Record<string, any>[];
+    if (rows.some(r => { const m = rowMonth(r); return m.includes(month) || m.includes(thaiMonth); })) return true;
+    if (rows.length < pageSize) return false;
+  }
+  return false;
+}
+
 export async function GET(request: NextRequest) {
   try {
     const user = await currentUser();
@@ -70,7 +99,7 @@ export async function GET(request: NextRequest) {
 
     if (
       !Number.isSafeInteger(departmentId) || departmentId < 1 ||
-      !['', 'context', 'pending-count', 'pending-batch'].includes(mode) ||
+      !['', 'context', 'pending-count', 'pending-batch', 'monthly-status'].includes(mode) ||
       (mode === '' && !tables.includes(table as typeof tables[number])) ||
       !Number.isSafeInteger(offset) || offset < 0 || offset > 1000000
     ) return fail('คำขออ่านรายการไม่ถูกต้อง');
@@ -99,6 +128,18 @@ export async function GET(request: NextRequest) {
         return fail('รูปแบบยอดรออนุมัติไม่ถูกต้อง', 503);
       }
       return Response.json({ total: payload.total, counts: payload.counts }, { headers: noStore });
+    }
+
+    if (mode === 'monthly-status') {
+      // month = เดือนที่แล้วตามเวลาเครื่องผู้ใช้ (YYYY-MM ค.ศ.) ส่งมาจากหน้าเว็บเพื่อให้ผลเหมือนเดิม
+      const month = q.get('month') || '';
+      if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(month)) return fail('เดือนไม่ถูกต้อง');
+      const thaiMonth = `${Number(month.slice(0, 4)) + 543}${month.slice(4)}`;
+      const results = await Promise.all(tables.map(async t => {
+        try { return { table: t, submitted: await hasSubmitted(t, departmentId, month, thaiMonth), error: '' }; }
+        catch { return { table: t, submitted: null, error: `อ่านสถานะจาก ${t} ไม่สำเร็จ` }; }
+      }));
+      return Response.json({ results }, { headers: noStore });
     }
 
     if (mode === 'pending-batch') {

@@ -1,6 +1,7 @@
 import {NextRequest} from 'next/server';
 import {currentUser,canApprove,db,fail,unexpected} from '@/lib/audits/chartServer';
 import {requiresReview} from '@/lib/review/period';
+import {invalidateDepartmentKpi} from '@/lib/kpiCache';
 export const dynamic='force-dynamic';
 const tables = [
  'nursing_chart_audits', 'wp_qa_records', 'nso_special_wp_records',
@@ -17,6 +18,9 @@ export async function POST(request:NextRequest){try{
  const ids=[...new Set<string>(body.ids.map(String))];const {data:rows,error}=await db().from(body.table).select('*').in('id',ids);if(error)return fail('อ่านรายการก่อนอนุมัติไม่สำเร็จ',503);if(!rows||rows.length!==ids.length)return fail('บางรายการไม่พบ กรุณาโหลดใหม่',409);
  for(const row of rows){if(!canApprove(user,Number(row.department_id)))return fail('ไม่มีสิทธิ์อนุมัติหน่วยงานนี้',403);if(row.status!=='pending'||!requiresReview(row))return fail('รายการไม่อยู่ในสถานะหรือรอบปีที่รออนุมัติ กรุณาโหลดใหม่',409);}
  const departments=[...new Set(rows.map((r:any)=>r.department_id))];if(departments.length!==1)return fail('อนุมัติได้ครั้งละหน่วยงาน');
- const {data:updated,error:writeError}=await db().from(body.table).update({status:'approved'}).in('id',ids).eq('department_id',departments[0]).eq('status','pending').select('id,status');if(writeError)return fail('บันทึกอนุมัติไม่สำเร็จ',503);if(!updated||updated.length!==ids.length||updated.some(row=>row.status!=='approved')||ids.some(id=>!updated.some(row=>String(row.id)===id)))return fail('บางรายการเปลี่ยนไปแล้ว กรุณาโหลดสถานะล่าสุด',409);
+ const {data:updated,error:writeError}=await db().from(body.table).update({status:'approved'}).in('id',ids).eq('department_id',departments[0]).eq('status','pending').select('id,status');if(writeError)return fail('บันทึกอนุมัติไม่สำเร็จ',503);
+ // บางแถวอาจอนุมัติไปแล้วแม้จะตอบ 409 จึงล้าง cache ทุกครั้งที่มีแถวถูกอัปเดต
+ if(updated?.length)invalidateDepartmentKpi();
+ if(!updated||updated.length!==ids.length||updated.some(row=>row.status!=='approved')||ids.some(id=>!updated.some(row=>String(row.id)===id)))return fail('บางรายการเปลี่ยนไปแล้ว กรุณาโหลดสถานะล่าสุด',409);
  return Response.json({approved:updated.length},{headers:{'Cache-Control':'no-store'}});
  }catch(e){return unexpected(e);}}

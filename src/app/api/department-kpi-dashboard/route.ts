@@ -3,16 +3,17 @@ import pressureSoreHistory from '@/lib/pressureSoreHistory.json';
 import {normalizeWard} from '@/lib/inspectionWards';
 import {departmentWpGraph} from '@/lib/departmentWpGraph';
 import {NextRequest,NextResponse} from 'next/server';
+import {unstable_cache} from 'next/cache';
 import {db,currentUser,canRead,fail,unexpected} from '@/lib/audits/chartServer';
 import {aggregateNursingAudits} from '@/lib/audits/report';
 import {aggregateIvCare,ivPercent,ivFraction,type IvReportRow} from '@/lib/ivCareReport';
 import {reviewMonth} from '@/lib/review/period';
 export const dynamic='force-dynamic';
-export async function GET(request:NextRequest){try{
- const user=await currentUser();if(!user)return fail('กรุณาเข้าสู่ระบบ',401);
- const id=Number(request.nextUrl.searchParams.get('department_id'));if(!Number.isSafeInteger(id)||id<=0)return fail('หน่วยงานไม่ถูกต้อง');if(!await canRead(user,id))return fail('ไม่มีสิทธิ์ดูหน่วยงานนี้',403);
+// ผลคำนวณขึ้นกับ department_id และ exclude_wp เท่านั้น ไม่ขึ้นกับผู้ใช้ จึง cache ร่วมกันได้
+// ตรวจสิทธิ์ทำนอก cache ทุกครั้ง; ข้อมูลที่เพิ่งอนุมัติจะแสดงภายใน KPI_CACHE_SECONDS
+const KPI_CACHE_SECONDS=300;
+async function computeDashboard(id:number,includeWp:boolean){
  async function read(table:string,columns:string,kind:'old'|'new'|'staff') {const rows:Record<string,any>[]=[];for(let offset=0;;offset+=1000){let q=db().from(table).select(columns).eq('department_id',String(id));if(kind==='old')q=q.gte('fiscal_year',2567).lte('fiscal_year',2569);else if(kind==='staff')q=q.gte('date','2026-10-01').lt('date','2027-10-01');else q=q.eq('status','approved');const {data,error}=await q.order(kind==='old'?'month':kind==='staff'?'date':'id').order('id').range(offset,offset+999);if(error)throw error;rows.push(...(data||[]));if((data||[]).length<1000)return rows;}}
- const includeWp=request.nextUrl.searchParams.get('exclude_wp')!=='1';
  const fallReport = Promise.all([
   read('fall_monthly_summary','id,fiscal_year,month,patient_days','new'),
   read('fall_incident_records','id,incident_date','new'),
@@ -87,5 +88,12 @@ export async function GET(request:NextRequest){try{
  const pressureSore=department?.Department
   ? Object.entries(pressureSoreHistory).find(([name])=>normalizeWard(name).toLowerCase()===normalizeWard(department.Department).toLowerCase())?.[1]??null
   : null;
- return NextResponse.json({items:result,annual,pressureSore,fall:await fallReport},{headers:{'Cache-Control':'no-store'}});
+ return {items:result,annual,pressureSore,fall:await fallReport};
+}
+const cachedDashboard=unstable_cache(computeDashboard,['department-kpi-dashboard-v1'],{revalidate:KPI_CACHE_SECONDS,tags:['department-kpi']});
+export async function GET(request:NextRequest){try{
+ const user=await currentUser();if(!user)return fail('กรุณาเข้าสู่ระบบ',401);
+ const id=Number(request.nextUrl.searchParams.get('department_id'));if(!Number.isSafeInteger(id)||id<=0)return fail('หน่วยงานไม่ถูกต้อง');if(!await canRead(user,id))return fail('ไม่มีสิทธิ์ดูหน่วยงานนี้',403);
+ const includeWp=request.nextUrl.searchParams.get('exclude_wp')!=='1';
+ return NextResponse.json(await cachedDashboard(id,includeWp),{headers:{'Cache-Control':'private, no-store'}});
 }catch(e){return unexpected(e);}}

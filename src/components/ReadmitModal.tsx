@@ -1,6 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
+import {saveUnitRecord,loadUnitMonthly} from '@/lib/unitRecords/client';
+import type {summarizeReadmitDischarges} from '@/lib/readmitDischarges';
 
 interface ReadmitCareModalProps {
   isOpen: boolean;
@@ -53,54 +56,59 @@ export default function ReadmitCareModal({
   const [fiscalYear, setFiscalYear] = useState(currentYearTh);
   const [month, setMonth] = useState(currentMonthNum);
   const [prevMonthDischarges, setPrevMonthDischarges] = useState('');
+  const manualDischarges=selectedMonthYear.endsWith('-10');
+  const [dischargeStats,setDischargeStats]=useState<ReturnType<typeof summarizeReadmitDischarges>|null>(null);
 
   // State สำหรับแสดงผลสรุปจำนวนเคส Readmit ในเดือนนั้น (อ้างอิงจาก admit_date)
+  const [summaryError,setSummaryError]=useState('');
   const [totalReadmits, setTotalReadmits] = useState(0);
   const [loadingSummaryData, setLoadingSummaryData] = useState(false);
 
   // ดึงข้อมูลสรุปอุบัติการณ์ของเดือนที่เลือกมาแสดงโดยอ้างอิงจาก admit_date
   useEffect(() => {
     if (isOpen && activeTab === 'summary' && departmentId) {
-      fetchMonthlyReadmitStats();
+      const controller=new AbortController();
+      fetchMonthlyReadmitStats(controller.signal);
+      return ()=>controller.abort();
     }
   }, [isOpen, activeTab, selectedMonthYear, departmentId]);
 
-  const fetchMonthlyReadmitStats = async () => {
-    setLoadingSummaryData(true);
+  const fetchMonthlyReadmitStats = async (signal?:AbortSignal) => {
+    setLoadingSummaryData(true);setSummaryError('');setDischargeStats(null);setPrevMonthDischarges('');setTotalReadmits(0);
     try {
-      const [y, m] = selectedMonthYear.split('-');
-      const startDate = `${y}-${m}-01`;
-      const endDate = new Date(Number(y), Number(m), 0).toISOString().slice(0, 10);
-
-      const { data, error } = await supabase
-        .from('readmit_incident_records')
-        .select('id')
-        .eq('department_id', Number(departmentId))
-        .gte('admit_date', startDate)
-        .lte('admit_date', endDate);
-
-      if (error) throw error;
-
-      if (data) {
-        setTotalReadmits(data.length);
+      const result=await loadUnitMonthly('readmit',departmentId,selectedMonthYear,signal);
+      if(!signal?.aborted){
+        setTotalReadmits(result.count);
+        setDischargeStats(result.denominator.stats);
+        if(!result.denominator.manual)setPrevMonthDischarges(result.denominator.stats?.total==null?'':String(result.denominator.stats.total));
       }
+
     } catch (error) {
-      console.error('Error fetching monthly readmit stats:', error);
+      if(signal?.aborted)return;
+      setSummaryError(error instanceof Error?error.message:'อ่านจำนวน Re-admit ไม่สำเร็จ');
     } finally {
-      setLoadingSummaryData(false);
+      if(!signal?.aborted)setLoadingSummaryData(false);
     }
   };
 
-  if (!isOpen) return null;
+  // Same as the other modals: lock page scroll while open.
+  useEffect(() => {
+    if (!isOpen) return;
+    const before = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = before; };
+  }, [isOpen]);
+
+  if (!isOpen || typeof document === 'undefined') return null;
 
   // บันทึกข้อมูลส่วนที่ 1 (รายเคส Re-admit)
   const handleSaveIncident = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!departmentId) return;
+    if (!departmentId || saving) return;
 
     setSaving(true);
     try {
-      const { error } = await supabase.from('readmit_incident_records').insert({
+      await saveUnitRecord('readmit-incident',{
         department_id: Number(departmentId),
         hn,
         an,
@@ -116,7 +124,6 @@ export default function ReadmitCareModal({
         status: 'pending',
       });
 
-      if (error) throw error;
 
       alert('บันทึกข้อมูล Re-admit รายเคสสำเร็จ');
       setHn('');
@@ -142,19 +149,17 @@ export default function ReadmitCareModal({
   // บันทึกข้อมูลส่วนที่ 2 (สรุปรายเดือน) ลงตาราง readmit_monthly_summary
   const handleSaveSummary = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!departmentId) return;
+    if (!departmentId || saving) return;
+    if(loadingSummaryData||summaryError||(!manualDischarges&&!dischargeStats?.complete)||prevMonthDischarges.trim()===''){alert('กรุณาตรวจสอบยอดจำหน่ายเดือนก่อนหน้าก่อนบันทึก');return;}
 
     setSaving(true);
     try {
-      const { error } = await supabase.from('readmit_monthly_summary').upsert({
+      await saveUnitRecord('readmit-summary',{
         department_id: Number(departmentId),
-        fiscal_year: Number(fiscalYear),
-        month: Number(month),
+        month: selectedMonthYear,
         prev_month_discharges: Number(prevMonthDischarges),
-        readmit_count: totalReadmits,
-      }, { onConflict: 'department_id,fiscal_year,month' });
+      });
 
-      if (error) throw error;
 
       alert('บันทึกข้อมูลสรุปรายเดือน Re-admit สำเร็จ');
       setPrevMonthDischarges('');
@@ -167,8 +172,9 @@ export default function ReadmitCareModal({
     }
   };
 
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 overflow-y-auto">
+  // Rendered on document.body above the site header (z-[100]), like the other modals.
+  return createPortal(
+    <div role="dialog" aria-modal="true" aria-label="บันทึกข้อมูลผู้ป่วยกลับมารักษาซ้ำ (Re-admit)" className="fixed inset-0 z-[99999] flex items-center justify-center bg-black/50 p-4 overflow-y-auto">
       <div className="bg-white rounded-2xl shadow-xl max-w-3xl w-full max-h-[90vh] flex flex-col overflow-hidden">
         
         {/* Header */}
@@ -324,7 +330,7 @@ export default function ReadmitCareModal({
 
               <div className="flex justify-end gap-3 pt-4 border-t">
                 <button type="button" onClick={onClose} className="px-5 py-2 border rounded-lg text-gray-700 hover:bg-gray-100 text-sm font-medium">ยกเลิก</button>
-                <button type="submit" disabled={saving} className="px-6 py-2 bg-teal-700 hover:bg-teal-800 text-white rounded-lg text-sm font-bold shadow disabled:opacity-50">
+                <button type="submit" disabled={saving || loadingSummaryData || !!summaryError || (!manualDischarges && !dischargeStats?.complete) || prevMonthDischarges.trim()===''} className="px-6 py-2 bg-teal-700 hover:bg-teal-800 text-white rounded-lg text-sm font-bold shadow disabled:opacity-50">
                   {saving ? 'กำลังบันทึก...' : 'บันทึก Re-admit'}
                 </button>
               </div>
@@ -355,11 +361,13 @@ export default function ReadmitCareModal({
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">ยอดจำหน่ายเดือนที่แล้ว</label>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">ยอดจำหน่ายแพทย์อนุญาตเดือนก่อนหน้า</label>
                     <input
                       type="number"
                       min="0"
-                      placeholder="เช่น 350"
+                      placeholder={manualDischarges?'กรอกยอดเดือนกันยายน':'รอข้อมูลสถิติเดือนก่อนหน้า'}
+                      readOnly={!manualDischarges}
+                      disabled={loadingSummaryData}
                       value={prevMonthDischarges}
                       onChange={(e) => setPrevMonthDischarges(e.target.value)}
                       className="w-full px-3 py-2 border rounded-lg text-sm bg-white font-semibold focus:ring-2 focus:ring-teal-500"
@@ -368,11 +376,23 @@ export default function ReadmitCareModal({
                   </div>
                 </div>
 
+                <p className="text-xs text-gray-600">{manualDischarges?'เดือนตุลาคม: กรอกยอดจำหน่ายแพทย์อนุญาตของเดือนกันยายนด้วยตนเอง':'ดึงยอดจำหน่ายแพทย์อนุญาตจากสถิติหอผู้ป่วยเดือนก่อนหน้าอัตโนมัติ ไม่รวมย้ายไปและเสียชีวิต'}</p>
+                {!manualDischarges && dischargeStats && !dischargeStats.complete && (
+                  <div role="alert" className="rounded-lg border border-amber-300 bg-amber-50 p-3 text-sm text-amber-900">
+                    สถิติเดือน {dischargeStats.month} ยังไม่ครบ/ต้องแก้ไข {dischargeStats.valid}/{dischargeStats.expected} เวร
+                    <details className="mt-1"><summary className="cursor-pointer">ดูวันที่และเวรที่ต้องตรวจสอบ</summary>
+                      {dischargeStats.missing.length>0&&<p>ขาด: {dischargeStats.missing.join(', ')}</p>}
+                      {dischargeStats.duplicate.length>0&&<p>ซ้ำ: {dischargeStats.duplicate.join(', ')}</p>}
+                      {dischargeStats.invalid.length>0&&<p>ยอดไม่ถูกต้อง: {dischargeStats.invalid.join(', ')}</p>}
+                    </details>
+                  </div>
+                )}
+                {summaryError && <p role="alert" className="text-sm text-red-700">{summaryError}</p>}
                 {/* กล่องแสดงผลจำนวนการ Re-admit ที่ดึงจากวันที่ Admit ในรายเคสโดยอัตโนมัติ */}
                 <div className="bg-white p-3 rounded-lg border border-teal-200 text-center">
                   <span className="text-xs text-gray-500 block">จำนวนการ Re-admit ในเดือนนี้ (คำนวณจากวันที่ Admit ในระบบรายเคส)</span>
                   <span className="text-xl font-bold text-teal-800">
-                    {loadingSummaryData ? 'กำลังโหลด...' : `${totalReadmits} ครั้ง`}
+                    {loadingSummaryData ? 'กำลังโหลด...' : summaryError ? 'อ่านข้อมูลไม่สำเร็จ' : `${totalReadmits} ครั้ง`}
                   </span>
                 </div>
 
@@ -381,7 +401,7 @@ export default function ReadmitCareModal({
 
               <div className="flex justify-end gap-3 pt-4 border-t">
                 <button type="button" onClick={onClose} className="px-5 py-2 border rounded-lg text-gray-700 hover:bg-gray-100 text-sm font-medium">ยกเลิก</button>
-                <button type="submit" disabled={saving} className="px-6 py-2 bg-teal-700 hover:bg-teal-800 text-white rounded-lg text-sm font-bold shadow disabled:opacity-50">
+                <button type="submit" disabled={saving || loadingSummaryData || !!summaryError || (!manualDischarges && !dischargeStats?.complete) || prevMonthDischarges.trim()===''} className="px-6 py-2 bg-teal-700 hover:bg-teal-800 text-white rounded-lg text-sm font-bold shadow disabled:opacity-50">
                   {saving ? 'กำลังบันทึก...' : 'บันทึกข้อมูลรายเดือน'}
                 </button>
               </div>
@@ -390,6 +410,7 @@ export default function ReadmitCareModal({
         </div>
 
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

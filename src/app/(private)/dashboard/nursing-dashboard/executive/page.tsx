@@ -24,9 +24,10 @@ export default function NursingExecutiveDashboard() {
                 className="bg-transparent font-semibold text-gray-800 focus:outline-none cursor-pointer"
               >
                 <option value="2570">2570</option>
+                <option value="2570">2570</option>
                 <option value="2569">2569</option>
-                <option value="2569">2568</option>
-                <option value="2569">2567</option>
+                <option value="2568">2568</option>
+                <option value="2567">2567</option>
               </select>
             </div>
 

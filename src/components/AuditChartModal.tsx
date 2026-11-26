@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import {ipdAuditRequest} from '@/lib/ipdAuditClient';
 import { createPortal } from 'react-dom';
 import { ClipboardDocumentCheckIcon } from '@heroicons/react/24/outline';
 
@@ -51,19 +52,15 @@ export default function AuditChartModal({
   }, [isOpen, initialMode, initialData, departmentId]);
 
   const fetchPendingAudits = async () => {
-    if (!departmentId) return;
+    if (!departmentId || saving) return;
     setLoadingList(true);
-    const { data, error } = await supabase
-      .from('nursing_chart_audits')
-      .select('*')
-      .eq('department_id', Number(departmentId))
-      .eq('status', 'pending')
-      .order('audit_date', { ascending: false });
+    try {
+      const response=await fetch(`/api/ipd-audit-records?department_id=${Number(departmentId)}`,{cache:'no-store'});
+      const result=await response.json();if(!response.ok)throw new Error(result.error);
+      setPendingList(result.records||[]);
+    }catch(error){setPendingList([]);alert(error instanceof Error?error.message:'อ่านรายการไม่สำเร็จ');}
+    finally{setLoadingList(false);}
 
-    if (!error && data) {
-      setPendingList(data);
-    }
-    setLoadingList(false);
   };
 
   // Lock background scrolling while the audit is open.
@@ -78,85 +75,34 @@ export default function AuditChartModal({
 
   const handleApprove = async (id?: string) => {
     const targetId = id || auditData.id;
-    if (!targetId) return;
+    if (!targetId || saving) return;
 
     setSaving(true);
-    const { error } = await supabase
-      .from('nursing_chart_audits')
-      .update({ status: 'approved' })
-      .eq('id', targetId);
+    try {
+      await ipdAuditRequest({action:'chart-approve',department_id:Number(departmentId),id:targetId});
+      alert('อนุมัติรายการสำเร็จ');onSuccess?.();onClose();
+    }catch(error){alert(error instanceof Error?error.message:'อนุมัติไม่สำเร็จ');}
+    finally{setSaving(false);}
 
-    setSaving(false);
-
-    if (error) {
-      alert('เกิดข้อผิดพลาดในการอนุมัติ: ' + error.message);
-    } else {
-      alert('อนุมัติรายการสำเร็จ');
-      onSuccess?.();
-      onClose();
-    }
   };
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!departmentId) return;
+    if (!departmentId || saving) return;
     
     setSaving(true);
 
-    const compileNotes = (labels: string[]) => {
-      let notesList: string[] = [];
-      labels.forEach(id => {
-        const noteVal = auditData[id + '_note'];
-        if (noteVal) {
-          notesList.push(`${id}: ${noteVal}`);
-        }
-      });
-      return notesList.length > 0 ? notesList.join('\n') : null;
-    };
+    try {
+      await ipdAuditRequest({action:'chart-save',department_id:Number(departmentId),answers:auditData});
+      alert('บันทึกข้อมูล Audit Chart สำเร็จ');onSuccess?.();onClose();
+    }catch(error){alert(error instanceof Error?error.message:'บันทึกไม่สำเร็จ');}
+    finally{setSaving(false);}
 
-    const s1Keys = ['s1_1_1', 's1_1_2', 's1_1_3', 's1_1_4', 's1_1_5', 's1_1_6', 's1_2_1', 's1_2_2', 's1_2_3', 's1_2_4', 's1_2_5', 's1_3_1', 's1_4_1', 's1_4_2'];
-    const s2Keys = ['s2_1_a', 's2_1_p', 's2_1_i', 's2_1_e', 's2_1_name', 's2_2_a', 's2_2_p', 's2_2_i', 's2_2_e', 's2_2_name', 's2_3_a', 's2_3_p', 's2_3_i', 's2_3_e', 's2_3_name', 's2_4_a', 's2_4_p', 's2_4_i', 's2_4_e', 's2_4_name'];
-    const s3Keys = ['s3_a', 's3_p', 's3_i', 's3_e', 's3_name'];
-    const s4Keys = ['s4_1', 's4_2', 's4_3', 's4_4', 's4_5', 's4_6'];
-    const s5Keys = ['s5_1'];
-
-    const payload: Record<string, any> = {
-      department_id: Number(departmentId),
-      audit_date: auditData.audit_date || new Date().toISOString().split('T')[0],
-      patient_hn: auditData.patient_hn || null,
-      disease: auditData.disease || null,          
-      auditor_name: auditData.auditor_name || null, 
-      notes: auditData.notes || null,
-      status: 'pending',
-      s1_notes: compileNotes(s1Keys),
-      s2_notes: compileNotes(s2Keys),
-      s3_notes: compileNotes(s3Keys),
-      s4_notes: compileNotes(s4Keys),
-      s5_notes: compileNotes(s5Keys),
-    };
-
-    Object.keys(auditData).forEach((key) => {
-      if (!key.endsWith('_note')) {
-        payload[key] = auditData[key];
-      }
-    });
-
-    const { error } = await supabase.from('nursing_chart_audits').insert([payload]);
-    
-    setSaving(false);
-    
-    if (error) {
-      alert('เกิดข้อผิดพลาดในการบันทึก: ' + error.message);
-    } else {
-      alert('บันทึกข้อมูล Audit Chart สำเร็จ');
-      onSuccess?.();
-      onClose();
-    }
   };
 
   const renderAuditItems = (items: { id: string; label: string }[]) => {
     return items.map(item => {
-      const currentVal = auditData[item.id];
+      const currentVal = auditData[item.id] ?? (Array.isArray(auditData.audit_na_keys) && auditData.audit_na_keys.includes(item.id) ? 'NA' : undefined);
       return (
         <div key={item.id} className="p-3 bg-white border rounded-xl space-y-2">
           <div className="flex justify-between items-center gap-4">

@@ -1,7 +1,6 @@
 // src/app/(private)/dashboard/staffing/overview/page.tsx
 'use client';
 import { useState, useEffect, useCallback } from 'react';
-import { createClient } from '@/utils/supabase/client';
 import { 
   UsersIcon, 
   CalendarDaysIcon, 
@@ -22,7 +21,7 @@ interface RosterRecord {
 }
 
 export default function StaffingOverviewPage() {
-  const supabase = createClient();
+  const [dataError,setDataError]=useState('');
   const [departments, setDepartments] = useState<any[]>([]);
   const [selectedDept, setSelectedDept] = useState<string | number>('');
   const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().slice(0, 7)); // YYYY-MM
@@ -34,23 +33,16 @@ export default function StaffingOverviewPage() {
   useEffect(() => {
     async function fetchDepartments() {
       try {
-        const { data, error } = await supabase
-          .from('departments')
-          .select('id, Department')
-          .order('Department', { ascending: true });
-
-        if (error) {
-          console.error('Error fetching departments:', error.message);
-        } else if (data && data.length > 0) {
-          setDepartments(data);
-          setSelectedDept(data[0].id);
-        }
+        const response=await fetch('/api/staffing/access-context',{cache:'no-store'});
+        const result=await response.json();if(!response.ok)throw new Error(result.error);
+        setDepartments(result.departments||[]);
+        setSelectedDept(result.profile?.department_id || result.departments?.[0]?.id || '');
       } catch (err) {
-        console.error('Unexpected error:', err);
+        setDataError(err instanceof Error?err.message:'อ่านสิทธิ์ไม่สำเร็จ');
       }
     }
     fetchDepartments();
-  }, [supabase]);
+  }, []);
 
   // คำนวณจำนวนวันในเดือนที่เลือก
   const [yearStr, monthStr] = selectedMonth.split('-');
@@ -66,26 +58,17 @@ export default function StaffingOverviewPage() {
     const startDate = `${selectedMonth}-01`;
     const endDate = `${selectedMonth}-${String(daysInMonth).padStart(2, '0')}`;
 
-    // 1. ดึงรายชื่อบุคลากรในแผนก
-    const { data: staffRes } = await supabase
-      .from('staff')
-      .select('id, full_name, position')
-      .eq('department_id', selectedDept)
-      .order('id', { ascending: true });
-
-    setStaffList(staffRes || []);
-
-    // 2. ดึงข้อมูลเวรในเดือนนั้น
-    const { data: rosterRes } = await supabase
-      .from('monthly_roster')
-      .select('staff_id, date, shift')
-      .eq('department_id', selectedDept)
-      .gte('date', startDate)
-      .lte('date', endDate);
-
-    setRosterRecords(rosterRes || []);
-    setLoading(false);
-  }, [supabase, selectedDept, selectedMonth, daysInMonth]);
+    try {
+      setDataError('');
+      const [staffResponse,rosterResponse]=await Promise.all([
+        fetch(`/api/staffing/staff?department_id=${selectedDept}`,{cache:'no-store'}),
+        fetch(`/api/staffing/roster?department_id=${selectedDept}&month=${selectedMonth}`,{cache:'no-store'})]);
+      const [staffResult,rosterResult]=await Promise.all([staffResponse.json(),rosterResponse.json()]);
+      if(!staffResponse.ok||!rosterResponse.ok)throw new Error(staffResult.error||rosterResult.error);
+      setStaffList(staffResult.records||[]);setRosterRecords(rosterResult.records||[]);
+    }catch(error){setStaffList([]);setRosterRecords([]);setDataError(error instanceof Error?error.message:'โหลดข้อมูลไม่สำเร็จ');}
+    finally{setLoading(false);}
+  }, [selectedDept,selectedMonth,daysInMonth]);
 
   useEffect(() => {
     fetchOverviewData();
@@ -93,7 +76,7 @@ export default function StaffingOverviewPage() {
 
   // คำนวณสถิติสรุปภาพรวมรายบุคคล
   const staffSummary = staffList.map((staff) => {
-    const userShifts = rosterRecords.filter((r) => r.staff_id === staff.id);
+    const userShifts = rosterRecords.filter((r) => String(r.staff_id) === String(staff.id));
     
     let morningCount = 0;
     let afternoonCount = 0;
@@ -171,11 +154,12 @@ export default function StaffingOverviewPage() {
   const pnwCount = staffList.filter((s) => (s.position || '').trim() === 'พนง').length;
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-800 p-4 lg:p-6 space-y-6 font-sans">
+    <div className="min-h-screen bg-slate-50 text-slate-800 pt-0 px-2 pb-3 space-y-3 font-sans">
+      {dataError && <div role="alert" className="p-3 bg-red-50 text-red-800">{dataError}</div>}
       {/* ส่วนหัว Header และตัวเลือก */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-xs">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-white p-3 rounded-2xl border border-slate-200 shadow-xs">
         <div>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <h1 className="text-xl font-bold text-slate-900 tracking-wide">ภาพรวมอัตรากำลัง (Staffing Overview)</h1>
             <a href="/dashboard/staffing" className="text-xs px-3 py-1 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-lg transition font-medium">← กลับหน้าภาพรวม</a>
           </div>
@@ -212,7 +196,7 @@ export default function StaffingOverviewPage() {
 
       {/* การ์ดสถิติภาพรวม */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-4">
+        <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-xs flex items-center gap-4">
           <div className="p-3 bg-emerald-50 text-emerald-700 rounded-xl">
             <UsersIcon className="w-6 h-6" />
           </div>
@@ -222,7 +206,7 @@ export default function StaffingOverviewPage() {
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-4">
+        <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-xs flex items-center gap-4">
           <div className="p-3 bg-blue-50 text-blue-700 rounded-xl">
             <BriefcaseIcon className="w-6 h-6" />
           </div>
@@ -232,7 +216,7 @@ export default function StaffingOverviewPage() {
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs flex items-center gap-4">
+        <div className="bg-white p-3 rounded-xl border border-slate-200 shadow-xs flex items-center gap-4">
           <div className="p-3 bg-amber-50 text-amber-700 rounded-xl">
             <CalendarDaysIcon className="w-6 h-6" />
           </div>

@@ -51,11 +51,11 @@ const monthly: Item[] = [
   {label:'WP/QA',href:'/dashboard/wp-qa'},
   {label:'IV Care',href:'/dashboard/iv-care'},
   {label:'Audit Chart',href:'/dashboard/audit-chart'},
-  {label:'Fall',href:'/dashboard/fall'},
-  {label:'Pressure sore',href:'/dashboard/pressure-sore'},
-  {label:'Re-admit',href:'/dashboard/readmit'},
-  {label:'จำหน่ายไม่สมัครใจ (AMA)',href:'/dashboard/ama'},
-  {label:'บันทึก Pressure sore (ทุกหน่วยงาน)',href:'/dashboard/pressure-sore/entry'},
+  {label:'Fall',href:'/dashboard/fall-report'},
+  {label:'Pressure sore',href:'/dashboard/pressure-sore-report'},
+  {label:'Re-admit',href:'/dashboard/readmit-report'},
+  {label:'จำหน่ายไม่สมัครใจ (AMA)',href:'/dashboard/ama-report'},
+  {label:'บันทึก Pressure sore (ทุกหน่วยงาน)',href:'/dashboard/pressure-sore-entry'},
 ];
 const monthlyPaths = monthly.map(m=>m.href);
 const nursingBranches: Item[] = [
@@ -65,8 +65,7 @@ const nursingBranches: Item[] = [
   'การพยาบาลผู้ป่วยศัลยกรรม','การพยาบาลผู้ป่วยสูติ–นรีเวช','การพยาบาลผู้ป่วยจิตเวช',
   'การพยาบาลผู้ป่วยนอก','การพยาบาลวิสัญญี','การพยาบาลผู้คลอด','การพยาบาลผู้ป่วยออร์โธปิดิกส์'
 ].map((label,i)=>({label,href:`/dashboard/nursing/branch-${i+1}`}));
-const exactOnly = new Set(['/dashboard/nso-strategy','/dashboard/pressure-sore']);
-const matching = (path:string, href:string) => path===href || (!exactOnly.has(href) && path.startsWith(href+'/'));
+const matching = (path:string, href:string) => path===href || (href!=='/dashboard/nso-strategy' && path.startsWith(href+'/'));
 function sectionFor(path:string){
   if(path.startsWith('/dashboard/nso-strategy'))return 'nso';
   if(path.startsWith('/dashboard/nursing-dashboard'))return 'dash';

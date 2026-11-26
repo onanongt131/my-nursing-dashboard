@@ -85,34 +85,31 @@ export default function StaffingHolidaysPage() {
   };
 
   useEffect(() => {
+    const controller = new AbortController();
     async function loadProfile() {
       setCheckingAccess(true);
       try {
-        const response = await fetch('/api/session-user', { cache: 'no-store' });
-        if (!response.ok) throw new Error('ไม่พบข้อมูลผู้เข้าสู่ระบบ');
-
+        const response = await fetch('/api/staffing/access-context', {
+          cache: 'no-store',
+          signal: controller.signal,
+        });
         const result = await response.json();
-        const email = result?.user?.email;
-        if (!email) throw new Error('ไม่พบอีเมลผู้เข้าสู่ระบบ');
-
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('id, email, full_name, role')
-          .eq('email', email)
-          .single();
-
-        if (error) throw error;
-        setProfile(data as UserProfile);
+        if (!response.ok || !result.profile) throw new Error(result.error || 'ไม่พบข้อมูลผู้เข้าสู่ระบบ');
+        if (!controller.signal.aborted) setProfile(result.profile as UserProfile);
       } catch (error) {
-        setProfile(null);
-        showMessage(getErrorMessage(error), 'error');
+        if (!controller.signal.aborted) {
+          setProfile(null);
+          setMessage(getErrorMessage(error));
+          setMessageType('error');
+        }
       } finally {
-        setCheckingAccess(false);
+        if (!controller.signal.aborted) setCheckingAccess(false);
       }
     }
 
-    loadProfile();
-  }, [supabase]);
+    void loadProfile();
+    return () => controller.abort();
+  }, []);
 
   const loadHolidays = useCallback(async () => {
     setLoading(true);
@@ -248,7 +245,7 @@ export default function StaffingHolidaysPage() {
   if (!profile) {
     return (
       <div className={`${sarabun.className} p-8 text-rose-700`}>
-        ไม่สามารถตรวจสอบบัญชีผู้ใช้ได้
+        {message || 'ไม่สามารถตรวจสอบบัญชีผู้ใช้ได้'}
       </div>
     );
   }

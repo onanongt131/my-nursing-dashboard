@@ -7,7 +7,8 @@ export default auth((req) => {
 
   // 1. กำหนดหน้า Public ที่ไม่ต้อง Login (รวมหน้าหลักและหน้าย่อยของมัน)
   const isPublicPage = 
-    pathname === "/dashboard" || 
+    pathname === "/dashboard" ||
+    pathname === "/dashboard/staffing/inspection-report/" || 
     pathname.startsWith("/dashboard/committee") || 
     pathname.startsWith("/dashboard/nursing");
 
@@ -18,7 +19,9 @@ export default auth((req) => {
 
   // 2. ถ้าเข้าหน้าอื่นใน /dashboard ที่ไม่ใช่ Public และยังไม่ได้ Login ให้ดีดไป /login
   if (!isLoggedIn) {
-    return NextResponse.redirect(new URL("/login", req.url));
+    const loginUrl = new URL("/login", req.url);
+    loginUrl.searchParams.set("callbackUrl", pathname + req.nextUrl.search);
+    return NextResponse.redirect(loginUrl);
   }
 
   return NextResponse.next();

@@ -1,14 +1,20 @@
 'use client';
+import { ReportStatusIcon, ReportStatusLegend, ReportValue, MonthlyTableViewport } from '@/components/MonthlyReportStatus';
+import { sortMonthlyDepartments } from '@/lib/monthlyReportDepartments';
+import ReportMonthHeading from '@/components/ReportMonthHeading';
 
 import React, { useState, useEffect, useMemo } from 'react';
+import {auditNoteFields,reportPercent} from '@/lib/audits/report';
 import { createClient } from '@/utils/supabase/client';
 
 export default function AuditChartPage() {
-  const supabase = createClient();
+  const supabase = useMemo(()=>createClient(),[]);
   const [data, setData] = useState<any[]>([]);
   const [departments, setDepartments] = useState<any[]>([]);
+  const [error,setError]=useState('');
   const [loading, setLoading] = useState(true);
-  const [selectedYear, setSelectedYear] = useState<string>('2567');
+  const [exportMonth,setExportMonth]=useState(10);
+  const [selectedYear, setSelectedYear] = useState<string>('2570');
   
   // State สำหรับ Modal สรุป 3 ย้อนหลัง
   const [selectedDeptModal, setSelectedDeptModal] = useState<{ id: string; name: string } | null>(null);
@@ -29,24 +35,11 @@ export default function AuditChartPage() {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const [auditRes, deptRes] = await Promise.all([
-          supabase.from('audit_chart_data').select('*'),
-          supabase.from('departments').select('*')
-        ]);
-
-        if (auditRes.error) {
-          console.error('Error fetching audit data:', auditRes.error.message);
-        } else {
-          setData(auditRes.data || []);
-        }
-
-        if (deptRes.error) {
-          console.error('Error fetching departments:', deptRes.error.message);
-        } else {
-          setDepartments(deptRes.data || []);
-        }
+        const response=await fetch('/api/audit-chart-report',{cache:'no-store'});
+        const body=await response.json();if(!response.ok)throw new Error(body.error||'โหลดรายงานไม่สำเร็จ');
+        setData(body.items||[]);setDepartments(body.departments||[]);setError('');
       } catch (err) {
-        console.error('Unexpected error:', err);
+        setError(err instanceof Error?err.message:'โหลดรายงานไม่สำเร็จ');
       } finally {
         setLoading(false);
       }
@@ -62,6 +55,7 @@ export default function AuditChartPage() {
           fetchData();
         }
       )
+      .on('postgres_changes',{event:'*',schema:'public',table:'nursing_chart_audits'},()=>{fetchData();})
       .subscribe();
 
     return () => {
@@ -94,7 +88,7 @@ export default function AuditChartPage() {
 
   const fiscalYears = useMemo(() => {
     const years = data.map((item) => String(item.fiscal_year));
-    return Array.from(new Set(years)).sort();
+    return Array.from(new Set([...years, '2570'])).sort();
   }, [data]);
 
   const filteredDataByYear = useMemo(() => {
@@ -103,28 +97,12 @@ export default function AuditChartPage() {
 
   const summaryStats = useMemo(() => {
     if (filteredDataByYear.length === 0) {
-      return { A: '0.00', P: '0.00', I: '0.00', E: '0.00', totalAPIE: '0.00' };
+      return { A: '—', P: '—', I: '—', E: '—', totalAPIE: '—' };
     }
 
-    const sumA = filteredDataByYear.reduce((acc, curr) => acc + Number(curr.a || curr.A || 0), 0);
-    const sumP = filteredDataByYear.reduce((acc, curr) => acc + Number(curr.p || curr.P || 0), 0);
-    const sumI = filteredDataByYear.reduce((acc, curr) => acc + Number(curr.i || curr.I || 0), 0);
-    const sumE = filteredDataByYear.reduce((acc, curr) => acc + Number(curr.e || curr.E || 0), 0);
-    const totalEntries = filteredDataByYear.length;
-
-    const pctA = totalEntries > 0 ? (sumA / (totalEntries * 220)) * 100 : 0;
-    const pctP = totalEntries > 0 ? (sumP / (totalEntries * 200)) * 100 : 0;
-    const pctI = totalEntries > 0 ? (sumI / (totalEntries * 120)) * 100 : 0;
-    const pctE = totalEntries > 0 ? (sumE / (totalEntries * 120)) * 100 : 0;
-    const totalAPIE = (pctA + pctP + pctI + pctE) / 4;
-
-    return {
-      A: pctA.toFixed(2),
-      P: pctP.toFixed(2),
-      I: pctI.toFixed(2),
-      E: pctE.toFixed(2),
-      totalAPIE: totalAPIE.toFixed(2)
-    };
+    const values=['a','p','i','e'].map(group=>reportPercent(filteredDataByYear,group));
+    const available=values.filter((v):v is number=>v!==null);
+    return {A:values[0]?.toFixed(2)??'—',P:values[1]?.toFixed(2)??'—',I:values[2]?.toFixed(2)??'—',E:values[3]?.toFixed(2)??'—',totalAPIE:available.length?(available.reduce((a,b)=>a+b,0)/available.length).toFixed(2):'—'};
   }, [filteredDataByYear]);
 
   const monthMapping: { [key: string]: { code: string; label: string; order: number } } = {
@@ -180,7 +158,7 @@ export default function AuditChartPage() {
         };
       }
       
-      departmentMap[deptId].months[month] = calculatedValue.toFixed(2);
+      departmentMap[deptId].months[month] = item.source==='nursing_chart_audits'&&item.total_apie===0?'—':calculatedValue.toFixed(2);
       departmentMap[deptId].sumA += aVal;
       departmentMap[deptId].sumP += pVal;
       departmentMap[deptId].sumI += iVal;
@@ -188,28 +166,27 @@ export default function AuditChartPage() {
       departmentMap[deptId].count += 1;
     });
 
-    return Object.keys(departmentMap).map((deptId) => {
+    return sortMonthlyDepartments(departments).map((dept) => {
+      const deptId = String(dept.id ?? dept.department_id);
       const info = departmentMap[deptId];
-      const cnt = info.count || 1;
 
-      const pctA = (info.sumA / (cnt * 220)) * 100;
-      const pctP = (info.sumP / (cnt * 200)) * 100;
-      const pctI = (info.sumI / (cnt * 120)) * 100;
-      const pctE = (info.sumE / (cnt * 120)) * 100;
-      const avgTotal = (pctA + pctP + pctI + pctE) / 4;
-
+      const records=filteredDataByYear.filter(row=>String(row.department_id)===deptId);
+      const pctA=reportPercent(records,'a'),pctP=reportPercent(records,'p'),pctI=reportPercent(records,'i'),pctE=reportPercent(records,'e');
+      const valid=[pctA,pctP,pctI,pctE].filter((v):v is number=>v!==null);
+      const avgTotal=valid.length?valid.reduce((a,b)=>a+b,0)/valid.length:null;
       return {
         departmentId: deptId,
-        departmentName: info.name,
-        months: info.months,
-        pctA: pctA.toFixed(1),
-        pctP: pctP.toFixed(1),
-        pctI: pctI.toFixed(1),
-        pctE: pctE.toFixed(1),
-        avgTotal: avgTotal.toFixed(1)
+        departmentName: info?.name ?? getMappedDepartmentName(departmentMapName[deptId], selectedYear),
+        months: info?.months ?? {},
+        pendingMonths: new Set(records.filter(r=>r.pending).map(r=>String(r.month))),
+        pctA: pctA?.toFixed(1)??'—',
+        pctP: pctP?.toFixed(1)??'—',
+        pctI: pctI?.toFixed(1)??'—',
+        pctE: pctE?.toFixed(1)??'—',
+        avgTotal: avgTotal?.toFixed(1)??'—'
       };
     });
-  }, [filteredDataByYear, departmentMapName, selectedYear]);
+  }, [filteredDataByYear, departmentMapName, selectedYear, departments]);
 
   // คำนวณข้อมูล 3 ปีย้อนหลังสำหรับหน่วยงานที่ถูกเลือกใน Modal
   const historicalDataForModal = useMemo(() => {
@@ -225,27 +202,16 @@ export default function AuditChartPage() {
         return { year, A: '-', P: '-', I: '-', E: '-', avg: '-' };
       }
 
-      let sumA = 0, sumP = 0, sumI = 0, sumE = 0, cnt = yearRows.length;
-      yearRows.forEach(item => {
-        sumA += Number(item.a || item.A || 0);
-        sumP += Number(item.p || item.P || 0);
-        sumI += Number(item.i || item.I || 0);
-        sumE += Number(item.e || item.E || 0);
-      });
-
-      const pctA = (sumA / (cnt * 220)) * 100;
-      const pctP = (sumP / (cnt * 200)) * 100;
-      const pctI = (sumI / (cnt * 120)) * 100;
-      const pctE = (sumE / (cnt * 120)) * 100;
-      const avgTotal = (pctA + pctP + pctI + pctE) / 4;
-
+      const pctA=reportPercent(yearRows,'a'),pctP=reportPercent(yearRows,'p'),pctI=reportPercent(yearRows,'i'),pctE=reportPercent(yearRows,'e');
+      const valid=[pctA,pctP,pctI,pctE].filter((v):v is number=>v!==null);
+      const avgTotal=valid.length?valid.reduce((a,b)=>a+b,0)/valid.length:null;
       return {
         year,
-        A: pctA.toFixed(1),
-        P: pctP.toFixed(1),
-        I: pctI.toFixed(1),
-        E: pctE.toFixed(1),
-        avg: avgTotal.toFixed(1)
+        A: pctA?.toFixed(1)??'—',
+        P: pctP?.toFixed(1)??'—',
+        I: pctI?.toFixed(1)??'—',
+        E: pctE?.toFixed(1)??'—',
+        avg: avgTotal?.toFixed(1)??'—'
       };
     });
   }, [selectedDeptModal, data]);
@@ -258,18 +224,11 @@ export default function AuditChartPage() {
     );
 
     if (targetRow) {
-      const rawA = Number(targetRow.a || targetRow.A || 0);
-      const rawP = Number(targetRow.p || targetRow.P || 0);
-      const rawI = Number(targetRow.i || targetRow.I || 0);
-      const rawE = Number(targetRow.e || targetRow.E || 0);
-      const rawDC = Number(targetRow.d_c || targetRow.dc || 0);
-
-      // คำนวณเป็นเปอร์เซ็นต์ตามสัดส่วนมาตรฐาน
-      const pctA = ((rawA / 220) * 100).toFixed(1);
-      const pctP = ((rawP / 200) * 100).toFixed(1);
-      const pctI = ((rawI / 120) * 100).toFixed(1);
-      const pctE = ((rawE / 120) * 100).toFixed(1);
-
+      const pctA=reportPercent([targetRow],'a')?.toFixed(1)??'—';
+      const pctP=reportPercent([targetRow],'p')?.toFixed(1)??'—';
+      const pctI=reportPercent([targetRow],'i')?.toFixed(1)??'—';
+      const pctE=reportPercent([targetRow],'e')?.toFixed(1)??'—';
+      const rawDC=targetRow.source==='nursing_chart_audits'?(reportPercent([targetRow],'d_c')?.toFixed(1)??'—')+'%':String(targetRow.d_c??targetRow.dc??'—');
       setSelectedCellDetail({
         monthName: monthLabel,
         deptName,
@@ -285,63 +244,82 @@ export default function AuditChartPage() {
   
   if (loading) return <div className="p-6 text-center text-gray-500">กำลังโหลดข้อมูล Audit Chart...</div>;
 
-  return (
-    <div className="p-6 space-y-6">
-      <div className="flex justify-between items-center mb-2">
-        <h1 className="text-2xl font-bold">Audit Chart : ร้อยละความสมบูรณ์บันทึกทางการพยาบาล</h1>
-        
-        <div className="flex items-center gap-2">
-          <label className="text-sm font-bold text-gray-700 whitespace-nowrap pl-2">📅 ปีงบประมาณ:</label>
-          <select 
-            value={selectedYear} 
-            onChange={(e) => setSelectedYear(e.target.value)}
-            className="border p-2 rounded-lg font-medium text-indigo-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
-          >
-            {fiscalYears.map((year) => (
-              <option key={year} value={year}>ปีงบประมาณ {year}</option>
-            ))}
-          </select>
-        </div>
-      </div>
-    
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 bg-indigo-50/60 p-3.5 rounded-xl border border-indigo-100 shadow-xs">
-        <div className="bg-white p-3 rounded-lg shadow-2xs text-center flex items-center justify-center gap-2">
-          <span className="text-xl font-semibold text-gray-400">A =</span>
-          <span className="text-2xl font-bold text-indigo-600">{summaryStats.A}</span>
-        </div>
-        <div className="bg-white p-3 rounded-lg shadow-2xs text-center flex items-center justify-center gap-2">
-          <span className="text-xl font-semibold text-gray-400">P =</span>
-          <span className="text-2xl font-bold text-indigo-600">{summaryStats.P}</span>
-        </div>
-        <div className="bg-white p-3 rounded-lg shadow-2xs text-center flex items-center justify-center gap-2">
-          <span className="text-xl font-semibold text-gray-400">I =</span>
-          <span className="text-2xl font-bold text-indigo-600">{summaryStats.I}</span>
-        </div>
-        <div className="bg-white p-3 rounded-lg shadow-2xs text-center flex items-center justify-center gap-2">
-          <span className="text-xl font-semibold text-gray-400">E =</span>
-          <span className="text-2xl font-bold text-indigo-600">{summaryStats.E}</span>
-        </div>
-        <div className="bg-indigo-600 text-white p-3 rounded-lg shadow-2xs col-span-2 md:col-span-1 flex items-center justify-center gap-2">
-          <span className="text-xl font-medium text-indigo-200">เฉลี่ยรวม =</span>
-          <span className="text-2xl font-extrabold">{summaryStats.totalAPIE}%</span>
-        </div>
-      </div>
+  const exportMonthCode=String(exportMonth);
+  const hasExportData=tableRows.some(row=>row.months[exportMonthCode]!==undefined||row.pendingMonths.has(exportMonthCode));
+  function downloadMonthly(){
+    const rows=[
+      ['Audit Chart','ปีงบประมาณ',selectedYear,'เดือน',exportMonth],
+      ['หน่วยงาน','A (%)','P (%)','I (%)','E (%)','APIE (%)','สถานะ',...auditNoteFields.map((_,index)=>index<5?`หมายเหตุส่วนที่ ${index+1}`:'หมายเหตุทั่วไป')],
+      ...tableRows.map(row=>{
+        const records=filteredDataByYear.filter(item=>String(item.department_id)===row.departmentId&&Number(item.month)===exportMonth);
+        const score=row.months[exportMonthCode];
+        const notes=auditNoteFields.map(field=>{
+          const values=records.flatMap(item=>item.audit_notes?.[field]??[item[field]??(field==='notes'?item.remark:undefined)])
+            .filter((note):note is string=>typeof note==='string'&&!!note.trim());
+          const formatted=field==='notes'?values:values.map(note=>note.replace(
+            /^(s[1-5]_[a-z0-9_]+)(?=\s*:)/gm,
+            (key)=>key.slice(1).split("_").map(part=>part.toUpperCase()).join("."),
+          ));
+          return [...new Set(formatted)].join('\n\n');
+        });
+        return [row.departmentName,...['a','p','i','e'].map(group=>reportPercent(records,group)?.toFixed(1)),
+          score,row.pendingMonths.has(exportMonthCode)?'รออนุมัติ':score===undefined?'รอข้อมูล':'มีผลรายงาน',...notes];
+      }),
+    ];
+    const csv=rows.map(row=>row.map(value=>{
+      const cell=String(value??'');
+      const safeCell=/^\s*[=+@-]/.test(cell)?"'"+cell:cell;
+      return '"'+safeCell.replaceAll('"','""')+'"';
+    }).join(',')).join('\r\n');
+    const url=URL.createObjectURL(new Blob(['\uFEFF',csv],{type:'text/csv;charset=utf-8'}));
+    const link=document.createElement('a');
+    link.href=url;
+    link.download=`Audit-Chart-${selectedYear}-${String(exportMonth).padStart(2,'0')}.csv`;
+    link.click();
+    window.setTimeout(()=>URL.revokeObjectURL(url),1000);
+  }
 
-      <div className="overflow-x-auto bg-white shadow-md rounded-xl border border-gray-100">
-        <table className="min-w-full divide-y divide-gray-100 text-sm">
-          <thead className="bg-purple-50 text-purple-900 font-semibold">
+  return (
+    <div className="mx-auto w-full min-w-0 max-w-[1480px] space-y-3 px-3 py-4 sm:px-5 lg:px-6">
+      {error&&<p role="alert" className="rounded-xl bg-red-50 p-3 text-red-700">{error}</p>}
+      <header className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-teal-100 bg-white px-5 py-3 shadow-sm ">
+        <div className="min-w-0"><h1 className="text-lg font-extrabold text-slate-900 sm:text-xl">Audit Chart</h1></div>
+        <ReportStatusLegend statuses={['pending','waiting']}/>
+        <label className="flex shrink-0 items-center gap-3 text-sm font-semibold text-slate-600">ปีงบประมาณ<select value={selectedYear} onChange={e=>setSelectedYear(e.target.value)} className="h-11 rounded-xl border border-teal-200 bg-teal-50 px-4 font-bold text-teal-900 outline-none focus:ring-2 focus:ring-teal-500">{fiscalYears.map(year=><option key={year} value={year}>{year}</option>)}</select></label>
+        <div className="flex flex-wrap items-center gap-2 text-xs">
+          <label htmlFor="audit-export-month" className="font-semibold text-slate-700">เลือกเดือน</label>
+          <input id="audit-export-month" type="month"
+            value={`${Number(selectedYear)-(exportMonth>=10?544:543)}-${String(exportMonth).padStart(2,'0')}`}
+            min={`${Number(selectedYear)-544}-10`} max={`${Number(selectedYear)-543}-09`}
+            onChange={event=>{
+              const input=event.currentTarget;
+              if(input.value&&input.validity.valid)setExportMonth(Number(input.value.slice(-2)));
+            }}
+            className="h-8 rounded-lg border border-teal-200 bg-white px-2 text-slate-700"/>
+          <button type="button" onClick={downloadMonthly} disabled={loading||!!error||!hasExportData}
+            className="h-8 rounded-lg bg-teal-700 px-3 font-semibold text-white hover:bg-teal-800 disabled:opacity-50">Download</button>
+        </div>
+      </header>
+      <section aria-label="สรุปคะแนน APIE" className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+        {([{code:'A',name:'การประเมิน',english:'Assessment',value:summaryStats.A},{code:'P',name:'การวางแผน',english:'Planning',value:summaryStats.P},{code:'I',name:'การปฏิบัติ',english:'Implementation',value:summaryStats.I},{code:'E',name:'การประเมินผล',english:'Evaluation',value:summaryStats.E}]).map(card=><div key={card.code} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm"><div className="mb-1 flex items-center gap-2"><span className="flex h-6 w-6 items-center justify-center rounded-lg bg-teal-50 text-sm font-extrabold text-teal-700">{card.code}</span><span className="text-xs font-semibold text-slate-600">{card.name}</span></div><p className="text-2xl font-extrabold tabular-nums text-slate-900">{card.value}<span className="ml-1 text-sm font-medium text-slate-400">{card.value==='—'?'':'%'}</span></p></div>)}
+        <div className="col-span-2 flex flex-col justify-center rounded-2xl bg-teal-800 px-4 py-3 text-white shadow-sm lg:col-span-1"><p className="text-xs font-semibold text-teal-100">คะแนนเฉลี่ยรวม APIE</p><p className="mt-1 text-2xl font-extrabold tabular-nums">{summaryStats.totalAPIE}<span className="ml-1 text-base text-teal-200">{summaryStats.totalAPIE==='—'?'':'%'}</span></p></div>
+      </section>
+
+      <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-4"><div className="flex flex-wrap items-baseline gap-x-3"><h2 className="text-sm font-bold text-slate-800">ผลการประเมินรายหน่วยงาน</h2><p className="text-xs text-slate-400">{tableRows.length} หน่วยงาน · ตุลาคม – กันยายน · คะแนนร้อยละ</p></div><div className="flex items-center gap-4 text-[11px] text-slate-500"><span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-emerald-500"/>ตั้งแต่ 90%</span><span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-rose-500"/>ต่ำกว่า 90%</span></div></div>
+        <MonthlyTableViewport label="ตาราง Audit Chart">
+        <table className="w-full table-fixed border-separate border-spacing-0 text-sm">
+          <thead className="sticky top-0 z-20 bg-slate-50 text-slate-600 font-semibold">
             <tr>
-              <th className="px-5 py-3.5 border-r border-gray-100 text-left sticky left-0 bg-purple-50 z-10 min-w-[220px]">หน่วยงาน</th>
+              <th className="px-4 py-1.5 border-r border-gray-100 text-left sticky left-0 bg-slate-50 z-10 w-[16%]">หน่วยงาน</th>
               {allMonths.map((m) => (
-                <th key={m.code} className="px-2 py-3.5 border-r border-gray-100 text-center w-16 whitespace-nowrap text-xs">
-                  {m.label}
-                </th>
+                <ReportMonthHeading key={m.code} month={m.code} className="!px-0.5" />
               ))}
-              <th className="px-3 py-3.5 border-r border-gray-100 text-center w-20 bg-purple-100 text-xs">A</th>
-              <th className="px-3 py-3.5 border-r border-gray-100 text-center w-20 bg-purple-100 text-xs">P</th>
-              <th className="px-3 py-3.5 border-r border-gray-100 text-center w-20 bg-purple-100 text-xs">I</th>
-              <th className="px-3 py-3.5 border-r border-gray-100 text-center w-20 bg-purple-100 text-xs">E</th>
-              <th className="px-4 py-3.5 text-center w-24 bg-purple-200 text-purple-950 text-xs">เฉลี่ย</th>
+              <th className="px-0.5 py-1.5 border-r border-gray-100 text-right w-[4%] bg-teal-50 text-xs">A</th>
+              <th className="px-0.5 py-1.5 border-r border-gray-100 text-right w-[4%] bg-teal-50 text-xs">P</th>
+              <th className="px-0.5 py-1.5 border-r border-gray-100 text-right w-[4%] bg-teal-50 text-xs">I</th>
+              <th className="px-0.5 py-1.5 border-r border-gray-100 text-right w-[4%] bg-teal-50 text-xs">E</th>
+              <th className="px-0.5 py-1.5 text-right w-[7%] bg-teal-100 text-teal-950 text-xs">เฉลี่ย</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 bg-white">
@@ -354,15 +332,15 @@ export default function AuditChartPage() {
                 const valAvg = parseFloat(row.avgTotal);
 
                 return (
-                  <tr key={index} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-5 py-3.5 border-r border-gray-100 font-medium text-gray-900 sticky left-0 bg-white">
+                  <tr key={index} className="group hover:bg-teal-50/30 transition-colors">
+                    <td className="px-4 py-1.5 border-r border-gray-100 font-medium text-gray-900 sticky left-0 z-10 bg-white group-hover:bg-teal-50">
                       <button 
                         onClick={() => setSelectedDeptModal({ id: row.departmentId, name: row.departmentName })}
-                        className="text-indigo-600 hover:text-indigo-900 hover:underline text-left font-medium focus:outline-none flex items-center gap-2"
-                        title="คลิกเพื่อดูสรุป 3 ปีย้อนหลัง"
+                        className="text-indigo-600 hover:text-indigo-900 hover:underline text-left font-medium flex w-full min-w-0 items-center gap-1"
+                        title={row.departmentName + " · คลิกเพื่อดูสรุป 3 ปีย้อนหลัง"}
                       >
-                        <span>🏢</span>
-                        <span>{row.departmentName}</span>
+                        <span aria-hidden="true" className="shrink-0">🏢</span>
+                        <span className="min-w-0 truncate">{row.departmentName}</span>
                       </button>
                     </td>
                     {allMonths.map((m) => {
@@ -371,48 +349,49 @@ export default function AuditChartPage() {
                       const isLow = numVal !== null && numVal < 90;
 
                       return (
-                        <td key={m.code} className="px-1.5 py-3.5 border-r border-gray-100 text-center">
-                          {numVal !== undefined && numVal !== null ? (
+                        <td key={m.code} className="px-0.5 py-1.5 border-r border-gray-100 text-right">
+                          {numVal !== null && Number.isFinite(numVal) ? (
+                            <ReportValue align="compact" warning={row.pendingMonths.has(m.code)&&<ReportStatusIcon status="pending"/>}>
                             <button
                               onClick={() => handleCellClick(row.departmentId, row.departmentName, m.code, m.label)}
-                              className={`inline-block px-1.5 py-0.5 rounded text-xs font-semibold cursor-pointer hover:scale-105 transition-transform ${
+                              className={`inline-block px-0.5 py-0.5 rounded-lg text-xs tabular-nums font-semibold cursor-pointer hover:scale-105 transition-transform ${
                                 isLow
                                   ? 'bg-red-50 text-red-600 border border-red-200'
                                   : 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                               }`}
                             >
                               {numVal.toFixed(1)}
-                            </button>
+                            </button></ReportValue>
                           ) : (
-                            <span className="text-gray-300 text-xs">-</span>
+                            <ReportStatusIcon status="waiting"/>
                           )}
                         </td>
                       );
                     })}
                     
-                    <td className="px-2 py-3.5 border-r border-gray-100 text-center bg-gray-50/50">
-                      <span className={`text-xs font-bold ${valA < 90 ? 'text-red-600' : 'text-indigo-600'}`}>
+                    <td className="px-0.5 py-1.5 border-r border-gray-100 text-right bg-gray-50/50">
+                      <span className={`text-xs tabular-nums font-bold ${valA < 90 ? 'text-red-600' : 'text-teal-700'}`}>
                         {row.pctA}
                       </span>
                     </td>
-                    <td className="px-2 py-3.5 border-r border-gray-100 text-center bg-gray-50/50">
-                      <span className={`text-xs font-bold ${valP < 90 ? 'text-red-600' : 'text-indigo-600'}`}>
+                    <td className="px-0.5 py-1.5 border-r border-gray-100 text-right bg-gray-50/50">
+                      <span className={`text-xs tabular-nums font-bold ${valP < 90 ? 'text-red-600' : 'text-teal-700'}`}>
                         {row.pctP}
                       </span>
                     </td>
-                    <td className="px-2 py-3.5 border-r border-gray-100 text-center bg-gray-50/50">
-                      <span className={`text-xs font-bold ${valI < 90 ? 'text-red-600' : 'text-indigo-600'}`}>
+                    <td className="px-0.5 py-1.5 border-r border-gray-100 text-right bg-gray-50/50">
+                      <span className={`text-xs tabular-nums font-bold ${valI < 90 ? 'text-red-600' : 'text-teal-700'}`}>
                         {row.pctI}
                       </span>
                     </td>
-                    <td className="px-2 py-3.5 border-r border-gray-100 text-center bg-gray-50/50">
-                      <span className={`text-xs font-bold ${valE < 90 ? 'text-red-600' : 'text-indigo-600'}`}>
+                    <td className="px-0.5 py-1.5 border-r border-gray-100 text-right bg-gray-50/50">
+                      <span className={`text-xs tabular-nums font-bold ${valE < 90 ? 'text-red-600' : 'text-teal-700'}`}>
                         {row.pctE}
                       </span>
                     </td>
-                    <td className="px-3 py-3.5 text-center bg-indigo-50/60">
-                      <span className={`text-xs font-extrabold ${valAvg < 90 ? 'text-red-600' : 'text-indigo-950'}`}>
-                        {row.avgTotal}
+                    <td className="px-0.5 py-1.5 text-right bg-teal-50/70">
+                      <span className={`text-xs tabular-nums font-extrabold ${valAvg < 90 ? 'text-red-600' : 'text-teal-950'}`}>
+                        {Number.isFinite(valAvg) ? <ReportValue align="compact" warning={row.pendingMonths.size>0&&<ReportStatusIcon status="pending"/>}>{row.avgTotal}</ReportValue> : row.avgTotal}
                       </span>
                     </td>
                   </tr>
@@ -427,7 +406,8 @@ export default function AuditChartPage() {
             )}
           </tbody>
         </table>
-      </div>
+        </MonthlyTableViewport>
+      </section>
 
       {/* Modal แสดงรายละเอียด A, P, I, E และ D/C เมื่อคลิกตัวเลขรายเดือน */}
       {cellModalOpen && (
@@ -449,19 +429,19 @@ export default function AuditChartPage() {
             <div className="p-6 space-y-3">
               <div className="flex justify-between items-center bg-gray-50 p-3.5 rounded-xl border border-gray-200">
                 <span className="font-semibold text-gray-700 text-sm">A (Assessment)</span>
-                <span className="font-extrabold text-indigo-600 text-base">{selectedCellDetail?.a}</span>
+                <span className="font-extrabold text-teal-700 text-base">{selectedCellDetail?.a}</span>
               </div>
               <div className="flex justify-between items-center bg-gray-50 p-3.5 rounded-xl border border-gray-200">
                 <span className="font-semibold text-gray-700 text-sm">P (Planning)</span>
-                <span className="font-extrabold text-indigo-600 text-base">{selectedCellDetail?.p}</span>
+                <span className="font-extrabold text-teal-700 text-base">{selectedCellDetail?.p}</span>
               </div>
               <div className="flex justify-between items-center bg-gray-50 p-3.5 rounded-xl border border-gray-200">
                 <span className="font-semibold text-gray-700 text-sm">I (Implementation)</span>
-                <span className="font-extrabold text-indigo-600 text-base">{selectedCellDetail?.i}</span>
+                <span className="font-extrabold text-teal-700 text-base">{selectedCellDetail?.i}</span>
               </div>
               <div className="flex justify-between items-center bg-gray-50 p-3.5 rounded-xl border border-gray-200">
                 <span className="font-semibold text-gray-700 text-sm">E (Evaluation)</span>
-                <span className="font-extrabold text-indigo-600 text-base">{selectedCellDetail?.e}</span>
+                <span className="font-extrabold text-teal-700 text-base">{selectedCellDetail?.e}</span>
               </div>
               <div className="flex justify-between items-center bg-emerald-50/50 p-3.5 rounded-xl border border-emerald-200">
                 <span className="font-semibold text-emerald-800 text-sm">บันทึกจำหน่าย (D/C)</span>
@@ -487,7 +467,7 @@ export default function AuditChartPage() {
           <div className="bg-white rounded-2xl shadow-xl max-w-lg w-full p-6 space-y-4 animate-in fade-in zoom-in duration-200">
             <div className="flex justify-between items-center border-b pb-3">
               <h3 className="text-lg font-bold text-gray-900">
-                สรุปผล 3 ปีย้อนหลัง: <span className="text-indigo-600">{selectedDeptModal.name}</span>
+                สรุปผล 3 ปีย้อนหลัง: <span className="text-teal-700">{selectedDeptModal.name}</span>
               </h3>
               <button 
                 onClick={() => setSelectedDeptModal(null)}

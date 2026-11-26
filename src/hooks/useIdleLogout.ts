@@ -1,8 +1,10 @@
 'use client';
 import { useState, useEffect } from 'react';
+import {usePathname} from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 
 export const useIdleLogout = (timeoutInMinutes: number = 5) => {
+  const pathname=usePathname();
   const [showWarning, setShowWarning] = useState(false);
   const timeoutMs = timeoutInMinutes * 60 * 1000;
 
@@ -46,7 +48,7 @@ export const useIdleLogout = (timeoutInMinutes: number = 5) => {
       clearTimeout(idleTimer);
       clearTimeout(warningTimer);
     };
-  }, [timeoutMs]); // 👈 ตัด supabase ออกจาก dependency ได้เลย เพราะสร้างข้างในแล้ว
+  }, [timeoutMs,pathname]); // 👈 ตัด supabase ออกจาก dependency ได้เลย เพราะสร้างข้างในแล้ว
 
   return { showWarning, setShowWarning };
 };

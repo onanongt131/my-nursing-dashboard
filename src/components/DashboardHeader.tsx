@@ -78,11 +78,11 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
     { name: 'wp-qa', label: 'WP/QA', path: '/dashboard/wp-qa' },
     { name: 'iv-care', label: 'IV care', path: '/dashboard/iv-care' },
     { name: 'audit-chart', label: 'Audit chart', path: '/dashboard/audit-chart' },
-    { name: 'fall', label: 'Fall', path: '/dashboard/fall' },
-    { name: 'pressure-sore', label: 'Pressure sore', path: '/dashboard/pressure-sore' },
-    { name: 'readmit', label: 'Re-admit', path: '/dashboard/readmit' },
-    { name: 'ama', label: 'จำหน่ายไม่สมัครใจ (AMA)', path: '/dashboard/ama' },
-    { name: 'pressure-sore-entry', label: 'บันทึก Pressure sore (ทุกหน่วยงาน)', path: '/dashboard/pressure-sore/entry' },
+    { name: 'fall', label: 'Fall', path: '/dashboard/fall-report' },
+    { name: 'pressure-sore', label: 'Pressure sore', path: '/dashboard/pressure-sore-report' },
+    { name: 'readmit', label: 'Re-admit', path: '/dashboard/readmit-report' },
+    { name: 'ama', label: 'จำหน่ายไม่สมัครใจ (AMA)', path: '/dashboard/ama-report' },
+    { name: 'pressure-sore-entry', label: 'บันทึก Pressure sore (ทุกหน่วยงาน)', path: '/dashboard/pressure-sore-entry' },
   ];
 
 

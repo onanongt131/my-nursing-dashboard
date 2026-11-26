@@ -1,15 +1,17 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { createClient } from '@/utils/supabase/client';
+import { type Department } from '@/lib/permissions/staffingAccess';
+
 
 export default function WardCommandCenterPage() {
+  const [dataError,setDataError]=useState('');
   const [loading, setLoading] = useState(true);
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr = new Date(Date.now() + 7 * 3600000).toISOString().slice(0, 10);
   
   const [selectedDate, setSelectedDate] = useState(todayStr);
   const [selectedShift, setSelectedShift] = useState('เวรเช้า');
-  const [departments, setDepartments] = useState<any[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [selectedDeptId, setSelectedDeptId] = useState<string>('');
 
   const [staffNames, setStaffNames] = useState<string>('-');
@@ -37,55 +39,47 @@ export default function WardCommandCenterPage() {
   });
 
   useEffect(() => {
+    const controller = new AbortController();
     async function initDepts() {
-      const supabase = createClient();
-      const { data: deptData } = await supabase.from('departments').select('*');
-
-      if (deptData) {
-        const validDepts = deptData.filter((d: any) => {
-          const name = (d.Department || d.department_name || d.name || '').trim();
-          const isOPD = name.toUpperCase().startsWith('OPD');
-          const excludedNames = [
-            'อายุรกรรมชาย 1',
-            'พิเศษอายุรกรรมชั้น 4',
-            'พิเศษอายุรกรรมชั้น 5',
-            'ศูนย์ใจรักษ์',
-            'ศูนย์ดูแลบาดแผล',
-            'อายุรกรรมหญิง'
-          ];
-          const isExcluded = excludedNames.some(exc => name.includes(exc));
-          return !isOPD && !isExcluded;
-        });
-
-        setDepartments(validDepts);
-        if (validDepts.length > 0 && !selectedDeptId) {
-          setSelectedDeptId(String(validDepts[0].id));
-        }
+      try {
+        const response = await fetch('/api/staffing/access-context', {cache:'no-store', signal:controller.signal});
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || 'อ่านหน่วยงานไม่สำเร็จ');
+        if (controller.signal.aborted) return;
+        const allowed: Department[] = result.departments;
+        const own = allowed.find(dept => Number(dept.id) === Number(result.profile.department_id));
+        const first = own ?? allowed[0];
+        if (!first) throw new Error('บัญชีนี้ไม่มีหน่วยงานที่มีสิทธิ์ดู');
+        setDepartments(allowed);
+        setSelectedDeptId(String(first.id));
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        setDataError(error instanceof Error ? error.message : 'อ่านหน่วยงานไม่สำเร็จ');
+        setLoading(false);
       }
     }
-    initDepts();
+    void initDepts();
+    return () => controller.abort();
   }, []);
 
   useEffect(() => {
+    const controller=new AbortController();
     async function fetchWardDetails() {
       if (!selectedDeptId) return;
       try {
-        setLoading(true);
-        const supabase = createClient();
+        setLoading(true);setDataError('');
 
-        const currentDept = departments.find((d: any) => String(d.id) === selectedDeptId);
-        const deptName = currentDept ? (currentDept.Department || currentDept.department_name || currentDept.name) : 'หอผู้ป่วย';
+        const params = new URLSearchParams({
+          date: selectedDate, shift: selectedShift, department_id: selectedDeptId,
+        });
+        const response = await fetch(`/api/staffing/inspection-report?${params}`, {cache:'no-store', signal:controller.signal});
+        const result = await response.json();
+        if (controller.signal.aborted) return;
+        if (!response.ok) throw new Error(result.error || 'อ่านข้อมูลหน่วยงานไม่สำเร็จ');
+        const currentDept = result.departments.find((dept: Department) => String(dept.id) === selectedDeptId);
+        const deptName = currentDept?.Department || 'หอผู้ป่วย';
         const totalBeds = Number(currentDept?.total_beds || currentDept?.beds || currentDept?.bed_count || 0);
-
-        const { data: staffingRows } = await supabase
-          .from('daily_staffing')
-          .select('*')
-          .eq('department_id', selectedDeptId);
-
-        let matchedRow = staffingRows?.find((r: any) => r.date === selectedDate && r.shift === selectedShift);
-        if (!matchedRow && staffingRows && staffingRows.length > 0) {
-          matchedRow = staffingRows[0];
-        }
+        const matchedRow=result.records.find((row:any)=>String(row.department_id)===selectedDeptId);
 
         if (matchedRow && (matchedRow.staff_names || matchedRow.staff || matchedRow.names)) {
           setStaffNames(matchedRow.staff_names || matchedRow.staff || matchedRow.names);
@@ -168,7 +162,7 @@ export default function WardCommandCenterPage() {
             shiftName: selectedShift,
             required: req,
             rn: matchedRow?.rn_count || 0,
-            pnNa: '-',
+            pnNa: String(Number(matchedRow?.pn_count||0)+Number(matchedRow?.na_count||0)),
             staffMix: `${currentStaffMixVal.toFixed(1)}%`,
             status: isNormal ? 'ผ่าน' : 'ต้องแก้ไข',
             statusBg: isNormal ? 'bg-emerald-100 text-emerald-700 border border-emerald-200' : 'bg-rose-100 text-rose-700 border border-rose-200'
@@ -198,17 +192,20 @@ export default function WardCommandCenterPage() {
         });
 
       } catch (err) {
-        console.error(err);
+        if(controller.signal.aborted)return;
+        setDataError(err instanceof Error?err.message:'อ่าน daily_staffing ไม่สำเร็จ');
       } finally {
-        setLoading(false);
+        if(!controller.signal.aborted)setLoading(false);
       }
     }
 
     fetchWardDetails();
-  }, [selectedDeptId, selectedDate, selectedShift, departments]);
+    return ()=>controller.abort();
+  }, [selectedDeptId, selectedDate, selectedShift]);
 
   return (
     <div className="min-h-screen bg-slate-50 text-slate-800 p-4 space-y-4 font-sans">
+      {dataError && <div role="alert" className="p-3 bg-red-50 text-red-800">{dataError}</div>}
       <div className="max-w-7xl mx-auto space-y-4">
         
         {/* Header แถบบนสุด พร้อมโลโก้โรงพยาบาลวชิระภูเก็ต และปุ่มกลับหน้าภาพรวม */}
@@ -229,12 +226,13 @@ export default function WardCommandCenterPage() {
           <div className="flex flex-wrap items-center gap-3 mt-3 sm:mt-0">
             <select
               value={selectedDeptId}
+              disabled={departments.length <= 1}
               onChange={(e) => setSelectedDeptId(e.target.value)}
               className="bg-white border border-slate-300 text-slate-700 text-xs rounded-xl px-3 py-2 w-48 sm:w-56 focus:outline-none focus:ring-2 focus:ring-emerald-500 shadow-xs truncate"
             >
-              {departments.map((d: any) => (
+              {departments.map(d => (
                 <option key={d.id} value={d.id}>
-                  {d.Department || d.department_name || d.name}
+                  {d.Department}
                 </option>
               ))}
             </select>

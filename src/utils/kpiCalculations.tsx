@@ -76,7 +76,7 @@ export const getYearlyTrend = (
   kpiType: KpiType, 
   operator: string, 
   target?: number | string, 
-  currentYear: number = 2569
+  currentYear: number = 2570
 ): React.ReactNode => {
   const prevYear = currentYear - 1;
   const avgCurrent = calculateYearlySummary(entries, currentYear, kpiType);

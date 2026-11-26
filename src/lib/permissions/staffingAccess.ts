@@ -2,6 +2,8 @@ export type UserProfile = {
   id: string;
   full_name: string | null;
   department_id: number | null;
+  /** หน่วยงานหลัก + หน่วยงานที่ดูแลเพิ่ม */
+  department_ids?: number[];
   role: string | null;
   email: string | null;
 };
@@ -20,8 +22,9 @@ export function canViewGroupDepartments(role?: string | null) {
   return role === 'head_group';
 }
 
-export function canSelectDepartment(role?: string | null) {
+export function canSelectDepartment(role?: string | null, departmentCount = 0) {
   return (
+    departmentCount > 1 ||
     role === 'admin' ||
     role === 'head_nurse' ||
     role === 'head_group'
@@ -51,7 +54,7 @@ export function getVisibleDepartments(
   }
 
   // head_group เห็นเฉพาะหน่วยงานในกลุ่มงานของตัวเอง
-  if (profile.role === 'head_group') {
+  if (profile.role === 'head_group' && userGroup) {
     return departments.filter(
       (dept) => dept.group === userGroup
     );
@@ -59,9 +62,8 @@ export function getVisibleDepartments(
 
   // head_department และ role อื่น
   // เห็นเฉพาะหน่วยงานของตัวเอง
+  const ids = profile.department_ids?.length ? profile.department_ids.map(Number) : [Number(profile.department_id)];
   return departments.filter(
-    (dept) =>
-      Number(dept.id) ===
-      Number(profile.department_id)
+    (dept) => ids.includes(Number(dept.id))
   );
 }

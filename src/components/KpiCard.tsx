@@ -10,7 +10,7 @@ export default function KpiCard({ kpi, chartData }: { kpi: any, chartData: any[]
 
   // ปรับปรุง: ใช้ useMemo เพื่อประสิทธิภาพที่ดีขึ้น
   const fullData = useMemo(() => {
-    return [2565, 2566, 2567, 2568, 2569].map((year) => {
+    return [2565, 2566, 2567, 2568, 2569, 2570].map((year) => {
       const found = chartData.find((d) => Number(d.year) === year);
       return {
         year: year.toString(),

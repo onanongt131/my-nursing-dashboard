@@ -1,10 +1,11 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
-import { createClient } from '@/utils/supabase/client';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { usableNp } from '@/lib/productivityReport';
 import { PrinterIcon, XMarkIcon } from '@heroicons/react/24/solid';
 
 export default function DepartmentDailyStatsTab({ departmentId }: { departmentId: string | number }) {
-  const supabase = createClient();
+  const requestId=useRef(0);
+  const [loadError,setLoadError]=useState('');
   const [selectedMonth, setSelectedMonth] = useState<string>(new Date().toISOString().slice(0, 7)); // รูปแบบ YYYY-MM
   const [statsData, setStatsData] = useState<any[]>([]);
   const [loading, setLoading] = useState<boolean>(false);
@@ -13,35 +14,12 @@ export default function DepartmentDailyStatsTab({ departmentId }: { departmentId
 
   const fetchDailyStats = useCallback(async () => {
     if (!departmentId) return;
+    const token=++requestId.current;
     setLoading(true);
 
-    const startDate = `${selectedMonth}-01`;
-    const [yearStr, monthStr] = selectedMonth.split('-');
-    const year = Number(yearStr);
-    const month = Number(monthStr);
-
-    const lastDayDate = new Date(year, month, 0).getDate();
-    const endDate = `${selectedMonth}-${String(lastDayDate).padStart(2, '0')}`;
-
-    const [statsRes, deptRes] = await Promise.all([
-      supabase
-        .from('daily_staffing')
-        .select('*')
-        .eq('department_id', departmentId)
-        .gte('date', startDate)
-        .lte('date', endDate)
-        .order('date', { ascending: true }),
-      supabase
-        .from('departments')
-        .select('*')
-        .eq('id', departmentId)
-        .single()
-    ]);
-
-    if (statsRes.error) {
-      console.error('Error fetching daily_staffing:', statsRes.error);
-      setStatsData([]);
-    } else {
+    setLoadError('');
+    try{
+      const r=await fetch('/api/department-daily-stats?'+new URLSearchParams({department_id:String(departmentId),month:selectedMonth}),{cache:'no-store'}),body=await r.json();if(!r.ok)throw new Error(body.error||'อ่านสถิติไม่สำเร็จ');if(token!==requestId.current)return;setDepartmentName(body.departmentName||'');const statsRes={data:body.items};
       const shiftPriority: { [key: string]: number } = {
         'เวรดึก': 1,
         'ดึก': 1,
@@ -63,11 +41,11 @@ export default function DepartmentDailyStatsTab({ departmentId }: { departmentId
       });
 
       setStatsData(sortedData);
-    }
+    }catch(e){if(token===requestId.current)setLoadError(e instanceof Error?e.message:'อ่านสถิติไม่สำเร็จ');}
 
 
-    setLoading(false);
-  }, [supabase, departmentId, selectedMonth]);
+    if(token===requestId.current)setLoading(false);
+  }, [departmentId, selectedMonth]);
 
   useEffect(() => {
     fetchDailyStats();
@@ -80,8 +58,8 @@ export default function DepartmentDailyStatsTab({ departmentId }: { departmentId
       acc[d] = { shifts: [], npSum: 0, count: 0 };
     }
     acc[d].shifts.push(row);
-    acc[d].npSum += Number(row.np || 0);
-    acc[d].count += 1;
+    const np = usableNp(row.np); // NP ว่าง/0 ไม่นำมาเฉลี่ย (ตรงกับหน้า Nursing Productivity)
+    if (np !== null) { acc[d].npSum += np; acc[d].count += 1; }
     return acc;
   }, {});
 
@@ -101,10 +79,11 @@ export default function DepartmentDailyStatsTab({ departmentId }: { departmentId
   }
 
   let sumDailyAverages = 0;
-  daysArray.forEach(d => {
+  const npDays = daysArray.filter(d => dailyGroups[d].count > 0);
+  npDays.forEach(d => {
     sumDailyAverages += dailyAverages[d];
   });
-  const monthlyAveragePerDay = totalDays > 0 ? sumDailyAverages / totalDays : 0;
+  const monthlyAveragePerDay = npDays.length > 0 ? sumDailyAverages / npDays.length : 0;
 
   const firstDate = daysArray[0];
   const lastDate = daysArray[daysArray.length - 1];
@@ -299,6 +278,7 @@ export default function DepartmentDailyStatsTab({ departmentId }: { departmentId
     printWindow.document.close();
   };
 
+  if(loadError)return <div role="alert" className="rounded-xl bg-red-50 p-4 text-red-800">{loadError}<button type="button" className="ml-2 underline" onClick={()=>fetchDailyStats()}>ลองโหลดใหม่</button></div>;
   return (
     <div className="space-y-4">
       {/* ส่วนควบคุมบนหน้าเว็บปกติ */}

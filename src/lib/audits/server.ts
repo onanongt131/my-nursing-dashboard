@@ -4,7 +4,8 @@ import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 
 export type AuditRole = 'staff' | 'head_department' | 'head_group' | 'head_nurse' | 'admin';
-export type AuditUser = { id: string; role: AuditRole; departmentId: number | null; group: string | null };
+// departmentId = หน่วยงานหลัก • departmentIds = หน่วยงานหลัก + หน่วยงานที่ดูแลเพิ่ม (profiles.extra_department_ids)
+export type AuditUser = { id: string; role: AuditRole; departmentId: number | null; departmentIds: number[]; group: string | null };
 export const FORM_TYPES = ['er', 'lr', 'or', 'dialysis', 'hbot', 'anesthesia', 'opd'] as const;
 export type FormType = typeof FORM_TYPES[number];
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -25,32 +26,43 @@ export function unexpected(error: unknown) {
   console.error('Audit API failure', error instanceof Error ? error.name : 'unknown');
   return fail('ไม่สามารถดำเนินการได้ กรุณาติดต่อผู้ดูแลระบบ', 500);
 }
+type ProfileRow = { id: string; role: string; department_id: number | null; status: string; departments: unknown; extra_department_ids?: number[] | null };
+/** อ่านโปรไฟล์พร้อมหน่วยงานที่ดูแลเพิ่ม • ถ้ายังไม่ได้เพิ่มคอลัมน์ extra_department_ids ใน Supabase ให้อ่านแบบเดิม (ผู้ใช้ยังเข้าระบบได้) */
+async function readProfile(id: string): Promise<{ data: ProfileRow | null; error: unknown }> {
+  const first = await db().from('profiles').select('id, role, department_id, status, extra_department_ids, departments(group)').eq('id', id).maybeSingle();
+  if (!first.error) return { data: first.data as ProfileRow | null, error: null };
+  if (!/extra_department_ids/.test(String((first.error as { message?: string }).message || ''))) return { data: null, error: first.error };
+  const legacy = await db().from('profiles').select('id, role, department_id, status, departments(group)').eq('id', id).maybeSingle();
+  return { data: legacy.data as ProfileRow | null, error: legacy.error };
+}
+export function userDepartmentIds(primary: unknown, extra: unknown): number[] {
+  const list = [primary, ...(Array.isArray(extra) ? extra : [])].map(Number).filter(n => Number.isSafeInteger(n) && n > 0);
+  return [...new Set(list)];
+}
 export async function currentUser(): Promise<AuditUser | null> {
   const session = await auth();
   const id = session?.user?.id;
   if (!id || !UUID.test(id)) return null;
-  const { data: p, error } = await db().from('profiles')
-    .select('id, role, department_id, status, departments(group)')
-    .eq('id', id).maybeSingle();
+  const { data: p, error } = await readProfile(id);
   if (error || !p || p.status !== 'approved') return null;
   const roles: AuditRole[] = ['staff', 'head_department', 'head_group', 'head_nurse', 'admin'];
   if (!roles.includes(p.role as AuditRole)) return null;
   const d = p.departments as unknown as { group?: string | null } | null;
-  return { id: p.id, role: p.role as AuditRole, departmentId: p.department_id, group: d?.group ?? null };
+  return { id: p.id, role: p.role as AuditRole, departmentId: p.department_id, departmentIds: userDepartmentIds(p.department_id, p.extra_department_ids), group: d?.group ?? null };
 }
 export async function canRead(user: AuditUser, departmentId: number) {
   if (user.role === 'admin' || user.role === 'head_nurse') return true;
-  if (user.departmentId === departmentId) return true;
+  if (user.departmentIds.includes(Number(departmentId))) return true;
   if (user.role !== 'head_group' || !user.group) return false;
   const { data, error } = await db().from('departments').select('id').eq('id', departmentId).eq('group', user.group).maybeSingle();
   if (error) return false;
   return !!data;
 }
 export function canCreate(user: AuditUser, departmentId: number) {
-  return user.role === 'admin' || user.role === 'head_nurse' || user.departmentId === departmentId;
+  return user.role === 'admin' || user.role === 'head_nurse' || user.departmentIds.includes(Number(departmentId));
 }
 export function canApprove(user: AuditUser, departmentId: number) {
-  return user.role === 'admin' || user.role === 'head_nurse' || (user.role === 'head_department' && user.departmentId === departmentId);
+  return user.role === 'admin' || user.role === 'head_nurse' || (user.role === 'head_department' && user.departmentIds.includes(Number(departmentId)));
 }
 export function validId(id: string) { return UUID.test(id); }
 export function validDept(n: unknown): n is number { return typeof n === 'number' && Number.isSafeInteger(n) && n > 0; }

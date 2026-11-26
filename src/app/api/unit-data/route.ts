@@ -13,7 +13,7 @@ export async function POST(request:NextRequest){try{
  if((query.get('select')||'').includes('('))return fail('กรุณาใช้คำขอแยกตามหน่วยงาน',400);
  let allowed:number[]=[];if(user.role==='admin'||user.role==='head_nurse'){}else if(user.role==='head_group'){
  const {data,error}=await db().from('departments').select('id');if(error)throw error;for(const d of data||[])if(await canRead(user,Number(d.id)))allowed.push(Number(d.id));
- }else if(user.departmentId)allowed=[Number(user.departmentId)];
+ }else allowed=[...user.departmentIds];
  if(user.role!=='admin'&&user.role!=='head_nurse'){
  if(!allowed.length)return fail('บัญชียังไม่ได้ผูกหน่วยงาน กรุณาติดต่อผู้ดูแลระบบ',403);
  // append, rather than replace, preserves caller filters while enforcing an AND restriction.
@@ -30,7 +30,7 @@ export async function POST(request:NextRequest){try{
  if(body.method==='POST')row.department_id=target;
  }
  }
- if(user.role!=='admin'&&user.role!=='head_nurse'){if(!user.departmentId)return fail('ไม่พบหน่วยงาน',403);query.append('department_id',`eq.${user.departmentId}`);}
+ if(user.role!=='admin'&&user.role!=='head_nurse'){if(!user.departmentIds.length)return fail('ไม่พบหน่วยงาน',403);query.append('department_id',user.departmentIds.length===1?`eq.${user.departmentIds[0]}`:`in.(${user.departmentIds.join(',')})`);}
  }
  const base=process.env.NEXT_PUBLIC_SUPABASE_URL,key=process.env.SUPABASE_SERVICE_ROLE_KEY;if(!base||!key)throw Error('Missing configuration');
  const headers:Record<string,string>={apikey:key,Authorization:`Bearer ${key}`,'Content-Type':'application/json'};

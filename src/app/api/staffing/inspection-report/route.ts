@@ -14,7 +14,7 @@ export async function GET(request: Request) {
     let departmentsQuery = client.from('departments').select('*');
     if (!['admin','head_nurse'].includes(user.role)) {
       if (user.role === 'head_group' && user.group) departmentsQuery = departmentsQuery.eq('group',user.group);
-      else if (user.departmentId) departmentsQuery = departmentsQuery.eq('id',user.departmentId);
+      else if (user.departmentIds.length) departmentsQuery = departmentsQuery.in('id',user.departmentIds);
       else return fail('ไม่พบหน่วยงานที่มีสิทธิ์อ่าน',403);
     }
     if (selected !== null) departmentsQuery = departmentsQuery.eq('id', departmentId);

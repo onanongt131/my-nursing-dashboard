@@ -57,7 +57,8 @@ export default function CategoryClient({ category }: { category: string }) {
           const userGroup = (userProfile.departments as any)?.group;
 
           if (role === 'staff' || role === 'head_department') {
-            filtered = allKpis.filter((k: any) => k.departments_id === userDeptId);
+            const userDeptIds = [userDeptId, ...((userProfile as any).extra_department_ids || [])].map(Number); // หน่วยงานหลัก + หน่วยงานที่ดูแลเพิ่ม
+            filtered = allKpis.filter((k: any) => userDeptIds.includes(Number(k.departments_id)));
           } 
           else if (role === 'head_group' && userGroup) {
             const { data: deptsInGroup } = await supabase

@@ -15,6 +15,8 @@ export default function RegisterPage() {
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
   const [deptId, setDeptId] = useState(''); 
+  const [extraIds, setExtraIds] = useState<string[]>([]); // หน่วยงานที่ดูแลเพิ่ม (หัวหน้าที่ดูแลหลายหน่วยงาน)
+  const [multi, setMulti] = useState(false);
   const [departments, setDepartments] = useState<Department[]>([]); 
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
@@ -47,6 +49,10 @@ export default function RegisterPage() {
       setErrorMsg('กรุณาเลือกหน่วยงานพยาบาลของคุณ');
       return;
     }
+    if (multi && !extraIds.filter(id => id !== deptId).length) {
+      setErrorMsg('กรุณาเลือกหน่วยงานที่ดูแลเพิ่มอย่างน้อย 1 หน่วยงาน หรือเอาเครื่องหมายออก');
+      return;
+    }
 
     setLoading(true);
 
@@ -59,6 +65,8 @@ export default function RegisterPage() {
           data: {
             full_name: fullName,
             department_id: deptId,
+            // ผู้ดูแลระบบตรวจ/แก้ได้ก่อนอนุมัติ • บันทึกลง profiles.extra_department_ids ด้วย trigger ใน Supabase
+            extra_department_ids: multi ? extraIds.filter(id => id !== deptId).map(Number) : [],
           },
         },
       });
@@ -119,6 +127,25 @@ export default function RegisterPage() {
               <option value="">-- กรุณาเลือกหน่วยงาน --</option>
               {departments.map((dept) => <option key={dept.id} value={dept.id}>{dept.Department}</option>)}
             </select>
+            <p className="mt-1 text-xs text-gray-500">หน่วยงานหลักของคุณ</p>
+          </div>
+          <div>
+            <label className="flex items-center gap-2 text-sm font-medium text-gray-700">
+              <input type="checkbox" className="h-4 w-4" checked={multi} onChange={(e) => setMulti(e.target.checked)} />
+              ดูแลหน่วยงานอื่นด้วย (เช่น หัวหน้าที่ดูแล 2 หน่วยงาน)
+            </label>
+            {multi && (
+              <div className="mt-2 max-h-48 overflow-y-auto rounded-xl border border-gray-300 p-2">
+                {departments.filter(d => String(d.id) !== deptId).map(d => (
+                  <label key={d.id} className="flex items-center gap-2 rounded-lg px-2 py-1 text-sm hover:bg-gray-50">
+                    <input type="checkbox" className="h-4 w-4" checked={extraIds.includes(String(d.id))}
+                      onChange={(e) => setExtraIds(ids => e.target.checked ? [...ids, String(d.id)] : ids.filter(x => x !== String(d.id)))} />
+                    {d.Department}
+                  </label>
+                ))}
+              </div>
+            )}
+            {multi && <p className="mt-1 text-xs text-gray-500">ผู้ดูแลระบบจะตรวจหน่วยงานที่เลือกก่อนอนุมัติบัญชี</p>}
           </div>
           <button className="w-full bg-purple-600 text-white p-3 rounded-xl font-bold hover:bg-purple-700 disabled:bg-gray-300" disabled={loading}>
             {loading ? <><Loader2 className="w-5 h-5 animate-spin" /> กำลังบันทึก...</> : 'สมัครสมาชิก'}

@@ -162,7 +162,7 @@ export default function StaffingDayOffPage() {
         const allowedDepartments: Department[] = result.departments || [];
         setUserProfile(profile); setUserGroup(result.group ?? null); setDepartments(allowedDepartments);
         const own = allowedDepartments.find(d => Number(d.id) === Number(profile.department_id));
-        setSelectedDept(own?.id ?? (canSelectDepartment(profile.role) ? allowedDepartments[0]?.id ?? '' : ''));
+        setSelectedDept(own?.id ?? (canSelectDepartment(profile.role, profile.department_ids?.length) ? allowedDepartments[0]?.id ?? '' : ''));
         setAccessError('');
       } catch (error) {
         if (controller.signal.aborted) return;
@@ -180,7 +180,7 @@ export default function StaffingDayOffPage() {
     userGroup
   );
 
-  const allowDepartmentSelect = canSelectDepartment(userProfile?.role);
+  const allowDepartmentSelect = canSelectDepartment(userProfile?.role, userProfile?.department_ids?.length);
 
   // สิทธิ์หน้า "ขอหยุด" แยกจากสิทธิ์แก้ตารางเวร
   // ผู้ใช้ทุกคนที่มี department_id สามารถเพิ่มคำขอหยุดได้

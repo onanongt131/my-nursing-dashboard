@@ -102,7 +102,7 @@ export async function POST(request: Request) {
     const client = db();
 
     if (body.action === 'create') {
-      if (!user.departmentId || (user.role !== 'admin' && user.departmentId !== department)) {
+      if (!user.departmentIds.length || (user.role !== 'admin' && !user.departmentIds.includes(department))) {
         return fail('ไม่มีสิทธิ์เพิ่มคำขอหยุดของหน่วยงานนี้', 403);
       }
       const { staff_id: staffId, start, end } = body;
@@ -134,7 +134,7 @@ export async function POST(request: Request) {
       return Response.json({ saved: data.length, existing: records.length - data.length });
     }
 
-    if (user.role !== 'admin' && !(user.role === 'head_department' && user.departmentId === department)) {
+    if (user.role !== 'admin' && !(user.role === 'head_department' && user.departmentIds.includes(department))) {
       return fail('ไม่มีสิทธิ์จัดการคำขอหยุดของหน่วยงานนี้', 403);
     }
     if (!validDept(body.id)) return fail('รายการคำขอไม่ถูกต้อง');

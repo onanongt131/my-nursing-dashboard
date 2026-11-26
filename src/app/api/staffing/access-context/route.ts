@@ -1,5 +1,5 @@
 import {auth} from '@/auth';
-import {db} from '@/lib/audits/chartServer';
+import {db,userDepartmentIds} from '@/lib/audits/chartServer';
 import {getVisibleDepartments,type UserProfile} from '@/lib/permissions/staffingAccess';
 export const dynamic='force-dynamic';
 const reply=(body:unknown,status=200)=>Response.json(body,{status,headers:{'Cache-Control':'private, no-store'}});
@@ -9,11 +9,13 @@ export async function GET(){
   if(!email)return reply({error:'กรุณาเข้าสู่ระบบใหม่'},401);
   const client=db();
   // Identity comes only from the verified session, never a browser-supplied email.
-  const {data:row,error}=await client.from('profiles').select('id,full_name,department_id,role,email,status').eq('email',email).maybeSingle();
+  let {data:row,error}=await client.from('profiles').select('id,full_name,department_id,extra_department_ids,role,email,status').eq('email',email).maybeSingle() as {data:any;error:any};
+  // ยังไม่ได้เพิ่มคอลัมน์ extra_department_ids: อ่านแบบเดิม
+  if(error&&/extra_department_ids/.test(String(error.message||'')))({data:row,error}=await client.from('profiles').select('id,full_name,department_id,role,email,status').eq('email',email).maybeSingle() as {data:any;error:any});
   if(error){console.error('staffing profile read failed',{code:error.code});return reply({error:'อ่านโปรไฟล์ไม่สำเร็จ กรุณาตรวจสิทธิ์และโครงสร้างตาราง profiles'},503);}
   if(!row)return reply({error:'ไม่พบโปรไฟล์ของบัญชีที่เข้าสู่ระบบ กรุณาให้ผู้ดูแลตรวจ email ใน profiles'},404);
   if(row.status!=='approved')return reply({error:'บัญชีนี้ยังไม่ได้รับอนุมัติ'},403);
-  const profile:UserProfile={id:row.id,full_name:row.full_name??null,department_id:row.department_id??null,role:row.role??null,email:row.email??null};
+  const profile:UserProfile={id:row.id,full_name:row.full_name??null,department_id:row.department_id??null,department_ids:userDepartmentIds(row.department_id,row.extra_department_ids),role:row.role??null,email:row.email??null};
   const {data:rows,error:de}=await client.from('departments').select('id,Department,group').order('Department',{ascending:true});
   if(de){console.error('staffing department read failed',{code:de.code});return reply({error:'อ่านหน่วยงานไม่สำเร็จ'},503);}
   const group=rows?.find(d=>Number(d.id)===Number(profile.department_id))?.group??null;

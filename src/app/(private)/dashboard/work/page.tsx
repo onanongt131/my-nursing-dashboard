@@ -15,10 +15,10 @@ export default async function WorkOverviewPage() {
     unitGroups.set(group, [...(unitGroups.get(group) || []), { label: title, href: `/dashboard/departments/${encodeURIComponent(String(d.id))}` }]);
   }
   const sections: WorkSection[] = [
-    { key: 'units', title: 'หน่วยงานภายใน', desc: 'ตัวชี้วัดและข้อมูลของแต่ละหน่วยงาน', groups: [...unitGroups.entries()].map(([label, items]) => ({ label, items })) },
-    { key: 'branches', title: '16 กลุ่มงาน', desc: 'กลุ่มงานการพยาบาลเฉพาะทาง', groups: [{ items: nursingBranches }] },
-    { key: 'committee', title: 'คณะกรรมการ', desc: 'งานคณะกรรมการกลุ่มภารกิจด้านการพยาบาล', groups: [{ items: committees }] },
-    { key: 'staff', title: 'อัตรากำลัง', desc: 'บุคลากร ตารางเวร และภาพรวมอัตรากำลัง', groups: [{ items: workforce }] },
+    { key: 'units', title: 'หน่วยงานภายใน', groups: [...unitGroups.entries()].map(([label, items]) => ({ label, items })) },
+    { key: 'branches', title: '16 กลุ่มงาน', groups: [{ items: nursingBranches }] },
+    { key: 'committee', title: 'คณะกรรมการ', groups: [{ items: committees }] },
+    { key: 'staff', title: 'อัตรากำลัง', groups: [{ items: workforce }] },
   ];
   return <WorkOverview sections={sections} />;
 }

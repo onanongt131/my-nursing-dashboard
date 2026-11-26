@@ -198,7 +198,7 @@ export const DashboardHeader = ({ departmentId,onNavigate,title, activeTab, onTa
           <button type="button" onClick={()=>selectTopSection(m.id)} aria-expanded={selectedSidebar===m.id} className={`${cls} w-full ${(m.id==='work'&&onMyDept ? selectedSidebar==='work' : active(m.id)||selectedSidebar===m.id)?'bg-emerald-800 text-amber-300 ring-1 ring-amber-400':'text-amber-100 hover:bg-emerald-800'}`}>{m.label}<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={`ml-2 h-4 w-4 shrink-0 transition-transform duration-200 ${selectedSidebar===m.id ? 'rotate-180' : ''}`}><path d="m6 9 6 6 6-6" /></svg></button>
 
         </div>)}
-        {userName && <Link href={myDeptHref} onClick={close} title={hasDepartment?'หน่วยงานของฉัน':'ยังไม่ได้ระบุหน่วยงาน เปิดรายการหน่วยงาน'} aria-label="ไปยังหน่วยงานของฉัน" className={`${cls} gap-2 ${onMyDept?'bg-emerald-800 text-amber-300 ring-1 ring-amber-400':'text-amber-100 hover:bg-emerald-800'}`}>
+        {userName && <Link href={myDeptHref} onClick={close} title={hasDepartment?'หน่วยงานของฉัน':'ยังไม่ได้ระบุหน่วยงาน เปิดรายการหน่วยงาน'} aria-label="ไปยังหน่วยงานของฉัน" className={`${cls} gap-2 ${onMyDept&&selectedSidebar!=='work'?'bg-emerald-800 text-amber-300 ring-1 ring-amber-400':'text-amber-100 hover:bg-emerald-800'}`}>
           <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-5h6v5M9 9h.01M15 9h.01M9 12h.01M15 12h.01" /></svg>
           หน่วยงานของฉัน
         </Link>}

@@ -77,7 +77,7 @@ function sectionFor(path:string){
   return 'all';
 }
 
-export default function UniversalDashboardSidebar({departmentId,departments=[],selectedSection,onClose}:{departmentId?:string|number|null;departments?:Department[];selectedSection?:string|null;onClose?:()=>void}) {
+export default function UniversalDashboardSidebar({departmentId,departments=[],selectedSection,onClose,pressureSoreEntry=false}:{departmentId?:string|number|null;departments?:Department[];selectedSection?:string|null;onClose?:()=>void;pressureSoreEntry?:boolean}) {
   const path = usePathname() || '';
   const hasDepartment=departmentId!=null&&String(departmentId).trim()!=='';
   const ownDepartmentHref=hasDepartment?`/dashboard/departments/${encodeURIComponent(String(departmentId))}`:'/dashboard/departments';
@@ -105,8 +105,8 @@ export default function UniversalDashboardSidebar({departmentId,departments=[],s
     {label:'คณะกรรมการ',items:committees},
     {label:'อัตรากำลัง',items:workforce},
     {label:'ตัวชี้วัดตามแผน',items:kpis},
-    {label:'ตัวชี้วัดรายเดือน',items:monthly},
-  ],[units]);
+    {label:'ตัวชี้วัดรายเดือน',items:pressureSoreEntry?[...monthly,{label:'บันทึก Pressure sore (ทุกหน่วยงาน)',href:'/dashboard/pressure-sore-entry'}]:monthly},
+  ],[units,pressureSoreEntry]);
   const groupIndex:Record<string,number>={dash:0,nso:1,units:2,branches:3,committee:4,staff:5,kpis:6,monthly:7};
   const sectionGroups = useMemo(() => {
     if (selectedSection === 'dashboard') return groups.slice(0,1);

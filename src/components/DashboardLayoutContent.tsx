@@ -12,6 +12,7 @@ interface UserProfile {
   department_id?: number | string | null;
   full_name?: string;
   group?: string | null;
+  permissions?: string[];
 }
 
 interface DashboardLayoutContentProps {
@@ -128,6 +129,7 @@ export default function DashboardLayoutContent({
             <div className="w-full min-w-0 shrink-0 lg:w-64">
               <UniversalDashboardSidebar
                 departmentId={profile?.department_id ?? null}
+                pressureSoreEntry={!!profile?.permissions?.includes('pressure_sore_all') || profile?.role === 'admin' || profile?.role === 'head_nurse'}
                 departments={departments}
                 selectedSection={selectedSidebar}
                 onClose={() => setSelectedSidebar(null)}

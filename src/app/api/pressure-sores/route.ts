@@ -1,12 +1,12 @@
 import {isPressureSoreIpd} from '@/lib/pressureSoreServer';
 import {NextRequest,NextResponse} from 'next/server';
-import {db,currentUser,canCreate,canRead,canApprove,fail,unexpected,isRecord,validDept} from '@/lib/audits/chartServer';
+import {db,currentUser,canRecordPressureSore,canReadPressureSore,canApprove,fail,unexpected,isRecord,validDept} from '@/lib/audits/chartServer';
 import {emptyPressureSore,validatePressureSore} from '@/lib/pressureSore';
 export const runtime='nodejs';export const dynamic='force-dynamic';
 export async function GET(request:NextRequest){try{
  const user=await currentUser();if(!user)return fail('กรุณาเข้าสู่ระบบ',401);
  const q=request.nextUrl.searchParams,dept=Number(q.get('department_id'));
- if(!validDept(dept))return fail('รหัสหน่วยงานไม่ถูกต้อง');if(!await canRead(user,dept))return fail('ไม่มีสิทธิ์',403);if(!await isPressureSoreIpd(dept))return fail('Pressure sore ใช้เฉพาะหน่วยงาน IPD ที่เปิดใช้งาน',403);
+ if(!validDept(dept))return fail('รหัสหน่วยงานไม่ถูกต้อง');if(!await canReadPressureSore(user,dept))return fail('ไม่มีสิทธิ์',403);if(!await isPressureSoreIpd(dept))return fail('Pressure sore ใช้เฉพาะหน่วยงาน IPD ที่เปิดใช้งาน',403);
  if(q.get('options')==='departments'){const {data,error}=await db().from('departments').select('id,Department').order('Department');if(error)return unexpected(error);return NextResponse.json({items:data??[]},{headers:{'Cache-Control':'no-store'}});}
  const status=q.get('status')||'pending';if(!['pending','approved'].includes(status))return fail('สถานะไม่ถูกต้อง');
  const limit=Math.min(100,Math.max(1,Number(q.get('limit'))||100));
@@ -21,7 +21,7 @@ export async function GET(request:NextRequest){try{
 export async function POST(request:NextRequest){try{
  const user=await currentUser();if(!user)return fail('กรุณาเข้าสู่ระบบ',401);
  const body:unknown=await request.json().catch(()=>null);if(!isRecord(body))return fail('ข้อมูลไม่ถูกต้อง');
- const dept=body.department_id;if(!validDept(dept))return fail('รหัสหน่วยงานไม่ถูกต้อง');if(!canCreate(user,dept))return fail('ไม่มีสิทธิ์บันทึกหน่วยงานนี้',403);if(!await isPressureSoreIpd(dept))return fail('Pressure sore ใช้เฉพาะหน่วยงาน IPD ที่เปิดใช้งาน',403);
+ const dept=body.department_id;if(!validDept(dept))return fail('รหัสหน่วยงานไม่ถูกต้อง');if(!canRecordPressureSore(user,dept))return fail('ไม่มีสิทธิ์บันทึกหน่วยงานนี้',403);if(!await isPressureSoreIpd(dept))return fail('Pressure sore ใช้เฉพาะหน่วยงาน IPD ที่เปิดใช้งาน',403);
  const values={...emptyPressureSore};for(const key of Object.keys(values) as (keyof typeof values)[])values[key]=typeof body[key]==='string'?(body[key] as string).trim():'';
  const issue=validatePressureSore(values);if(issue)return NextResponse.json({error:issue.message,field:issue.field},{status:400});
  const {data:department,error:de}=await db().from('departments').select('id').eq('id',dept).maybeSingle();if(de||!department)return fail('ไม่พบหน่วยงาน');

@@ -7,7 +7,8 @@ import { NextResponse } from 'next/server';
 
 export type AuditRole = 'staff' | 'head_department' | 'head_group' | 'head_nurse' | 'admin';
 // departmentId = หน่วยงานหลัก • departmentIds = หน่วยงานหลัก + หน่วยงานที่ดูแลเพิ่ม (profiles.extra_department_ids)
-export type AuditUser = { id: string; role: AuditRole; departmentId: number | null; departmentIds: number[]; group: string | null };
+// permissions = สิทธิ์พิเศษเฉพาะงาน เช่น 'pressure_sore_all' (บันทึกแผลกดทับได้ทุกหน่วยงาน แต่เข้าส่วนอื่นของหน่วยงานนั้นไม่ได้)
+export type AuditUser = { id: string; role: AuditRole; departmentId: number | null; departmentIds: number[]; group: string | null; permissions: string[] };
 export const FORM_TYPES = ['er', 'lr', 'or', 'dialysis', 'hbot', 'anesthesia', 'opd'] as const;
 export type FormType = typeof FORM_TYPES[number];
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
@@ -28,14 +29,20 @@ export function unexpected(error: unknown) {
   console.error('Audit API failure', error instanceof Error ? error.name : 'unknown');
   return fail('ไม่สามารถดำเนินการได้ กรุณาติดต่อผู้ดูแลระบบ', 500);
 }
-type ProfileRow = { id: string; role: string; department_id: number | null; status: string; departments: unknown; extra_department_ids?: number[] | null };
+type ProfileRow = { id: string; role: string; department_id: number | null; status: string; departments: unknown; extra_department_ids?: number[] | null; permissions?: string[] | null };
 /** อ่านโปรไฟล์พร้อมหน่วยงานที่ดูแลเพิ่ม • ถ้ายังไม่ได้เพิ่มคอลัมน์ extra_department_ids ใน Supabase ให้อ่านแบบเดิม (ผู้ใช้ยังเข้าระบบได้) */
 async function readProfile(id: string): Promise<{ data: ProfileRow | null; error: unknown }> {
-  const first = await db().from('profiles').select('id, role, department_id, status, extra_department_ids, departments(group)').eq('id', id).maybeSingle();
-  if (!first.error) return { data: first.data as ProfileRow | null, error: null };
-  if (!/extra_department_ids/.test(String((first.error as { message?: string }).message || ''))) return { data: null, error: first.error };
-  const legacy = await db().from('profiles').select('id, role, department_id, status, departments(group)').eq('id', id).maybeSingle();
-  return { data: legacy.data as ProfileRow | null, error: legacy.error };
+  // คอลัมน์เสริม (extra_department_ids, permissions) ที่ยังไม่ได้รัน SQL จะถูกตัดออกแล้วอ่านใหม่ ผู้ใช้ยังเข้าระบบได้
+  let optional = ['extra_department_ids', 'permissions'];
+  for (let attempt = 0; attempt < 3; attempt++) {
+    const r = await db().from('profiles').select(['id', 'role', 'department_id', 'status', ...optional, 'departments(group)'].join(', ')).eq('id', id).maybeSingle();
+    if (!r.error) return { data: r.data as unknown as ProfileRow | null, error: null };
+    const message = String((r.error as { message?: string }).message || '');
+    const missing = optional.filter(c => message.includes(c));
+    if (!missing.length) return { data: null, error: r.error };
+    optional = optional.filter(c => !missing.includes(c));
+  }
+  return { data: null, error: new Error('profiles read failed') };
 }
 export function userDepartmentIds(primary: unknown, extra: unknown): number[] {
   const list = [primary, ...(Array.isArray(extra) ? extra : [])].map(Number).filter(n => Number.isSafeInteger(n) && n > 0);
@@ -51,7 +58,7 @@ export async function currentUser(): Promise<AuditUser | null> {
   if (!roles.includes(p.role as AuditRole)) return null;
   const rawDepartment = p.departments as unknown as { group?: string | null } | { group?: string | null }[] | null;
   const d = Array.isArray(rawDepartment) ? rawDepartment[0] : rawDepartment;
-  return { id: p.id, role: p.role as AuditRole, departmentId: p.department_id, departmentIds: userDepartmentIds(p.department_id, p.extra_department_ids), group: d?.group ?? null };
+  return { id: p.id, role: p.role as AuditRole, departmentId: p.department_id, departmentIds: userDepartmentIds(p.department_id, p.extra_department_ids), group: d?.group ?? null, permissions: Array.isArray(p.permissions) ? p.permissions.map(String) : [] };
 }
 export async function canRead(user: AuditUser, departmentId: number) {
   if (user.role === 'admin' || user.role === 'head_nurse') return true;
@@ -66,6 +73,14 @@ export function canCreate(user: AuditUser, departmentId: number) {
 }
 export function canApprove(user: AuditUser, departmentId: number) {
   return user.role === 'admin' || user.role === 'head_nurse' || (user.role === 'head_department' && user.departmentIds.includes(Number(departmentId)));
+}
+export const PRESSURE_SORE_ALL = 'pressure_sore_all';
+/** Pressure sore: ผู้มีสิทธิ์บันทึกทุกหน่วยงาน หรือสิทธิ์ปกติของหน่วยงานนั้น (อนุมัติยังใช้ canApprove) */
+export function canRecordPressureSore(user: AuditUser, departmentId: number) {
+  return user.permissions.includes(PRESSURE_SORE_ALL) || canCreate(user, departmentId);
+}
+export async function canReadPressureSore(user: AuditUser, departmentId: number) {
+  return user.permissions.includes(PRESSURE_SORE_ALL) || await canRead(user, departmentId);
 }
 export function validId(id: string) { return UUID.test(id); }
 export function validDept(n: unknown): n is number { return typeof n === 'number' && Number.isSafeInteger(n) && n > 0; }

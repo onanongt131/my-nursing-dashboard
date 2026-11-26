@@ -85,6 +85,9 @@ export default function DashboardLayoutContent({
     if (path.startsWith('/dashboard/nso-strategy')) return 'nso';
     if (path.startsWith('/dashboard/nursing-dashboard')) return 'dashboard';
     if (path === '/dashboard') return null;
+    // หน้าหน่วยงานของฉัน: ไม่ต้องแสดง Sidebar "ระบบงาน"
+    const ownDept = profile?.department_id != null && String(profile.department_id).trim() !== '' ? `/dashboard/departments/${encodeURIComponent(String(profile.department_id))}` : null;
+    if (ownDept && (path === ownDept || path.startsWith(ownDept + '/'))) return null;
     if (['/dashboard/category','/dashboard/strategy','/dashboard/rm','/dashboard/productivity','/dashboard/wp-qa','/dashboard/iv-care','/dashboard/audit-chart','/dashboard/fall-report','/dashboard/pressure-sore-report','/dashboard/readmit-report','/dashboard/ama-report','/dashboard/readmit-ama'].some(p => path === p || path.startsWith(p+'/'))) return 'report';
     return 'work';
   };

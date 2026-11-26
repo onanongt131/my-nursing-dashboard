@@ -9,6 +9,13 @@ function serverAuthClient() {
   });
 }
 
+// Vercel Preview: ให้ NextAuth ใช้โดเมนของ Preview เอง แทน NEXTAUTH_URL ของเว็บจริง
+// (ไม่เช่นนั้นการล็อกอินบน Preview จะเด้งไปโดเมน Production)
+if (process.env.VERCEL_ENV === "preview") {
+  const previewHost = process.env.VERCEL_BRANCH_URL || process.env.VERCEL_URL;
+  if (previewHost) process.env.AUTH_URL = `https://${previewHost}`;
+}
+
 export const { handlers, signIn, signOut, auth } = NextAuth({
   pages: { signIn: "/login" },
   session: { strategy: "jwt" },

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
+import { committees, nursingBranches, workforce } from '@/lib/workMenus';
 
 type Department = { id?: string | number; Department?: string; department_name?: string; name?: string; group?: string; group_name?: string };
 type Item = { label: string; href: string };
@@ -25,22 +26,6 @@ const nso: Item[] = [
   {label:'Action Plan',href:'/dashboard/nso-strategy/action-plan'},
   {label:'บันทึกและรับรองผล',href:'/dashboard/nso-strategy/monitoring'},
 ];
-const workforce: Item[] = [
-  {label:'บุคลากรและสมรรถนะ',href:'/dashboard/staffing'},
-  {label:'Ward Command Center',href:'/dashboard/staffing/command-center'},
-  {label:'ตารางเวร',href:'/dashboard/staffing/schedule'},
-  {label:'ภาพรวมอัตรากำลัง',href:'/dashboard/staffing/overview'},
-  {label:'รายงานเวรตรวจการ',href:'/dashboard/staffing/inspection-report'},
-];
-const committees: Item[] = [
-  {label:'คณะกรรมการบริหาร',href:'/dashboard/committee/executive'},
-  {label:'คณะกรรมการ QA',href:'/dashboard/committee/qa'},
-  {label:'คณะกรรมการ RM',href:'/dashboard/committee/rm'},
-  {label:'คณะกรรมการ HRN',href:'/dashboard/committee/academic'},
-  {label:'คณะกรรมการอัตรากำลัง',href:'/dashboard/committee/personnel'},
-  {label:'คณะกรรมการ R2R',href:'/dashboard/committee/r2r'},
-  {label:'คณะกรรมการบ้านพัก',href:'/dashboard/committee/home'},
-];
 const kpis: Item[] = [
   {label:'KPI ตามหมวด',href:'/dashboard/category'},
   {label:'KPI ตามแผน',href:'/dashboard/strategy'},
@@ -56,13 +41,6 @@ const monthly: Item[] = [
   {label:'Re-admit',href:'/dashboard/readmit-report'},
   {label:'จำหน่ายไม่สมัครใจ (AMA)',href:'/dashboard/ama-report'},
 ];
-const nursingBranches: Item[] = [
-  'การพยาบาลวิจัยและพัฒนาการบริการ','การพยาบาลผู้ป่วยหนัก','การพยาบาลผู้ป่วยอุบัติเหตุและฉุกเฉิน',
-  'การพยาบาลผู้ป่วยผ่าตัด','การพยาบาลผู้ป่วยอายุรกรรม','การพยาบาลควบคุมและป้องกันการติดเชื้อ',
-  'การพยาบาลผู้ป่วยกุมารเวชกรรม','การพยาบาลโสต ศอ นาสิก จักษุ','การพยาบาลตรวจรักษาพิเศษ',
-  'การพยาบาลผู้ป่วยศัลยกรรม','การพยาบาลผู้ป่วยสูติ–นรีเวช','การพยาบาลผู้ป่วยจิตเวช',
-  'การพยาบาลผู้ป่วยนอก','การพยาบาลวิสัญญี','การพยาบาลผู้คลอด','การพยาบาลผู้ป่วยออร์โธปิดิกส์'
-].map((label,i)=>({label,href:`/dashboard/nursing/branch-${i+1}`}));
 const matching = (path:string, href:string) => path===href || (!['/dashboard/nso-strategy','/dashboard/staffing'].includes(href) && path.startsWith(href+'/'));
 function sectionFor(path:string){
   if(path.startsWith('/dashboard/nso-strategy'))return 'nso';
@@ -79,8 +57,6 @@ function sectionFor(path:string){
 
 export default function UniversalDashboardSidebar({departmentId,departments=[],selectedSection,onClose,pressureSoreEntry=false}:{departmentId?:string|number|null;departments?:Department[];selectedSection?:string|null;onClose?:()=>void;pressureSoreEntry?:boolean}) {
   const path = usePathname() || '';
-  const hasDepartment=departmentId!=null&&String(departmentId).trim()!=='';
-  const ownDepartmentHref=hasDepartment?`/dashboard/departments/${encodeURIComponent(String(departmentId))}`:'/dashboard/departments';
   const context=sectionFor(path);
   const [collapsed,setCollapsed]=useState(false);
   const [mobileOpen,setMobileOpen]=useState(false);
@@ -119,7 +95,6 @@ export default function UniversalDashboardSidebar({departmentId,departments=[],s
     const preferred = groups[groupIndex[context]]?.label;
     const first = sectionGroups[0]?.label;
     // เมื่อเลือกเมนู "ระบบงาน" จากด้านบน ให้เริ่มด้วยกลุ่มเมนูที่พับอยู่
-    // โดยยังแสดงปุ่ม "หน่วยงานของฉัน" แยกไว้ด้านบนเสมอ
     if (selectedSection === 'work') {
       setOpenGroup(null);
     } else {
@@ -137,23 +112,6 @@ export default function UniversalDashboardSidebar({departmentId,departments=[],s
         <button type="button" onClick={onClose} className="rounded px-2 py-1 text-amber-100 hover:bg-emerald-800" aria-label="ปิด Sidebar"><svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" className="h-4 w-4"><path d="M18 6 6 18M6 6l12 12" /></svg></button>
       </div>
       <nav aria-label="เมนูระบบ Dashboard" className="space-y-1 p-2">
-          <Link
-            title={hasDepartment?"หน่วยงานของฉัน":"ยังไม่ได้ระบุหน่วยงาน เปิดรายการหน่วยงาน"}
-            href={ownDepartmentHref}
-            onClick={()=>setMobileOpen(false)}
-            aria-label="ไปยังหน่วยงานของฉัน"
-            className="group mb-3 flex items-center gap-2.5 rounded-xl border border-emerald-500/40 bg-emerald-800/40 px-3 py-2.5 text-sm font-semibold text-emerald-50 shadow-sm transition-colors duration-200 hover:border-emerald-300/70 hover:bg-emerald-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-300"
-          >
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-700/70 text-emerald-100 ring-1 ring-emerald-400/30 transition-colors group-hover:bg-emerald-600">
-              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-[18px] w-[18px]">
-                <path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-5h6v5M9 9h.01M15 9h.01M9 12h.01M15 12h.01" />
-              </svg>
-            </span>
-            {!collapsed&&<>
-              <span className="min-w-0 flex-1">หน่วยงานของฉัน{!hasDepartment&&<small className="mt-0.5 block text-xs font-normal text-emerald-200">ยังไม่ได้ระบุหน่วยงาน</small>}</span>
-              <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0 text-emerald-300 transition-transform group-hover:translate-x-0.5"><path d="m9 18 6-6-6-6" /></svg>
-            </>}
-          </Link>
         {sectionGroups.map((g,i)=><div key={g.label}>
           <button type="button" title={g.label} onClick={()=>{if(collapsed)setCollapsed(false);setOpenGroup(openGroup===g.label?null:g.label)}} aria-expanded={openGroup===g.label} className="flex w-full items-center justify-between rounded-lg px-3 py-2.5 text-left text-sm font-semibold text-emerald-50 hover:bg-emerald-800">
             <span>{collapsed?String(i+1):g.label}</span>{!collapsed&&<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={`h-4 w-4 shrink-0 transition-transform duration-200 ${openGroup===g.label?'rotate-180':''}`}><path d="m6 9 6 6 6-6" /></svg>}

@@ -10,6 +10,7 @@ import {summarizeFallPatientDays} from '@/lib/fallPatientDays';
 import {summarizeAmaDischarges} from '@/lib/amaDischarges';
 import {IV_FACTOR_GROUPS} from '@/lib/ivCareFactors';
 import {wpSpecialCriteria,type WpFormType} from '@/lib/wpSpecialCriteria';
+import {invalidateDepartmentKpi} from '@/lib/kpiCache';
 export const runtime='nodejs';export const dynamic='force-dynamic';
 type Context={params:Promise<{table:string;id:string}>};
 async function context(c:Context){const {table,id}=await c.params;if(!Object.hasOwn(fields,table)||!/^([0-9]+|[0-9a-f-]{36})$/i.test(id))return {error:fail('รายการไม่ถูกต้อง')};const user=await currentUser();if(!user)return {error:fail('กรุณาเข้าสู่ระบบ',401)};const {data:item,error}=await db().from(table).select('*').eq('id',id).maybeSingle();if(error)return {error:unexpected(error)};if(!item)return {error:fail('ไม่พบรายการ',404)};if(!requiresReview(item))return {error:fail('ข้อมูลก่อนปีงบประมาณ 2570 ไม่อยู่ในขั้นตอนแก้ไขและอนุมัติ',409)};const dept=Number(item.department_id);if(!canCreate(user,dept))return {error:fail('ไม่มีสิทธิ์แก้ไขหน่วยงานนี้',403)};if(!['pending','draft'].includes(item.status))return {error:fail('อนุมัติแล้วหรือไม่อยู่ในสถานะที่แก้ไขได้',409)};if(item.created_by&&item.created_by!==user.id&&!canApprove(user,dept))return {error:fail('แก้ไขได้เฉพาะผู้บันทึกหรือหัวหน้าผู้มีสิทธิ์',403)};return {table,id,user,item,dept};}
@@ -64,6 +65,8 @@ export async function PATCH(r:NextRequest,c:Context){try{
  if('updated_at'in item)changes.updated_at=new Date().toISOString();
  let query=db().from(table).update(changes).eq('id',id).eq('status',item.status);
  for(const key of writable){if(item[key]===null)query=query.is(key,null);else if(item[key]!==undefined)query=query.eq(key,typeof item[key]==='object'?JSON.stringify(item[key]):item[key]);}
- const {data,error}=await query.select('*').maybeSingle();if(error)return unexpected(error);if(!data)return fail('รายการถูกแก้ไขหรืออนุมัติแล้ว กรุณาโหลดใหม่',409);
+  const {data,error}=await query.select('*').maybeSingle();if(error)return unexpected(error);if(!data)return fail('รายการถูกแก้ไขหรืออนุมัติแล้ว กรุณาโหลดใหม่',409);
+ // กราฟ Readmit/AMA นับรายการ pending ด้วย จึงล้าง cache เมื่อแก้ตารางกลุ่มนี้เท่านั้น
+ if(['readmit_incident_records','ama_incident_records','readmit_monthly_summary','ama_monthly_summary'].includes(table))invalidateDepartmentKpi();
  return NextResponse.json({item:data},{headers:{'Cache-Control':'no-store'}});
 }catch(e){return unexpected(e);}}

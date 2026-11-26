@@ -84,7 +84,7 @@ export default function DashboardLayoutContent({
   const sectionFromPath = (path: string): string | null => {
     if (path.startsWith('/dashboard/nso-strategy')) return 'nso';
     if (path.startsWith('/dashboard/nursing-dashboard')) return 'dashboard';
-    if (path === '/dashboard' || path === '/dashboard/work') return null;
+    if (path === '/dashboard') return null;
     // หน้าหน่วยงานของฉัน: ไม่ต้องแสดง Sidebar "ระบบงาน"
     const ownDept = profile?.department_id != null && String(profile.department_id).trim() !== '' ? `/dashboard/departments/${encodeURIComponent(String(profile.department_id))}` : null;
     if (ownDept && (path === ownDept || path.startsWith(ownDept + '/'))) return null;

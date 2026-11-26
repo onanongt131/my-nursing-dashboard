@@ -1,24 +1,12 @@
-import { dashboardContext } from '@/lib/auth/dashboardContext';
-import { committees, nursingBranches, workforce, type WorkItem } from '@/lib/workMenus';
-import WorkOverview, { type WorkSection } from './WorkOverview';
-
-export const dynamic = 'force-dynamic';
-
-/** หน้ารวม "ระบบงาน": เลือกกลุ่มเมนูก่อนเข้าหน้าย่อย */
-export default async function WorkOverviewPage() {
-  const { departments } = await dashboardContext();
-  const unitGroups = new Map<string, WorkItem[]>();
-  for (const d of departments) {
-    const title = d.Department || d.department_name || d.name;
-    if (d.id == null || !title) continue;
-    const group = d.group || d.group_name || 'กลุ่มงานทั่วไป';
-    unitGroups.set(group, [...(unitGroups.get(group) || []), { label: title, href: `/dashboard/departments/${encodeURIComponent(String(d.id))}` }]);
-  }
-  const sections: WorkSection[] = [
-    { key: 'units', title: 'หน่วยงานภายใน', groups: [...unitGroups.entries()].map(([label, items]) => ({ label, items })) },
-    { key: 'branches', title: '16 กลุ่มงาน', groups: [{ items: nursingBranches }] },
-    { key: 'committee', title: 'คณะกรรมการ', groups: [{ items: committees }] },
-    { key: 'staff', title: 'อัตรากำลัง', groups: [{ items: workforce }] },
-  ];
-  return <WorkOverview sections={sections} />;
+/** หน้า "ระบบงาน": ใช้เมนูใน Sidebar ด้านซ้ายเพื่อเลือกหน้า */
+export default function WorkPage() {
+  return (
+    <section className="flex min-h-[16rem] flex-col items-center justify-center gap-3 rounded-2xl border border-dashed border-emerald-200 bg-white p-8 text-center">
+      <span className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
+        <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="h-6 w-6"><path d="m15 18-6-6 6-6" /></svg>
+      </span>
+      <p className="text-base font-semibold text-emerald-950">กรุณาเลือกเมนูที่ต้องการ</p>
+      <p className="text-sm text-slate-500">เลือกจากรายการในเมนู &quot;ระบบงาน&quot;</p>
+    </section>
+  );
 }

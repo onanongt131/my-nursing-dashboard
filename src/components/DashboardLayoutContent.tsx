@@ -84,7 +84,7 @@ export default function DashboardLayoutContent({
   const sectionFromPath = (path: string): string | null => {
     if (path.startsWith('/dashboard/nso-strategy')) return 'nso';
     if (path.startsWith('/dashboard/nursing-dashboard')) return 'dashboard';
-    if (path === '/dashboard') return null;
+    if (path === '/dashboard' || path === '/dashboard/work') return null;
     // หน้าหน่วยงานของฉัน: ไม่ต้องแสดง Sidebar "ระบบงาน"
     const ownDept = profile?.department_id != null && String(profile.department_id).trim() !== '' ? `/dashboard/departments/${encodeURIComponent(String(profile.department_id))}` : null;
     if (ownDept && (path === ownDept || path.startsWith(ownDept + '/'))) return null;
@@ -113,7 +113,7 @@ export default function DashboardLayoutContent({
       <div className="relative z-30 w-full rounded-2xl border border-gray-100 bg-white shadow-sm">
         <DashboardHeader
           departmentId={profile?.department_id}
-          onNavigate={(section,href)=>{setSelectedSidebar(section);if(pathname!==href){setNavigationTarget({from:pathname,to:href});router.push(href);}}}
+          onNavigate={(section,href)=>{setSelectedSidebar(sectionFromPath(href)===null?null:section);if(pathname!==href){setNavigationTarget({from:pathname,to:href});router.push(href);}}}
           title="กลุ่มภารกิจด้านการพยาบาล"
           activeTab={activeTab}
           onTabChange={handleTabChange}

@@ -1,6 +1,13 @@
 export type DailyProductivity = { department_id: number | string; date: string; np: number | string | null };
 
-/** Same calculation as DepartmentDailyStatsTab: mean shifts per day, then mean days per month. */
+/** NP ที่ใช้คำนวณได้: เป็นตัวเลขและมากกว่า 0 (NP ว่าง/0 = ข้อมูลผิด ไม่นำมาเฉลี่ย • ตรงกับรายงานใน Google Sheet) */
+export function usableNp(value: unknown): number | null {
+  if (value == null || String(value).trim() === '') return null;
+  const n = Number(value);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+/** Same calculation as DepartmentDailyStatsTab: mean of usable shift NP per day, then mean of days per month. */
 export function monthlyProductivity(rows: DailyProductivity[]) {
   const groups = new Map<string, { department_id: number | string; month: number; days: Map<string, {sum: number; count: number}> }>();
   for (const row of rows) {
@@ -10,13 +17,14 @@ export function monthlyProductivity(rows: DailyProductivity[]) {
       month = { department_id: row.department_id, month: Number(row.date.slice(5, 7)), days: new Map() };
       groups.set(key, month);
     }
+    const np = usableNp(row.np);
+    if (np === null) continue; // เวรที่ NP ว่างหรือ 0 แสดงในรายการข้อมูลไม่ครบแทน
     const day = month.days.get(row.date) || {sum: 0, count: 0};
-    // Keep the monthly statistics screen's treatment of empty NP as zero.
-    day.sum += Number(row.np || 0);
+    day.sum += np;
     day.count++;
     month.days.set(row.date, day);
   }
-  return [...groups.values()].map(group => ({
+  return [...groups.values()].filter(group => group.days.size > 0).map(group => ({
     department_id: group.department_id,
     month: group.month,
     fiscal_year: 2570,
@@ -34,7 +42,7 @@ export function productivityDepartmentName(name: string, year: string) {
 }
 
 export type NpCompleteness = {
-  expected: number; valid: number; missing: string[]; invalid: string[]; duplicate: string[];
+  expected: number; valid: number; missing: string[]; invalid: string[]; duplicate: string[]; zero?: number;
   through: string | null;
 };
 
@@ -61,7 +69,7 @@ export function productivityCompleteness(
   return result.map(item => {
     const year = item.month >= 10 ? 2026 : 2027;
     const count = new Date(Date.UTC(year, item.month, 0)).getUTCDate();
-    const completeness: NpCompleteness = {expected:0,valid:0,missing:[],invalid:[],duplicate:[],through:null};
+    const completeness: NpCompleteness = {expected:0,valid:0,missing:[],invalid:[],duplicate:[],zero:0,through:null};
     for (let day=1;day<=count;day++) {
       const date = `${year}-${String(item.month).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
       if (date >= today) break;
@@ -72,7 +80,11 @@ export function productivityCompleteness(
         const label = `${date} ${shift}`;
         if (!found.length) completeness.missing.push(label);
         else if (found.length > 1) completeness.duplicate.push(label);
-        else if (found[0].np == null || String(found[0].np).trim() === '' || !Number.isFinite(Number(found[0].np)) || Number(found[0].np) < 0) completeness.invalid.push(label);
+        else if (usableNp(found[0].np) === null) {
+          const zero = found[0].np != null && String(found[0].np).trim() !== '' && Number(found[0].np) === 0;
+          if (zero) completeness.zero = (completeness.zero || 0) + 1;
+          completeness.invalid.push(label + (zero ? ' (NP = 0)' : ' (NP ว่าง)'));
+        }
         else completeness.valid++;
       }
     }

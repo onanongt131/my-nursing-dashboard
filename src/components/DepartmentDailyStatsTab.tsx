@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { usableNp } from '@/lib/productivityReport';
 import { PrinterIcon, XMarkIcon } from '@heroicons/react/24/solid';
 
 export default function DepartmentDailyStatsTab({ departmentId }: { departmentId: string | number }) {
@@ -57,8 +58,8 @@ export default function DepartmentDailyStatsTab({ departmentId }: { departmentId
       acc[d] = { shifts: [], npSum: 0, count: 0 };
     }
     acc[d].shifts.push(row);
-    acc[d].npSum += Number(row.np || 0);
-    acc[d].count += 1;
+    const np = usableNp(row.np); // NP ว่าง/0 ไม่นำมาเฉลี่ย (ตรงกับหน้า Nursing Productivity)
+    if (np !== null) { acc[d].npSum += np; acc[d].count += 1; }
     return acc;
   }, {});
 
@@ -78,10 +79,11 @@ export default function DepartmentDailyStatsTab({ departmentId }: { departmentId
   }
 
   let sumDailyAverages = 0;
-  daysArray.forEach(d => {
+  const npDays = daysArray.filter(d => dailyGroups[d].count > 0);
+  npDays.forEach(d => {
     sumDailyAverages += dailyAverages[d];
   });
-  const monthlyAveragePerDay = totalDays > 0 ? sumDailyAverages / totalDays : 0;
+  const monthlyAveragePerDay = npDays.length > 0 ? sumDailyAverages / npDays.length : 0;
 
   const firstDate = daysArray[0];
   const lastDate = daysArray[daysArray.length - 1];

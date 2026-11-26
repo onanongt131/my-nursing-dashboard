@@ -91,7 +91,10 @@ export const ProductivityTable: React.FC<ProductivityTableProps> = ({ data, sele
                             <button type="button" aria-label={'ดูรายละเอียดข้อมูลไม่ครบ ' + deptName + ' ' + monthLabels[months.indexOf(m)]}
                               onClick={() => setQualityDetail({name:deptName,month:monthLabels[months.indexOf(m)],quality:status})}
                               className="rounded-full focus-visible:outline focus-visible:outline-amber-600">
-                              <ReportStatusIcon status="incomplete"/>
+                              <span className="relative inline-flex" title={status?.zero ? 'NP = 0 จำนวน ' + status.zero + ' เวร' : undefined}>
+                                <ReportStatusIcon status="incomplete"/>
+                                {!!status?.zero && <sup className="absolute -top-2 left-1/2 -translate-x-1/2 min-w-[14px] rounded-full bg-red-600 px-1 text-center text-[9px] font-bold leading-[14px] text-white">{status.zero}</sup>}
+                              </span>
                             </button>
                           )}>
                             <span className={'rounded-md px-0.5 py-0.5 font-semibold tabular-nums ' + getBgColor(value)}>
@@ -124,7 +127,7 @@ export const ProductivityTable: React.FC<ProductivityTableProps> = ({ data, sele
           <div className="flex justify-between gap-3 mb-3"><h3 id="np-quality-title" className="font-bold">{qualityDetail.name} — {qualityDetail.month} ปีงบประมาณ {selectedYear}</h3>
             <button type="button" onClick={() => setQualityDetail(null)} aria-label="ปิดรายละเอียด">✕</button></div>
           <p className="text-sm mb-3">ข้อมูลใช้ได้ {qualityDetail.quality.valid}/{qualityDetail.quality.expected} เวร ตรวจถึง {qualityDetail.quality.through} (ไม่รวมวันนี้)</p>
-          {([['missing','เวรที่ขาด'],['invalid','ค่า NP ว่างหรือไม่ถูกต้อง'],['duplicate','ข้อมูลวัน/เวรซ้ำ']] as const).map(([key,label]) => <div key={key} className="mb-3">
+          {([['missing','เวรที่ขาด'],['invalid','ค่า NP ว่างหรือ = 0 (ไม่นำมาเฉลี่ย)'],['duplicate','ข้อมูลวัน/เวรซ้ำ']] as const).map(([key,label]) => <div key={key} className="mb-3">
             <h4 className="font-semibold text-sm">{label}: {qualityDetail.quality[key].length} เวร</h4>
             <p className="text-sm whitespace-pre-line mt-1">{qualityDetail.quality[key].join('\n') || 'ไม่มี'}</p>
           </div>)}

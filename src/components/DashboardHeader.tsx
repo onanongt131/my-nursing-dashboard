@@ -173,6 +173,8 @@ export const DashboardHeader = ({ departmentId,onNavigate,title, activeTab, onTa
     if(destination&&pathname!==destination)router.push(destination);
   };
   const active = (id:string) => id==='dashboard' ? pathname.startsWith('/dashboard/nursing-dashboard') : id==='nso' ? pathname.startsWith('/dashboard/nso-strategy') : id==='work' ? ['/dashboard/departments','/dashboard/nursing/','/dashboard/committee','/dashboard/staffing','/dashboard/p4p'].some(p=>pathname.startsWith(p)) : false;
+  const hasDepartment = departmentId != null && String(departmentId).trim() !== '';
+  const myDeptHref = hasDepartment ? `/dashboard/departments/${encodeURIComponent(String(departmentId))}` : '/dashboard/departments';
   const cls = 'inline-flex items-center justify-center rounded-xl px-3 py-2.5 text-sm font-semibold whitespace-nowrap transition-colors min-w-0';
   return <div ref={containerRef} className="relative z-40 w-full rounded-xl border border-emerald-100 bg-white shadow-sm">
     <header className="flex items-center justify-between gap-3 border-b border-gray-100 px-3 py-3 sm:px-6">
@@ -195,6 +197,10 @@ export const DashboardHeader = ({ departmentId,onNavigate,title, activeTab, onTa
           <button type="button" onClick={()=>selectTopSection(m.id)} aria-expanded={selectedSidebar===m.id} className={`${cls} w-full ${active(m.id)||selectedSidebar===m.id?'bg-emerald-800 text-amber-300 ring-1 ring-amber-400':'text-amber-100 hover:bg-emerald-800'}`}>{m.label}<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={`ml-2 h-4 w-4 shrink-0 transition-transform duration-200 ${selectedSidebar===m.id ? 'rotate-180' : ''}`}><path d="m6 9 6 6 6-6" /></svg></button>
 
         </div>)}
+        {userName && <Link href={myDeptHref} onClick={close} title={hasDepartment?'หน่วยงานของฉัน':'ยังไม่ได้ระบุหน่วยงาน เปิดรายการหน่วยงาน'} aria-label="ไปยังหน่วยงานของฉัน" className={`${cls} gap-2 ${pathname===myDeptHref?'bg-emerald-800 text-amber-300 ring-1 ring-amber-400':'text-amber-100 hover:bg-emerald-800'}`}>
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-5h6v5M9 9h.01M15 9h.01M9 12h.01M15 12h.01" /></svg>
+          หน่วยงานของฉัน
+        </Link>}
         <div className="flex flex-col gap-2 border-t border-emerald-800 px-3 py-3 text-amber-100 md:hidden"><span>{displayUserName}</span><LogoutButton /></div>
       </nav>
     </div>

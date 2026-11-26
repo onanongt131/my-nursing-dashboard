@@ -104,6 +104,7 @@ export default function DashboardLayoutContent({
           userGroup={profile?.group ?? undefined}
           selectedSidebar={selectedSidebar}
           onSidebarSelect={setSelectedSidebar}
+          departmentId={profile?.department_id ?? null}
         />
       </div>
 

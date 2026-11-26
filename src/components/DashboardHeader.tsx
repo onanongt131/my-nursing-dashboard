@@ -7,11 +7,11 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { createClient } from '@/utils/supabase/client';
 
 type Department = { id?: string | number; Department?: string; department_name?: string; name?: string; group?: string; group_name?: string };
-type Props = { title?: string; activeTab?: string; onTabChange?: (tab: string) => void; departments?: Department[]; userName?: string; userRole?: string; userGroup?: string; selectedSidebar?: string | null; onSidebarSelect?: (section: string | null) => void };
+type Props = { title?: string; activeTab?: string; onTabChange?: (tab: string) => void; departments?: Department[]; userName?: string; userRole?: string; userGroup?: string; selectedSidebar?: string | null; onSidebarSelect?: (section: string | null) => void; departmentId?: string | number | null };
 type NavItem = { label: string; href?: string; tab?: string; desc?: string };
 type NavSection = { title: string; items: NavItem[] };
 
-export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [], userName, userRole, userGroup, selectedSidebar, onSidebarSelect }: Props) => {
+export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [], userName, userRole, userGroup, selectedSidebar, onSidebarSelect, departmentId }: Props) => {
   const pathname = usePathname();
   const router = useRouter();
   const [supabase] = useState(() => createClient());
@@ -78,6 +78,11 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
     { name: 'wp-qa', label: 'WP/QA', path: '/dashboard/wp-qa' },
     { name: 'iv-care', label: 'IV care', path: '/dashboard/iv-care' },
     { name: 'audit-chart', label: 'Audit chart', path: '/dashboard/audit-chart' },
+    { name: 'fall', label: 'Fall', path: '/dashboard/fall' },
+    { name: 'pressure-sore', label: 'Pressure sore', path: '/dashboard/pressure-sore' },
+    { name: 'readmit', label: 'Re-admit', path: '/dashboard/readmit' },
+    { name: 'ama', label: 'จำหน่ายไม่สมัครใจ (AMA)', path: '/dashboard/ama' },
+    { name: 'pressure-sore-entry', label: 'บันทึก Pressure sore (ทุกหน่วยงาน)', path: '/dashboard/pressure-sore/entry' },
   ];
 
 
@@ -124,7 +129,7 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
     {title:'คณะกรรมการ', items: committeeList.map(c => ({label:c.name, href:c.path}))},
     {title:'อัตรากำลัง', items: staffingSubMenus.map(s => ({label:s.label, href:s.path}))},
     {title:'ตัวชี้วัดตามแผน', items: kpiSubMenus.map(s => ({label:s.label, tab:s.name}))},
-    {title:'ตัวชี้วัดรายเดือน', items: monthlySubMenus.map(s => ({label:s.label, tab:s.name}))},
+    {title:'ตัวชี้วัดรายเดือน', items: monthlySubMenus.map(s => ({label:s.label, href:s.path}))},
   ];
   const close = () => { setOpenMenu(null); setOpenSection(null); setMobileOpen(false); };
   const go = (item: NavItem) => {
@@ -167,6 +172,7 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
     if (destination && pathname !== destination) router.push(destination);
   };
   const active = (id:string) => id==='dashboard' ? pathname.startsWith('/dashboard/nursing-dashboard') : id==='nso' ? pathname.startsWith('/dashboard/nso-strategy') : id==='work' ? ['/dashboard/departments','/dashboard/nursing/','/dashboard/committee','/dashboard/staffing'].some(p=>pathname.startsWith(p)) : false;
+  const myDeptHref = departmentId != null && String(departmentId).trim() !== '' ? `/dashboard/departments/${encodeURIComponent(String(departmentId))}` : null;
   const cls = 'inline-flex items-center justify-center rounded-xl px-3 py-2.5 text-sm font-semibold whitespace-nowrap transition-colors min-w-0';
   return <div ref={containerRef} className="relative z-40 w-full rounded-xl border border-emerald-100 bg-white shadow-sm">
     <header className="flex items-center justify-between gap-3 border-b border-gray-100 px-3 py-3 sm:px-6">
@@ -189,6 +195,10 @@ export const DashboardHeader = ({ title, activeTab, onTabChange, departments = [
           <button type="button" onClick={()=>selectTopSection(m.id)} aria-expanded={selectedSidebar===m.id} className={`${cls} w-full ${active(m.id)||selectedSidebar===m.id?'bg-emerald-800 text-amber-300 ring-1 ring-amber-400':'text-amber-100 hover:bg-emerald-800'}`}>{m.label}<svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className={`ml-2 h-4 w-4 shrink-0 transition-transform duration-200 ${selectedSidebar===m.id ? 'rotate-180' : ''}`}><path d="m6 9 6 6 6-6" /></svg></button>
 
         </div>)}
+        {myDeptHref && <Link href={myDeptHref} onClick={()=>{onSidebarSelect?.(null);close();}} aria-label="ไปยังหน่วยงานของฉัน" className={`${cls} gap-2 ${pathname===myDeptHref?'bg-emerald-800 text-amber-300 ring-1 ring-amber-400':'text-amber-100 hover:bg-emerald-800'}`}>
+          <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" className="h-4 w-4 shrink-0"><path d="M3 21h18M5 21V7l7-4 7 4v14M9 21v-5h6v5M9 9h.01M15 9h.01M9 12h.01M15 12h.01" /></svg>
+          หน่วยงานของฉัน
+        </Link>}
         <div className="flex flex-col gap-2 border-t border-emerald-800 px-3 py-3 text-amber-100 md:hidden"><span>{displayUserName}</span><LogoutButton /></div>
       </nav>
     </div>

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useMemo, useState } from 'react';
+import { committees, nursingBranches, workforce } from '@/lib/workMenus';
 
 type Department = { id?: string | number; Department?: string; department_name?: string; name?: string; group?: string; group_name?: string };
 type Item = { label: string; href: string };
@@ -25,22 +26,6 @@ const nso: Item[] = [
   {label:'Action Plan',href:'/dashboard/nso-strategy/action-plan'},
   {label:'บันทึกและรับรองผล',href:'/dashboard/nso-strategy/monitoring'},
 ];
-const workforce: Item[] = [
-  {label:'บุคลากรและสมรรถนะ',href:'/dashboard/staffing'},
-  {label:'Ward Command Center',href:'/dashboard/staffing/command-center'},
-  {label:'ตารางเวร',href:'/dashboard/staffing/schedule'},
-  {label:'ภาพรวมอัตรากำลัง',href:'/dashboard/staffing/overview'},
-  {label:'รายงานเวรตรวจการ',href:'/dashboard/staffing/inspection-report'},
-];
-const committees: Item[] = [
-  {label:'คณะกรรมการบริหาร',href:'/dashboard/committee/executive'},
-  {label:'คณะกรรมการ QA',href:'/dashboard/committee/qa'},
-  {label:'คณะกรรมการ RM',href:'/dashboard/committee/rm'},
-  {label:'คณะกรรมการ HRN',href:'/dashboard/committee/academic'},
-  {label:'คณะกรรมการอัตรากำลัง',href:'/dashboard/committee/personnel'},
-  {label:'คณะกรรมการ R2R',href:'/dashboard/committee/r2r'},
-  {label:'คณะกรรมการบ้านพัก',href:'/dashboard/committee/home'},
-];
 const kpis: Item[] = [
   {label:'KPI ตามหมวด',href:'/dashboard/category'},
   {label:'KPI ตามแผน',href:'/dashboard/strategy'},
@@ -56,13 +41,6 @@ const monthly: Item[] = [
   {label:'Re-admit',href:'/dashboard/readmit-report'},
   {label:'จำหน่ายไม่สมัครใจ (AMA)',href:'/dashboard/ama-report'},
 ];
-const nursingBranches: Item[] = [
-  'การพยาบาลวิจัยและพัฒนาการบริการ','การพยาบาลผู้ป่วยหนัก','การพยาบาลผู้ป่วยอุบัติเหตุและฉุกเฉิน',
-  'การพยาบาลผู้ป่วยผ่าตัด','การพยาบาลผู้ป่วยอายุรกรรม','การพยาบาลควบคุมและป้องกันการติดเชื้อ',
-  'การพยาบาลผู้ป่วยกุมารเวชกรรม','การพยาบาลโสต ศอ นาสิก จักษุ','การพยาบาลตรวจรักษาพิเศษ',
-  'การพยาบาลผู้ป่วยศัลยกรรม','การพยาบาลผู้ป่วยสูติ–นรีเวช','การพยาบาลผู้ป่วยจิตเวช',
-  'การพยาบาลผู้ป่วยนอก','การพยาบาลวิสัญญี','การพยาบาลผู้คลอด','การพยาบาลผู้ป่วยออร์โธปิดิกส์'
-].map((label,i)=>({label,href:`/dashboard/nursing/branch-${i+1}`}));
 const matching = (path:string, href:string) => path===href || (!['/dashboard/nso-strategy','/dashboard/staffing'].includes(href) && path.startsWith(href+'/'));
 function sectionFor(path:string){
   if(path.startsWith('/dashboard/nso-strategy'))return 'nso';

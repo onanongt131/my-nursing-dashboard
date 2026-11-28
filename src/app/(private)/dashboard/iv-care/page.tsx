@@ -5,6 +5,7 @@ import ReportMonthHeading from '@/components/ReportMonthHeading';
 import {useState,useEffect,useMemo,useCallback,useRef} from 'react';
 import {createPortal} from 'react-dom';
 import {createClient} from '@/utils/supabase/client';
+import {coalescedReload} from '@/lib/coalescedReload';
 import {ivFraction,ivPercent,type IvMetric,type IvReportRow} from '@/lib/ivCareReport';
 const months=[{id:10,name:'OCT'},{id:11,name:'NOV'},{id:12,name:'DEC'},{id:1,name:'JAN'},{id:2,name:'FEB'},{id:3,name:'MAR'},{id:4,name:'APR'},{id:5,name:'MAY'},{id:6,name:'JUN'},{id:7,name:'JUL'},{id:8,name:'AUG'},{id:9,name:'SEP'}];
 const tabs:{key:IvMetric;label:string;detail:string}[]=[{key:'success',label:'อัตราความสำเร็จ',detail:'ครั้งแรกสำเร็จ / แทงเข็มทั้งหมด'},{key:'phlebitis',label:'Phlebitis',detail:'ระดับ 3–4 / ตำแหน่งให้สารน้ำ'},{key:'extravasation',label:'Extravasation',detail:'ทุกระดับ / ตำแหน่งให้สารน้ำ'},{key:'infiltration',label:'Infiltration',detail:'ทุกระดับ / ตำแหน่งให้สารน้ำ'}];
@@ -30,7 +31,7 @@ export default function IvCarePage(){
  const [exportMonth,setExportMonth]=useState(10);
  const supabase=useMemo(()=>createClient(),[]),generation=useRef(0);
  const load=useCallback(async()=>{const token=++generation.current;setLoading(true);try{const response=await fetch('/api/iv-care-report',{cache:'no-store'});const body=await response.json();if(!response.ok)throw Error(body.error||'โหลดรายงานไม่สำเร็จ');if(token!==generation.current)return;setRows(body.items||[]);setIncidents(body.incidents||[]);setDepartments(sortMonthlyDepartments<IvDepartment>(body.departments||[]));setPendingMonths(new Set(body.pending_months||[]));setWarning(body.invalid?'ข้อมูลไม่ถูกต้อง/สรุปซ้ำ '+body.invalid+' รายการ':'');setError('');}catch(e){if(token===generation.current)setError(e instanceof Error?e.message:'โหลดไม่สำเร็จ');}finally{if(token===generation.current)setLoading(false);}},[]);
- useEffect(()=>{void load();const channel=supabase.channel('iv-care-report').on('postgres_changes',{event:'*',schema:'public',table:'iv_care_data'},()=>void load()).on('postgres_changes',{event:'*',schema:'public',table:'iv_care_complications'},()=>void load()).on('postgres_changes',{event:'*',schema:'public',table:'iv_care_monthly_summaries'},()=>void load()).subscribe();return()=>{generation.current++;void supabase.removeChannel(channel);};},[load,supabase]);
+ useEffect(()=>{void load();const reload=coalescedReload(()=>void load());const channel=supabase.channel('iv-care-report').on('postgres_changes',{event:'*',schema:'public',table:'iv_care_data'},()=>reload.trigger()).on('postgres_changes',{event:'*',schema:'public',table:'iv_care_complications'},()=>reload.trigger()).on('postgres_changes',{event:'*',schema:'public',table:'iv_care_monthly_summaries'},()=>reload.trigger()).subscribe();return()=>{generation.current++;reload.cancel();void supabase.removeChannel(channel);};},[load,supabase]);
  useEffect(()=>{if(!detail)return;const before=document.body.style.overflow;document.body.style.overflow='hidden';return()=>{document.body.style.overflow=before;};},[detail]);
  const years=useMemo(()=>Array.from(new Set([2570,2569,2568,2567,2566,...rows.map(r=>Number(r.fiscal_year))])).sort((a,b)=>b-a),[rows]);
  const selected=useMemo(()=>rows.filter(r=>Number(r.fiscal_year)===year),[rows,year]);

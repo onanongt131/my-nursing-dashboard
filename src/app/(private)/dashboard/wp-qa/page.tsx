@@ -3,6 +3,7 @@ import { ReportStatusIcon, ReportStatusLegend, ReportValue, MonthlyTableViewport
 import { sortMonthlyDepartments } from '@/lib/monthlyReportDepartments';
 import ReportMonthHeading from '@/components/ReportMonthHeading';
 import {ExecutiveSummary,ReportViewSwitch} from '@/components/ExecutiveSummary';
+import WpTopFailing from '@/components/WpTopFailing';
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 
@@ -397,9 +398,10 @@ export default function WpQaDashboard() {
       {!loadError&&invalidRows>0&&<p role="alert" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">มีข้อมูลจำนวนประเมินหรือผลประเมินไม่ถูกต้อง {invalidRows} รายการ กรุณาตรวจข้อมูลต้นทาง</p>}
 
       {!loadError && loading && <p className="p-6 text-center text-sm text-gray-500">กำลังโหลดข้อมูล…</p>}
-      {!loadError && !loading && <ReportViewSwitch tableLabel={overview?'ตารางรายหน่วยงาน':'ตารางรายตัวชี้วัด'} summary={<ExecutiveSummary metric={overview?'ร้อยละตัวชี้วัดที่ผ่านเกณฑ์':'คะแนนตัวชี้วัด'} unit="%" decimals={1} good={v=>v>=90} goodLabel="≥ 90%" badness={v=>-v} lines={[90]}
+      {!loadError && !loading && <ReportViewSwitch tableLabel={overview?'ตารางรายหน่วยงาน':'ตารางรายตัวชี้วัด'} summary={<><ExecutiveSummary metric={overview?'ร้อยละตัวชี้วัดที่ผ่านเกณฑ์':'คะแนนตัวชี้วัด'} unit="%" decimals={1} good={v=>v>=90} goodLabel="≥ 90%" badness={v=>-v} lines={[90]}
         overall={totalItemsCount>0?summaryPercentage:null} monthly={execMonthly} rows={execRows} rowLabel={overview?'หน่วยงาน':'ตัวชี้วัด'} pendingCount={execPending}
-        note={overview?'แต่ละหน่วยงาน = ร้อยละของตัวชี้วัด WP/QA ที่ได้คะแนน ≥ 90 · แนวโน้มเป็นค่าเฉลี่ยของหน่วยงานที่มีข้อมูล':`ตัวชี้วัด WP/QA ของ ${departments.find(d=>String(d.id)===selectedDept)?.name??'หน่วยงานที่เลือก'} · ทั้งปีของหน่วยงาน = ร้อยละตัวชี้วัดที่ผ่านเกณฑ์`}/>}>
+        note={overview?'แต่ละหน่วยงาน = ร้อยละของตัวชี้วัด WP/QA ที่ได้คะแนน ≥ 90 · แนวโน้มเป็นค่าเฉลี่ยของหน่วยงานที่มีข้อมูล':`ตัวชี้วัด WP/QA ของ ${departments.find(d=>String(d.id)===selectedDept)?.name??'หน่วยงานที่เลือก'} · ทั้งปีของหน่วยงาน = ร้อยละตัวชี้วัดที่ผ่านเกณฑ์`}/>
+        <WpTopFailing records={rawData.filter(r=>String(r.fiscal_year).trim()===String(selectedYear).trim())} deptName={id=>getMappedDepartmentName(departmentMapName[id]||`หน่วยงาน ${id}`,selectedYear)}/></>}>
       {!loadError && !loading && <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-xl border border-purple-100 bg-purple-50/50 px-3 py-2 text-sm">
         <div className="flex items-center gap-2 font-semibold text-slate-700">
           <span>ผ่านเกณฑ์</span>

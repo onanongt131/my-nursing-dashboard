@@ -61,7 +61,7 @@ export default function QualitySafetyDashboardPage() {
   const [selectedTrendKpi, setSelectedTrendKpi] = useState<Kpi>('Fall');
   const fall = useJson<{ items: Row[] }>(`/api/safety-monthly-report?kind=fall&year=${year}`);
   const pressure = useJson<{ items: Row[] }>(`/api/safety-monthly-report?kind=pressure&year=${year}`);
-  const iv = useJson<{ items: IvReportRow[]; departments: { id: number | string; Department: string }[] }>('/api/iv-care-report');
+  const iv = useJson<{ items: IvReportRow[]; departments: { id: number | string; Department: string }[] }>(`/api/iv-care-report?fiscal_year=${year}`);
 
   const data = useMemo(() => {
     const fallRows = fall?.data?.items ?? [], pressRows = pressure?.data?.items ?? [];

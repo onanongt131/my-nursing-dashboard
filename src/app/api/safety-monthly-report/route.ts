@@ -8,8 +8,6 @@ export const dynamic='force-dynamic';
 
 export async function GET(request:NextRequest){
  try{
-  const user=await currentUser();
-  if(!user)return fail('กรุณาเข้าสู่ระบบ',401);
   const kind=request.nextUrl.searchParams.get('kind');
   const fiscalYear=Number(request.nextUrl.searchParams.get('year'));
   if((kind!=='fall'&&kind!=='pressure')||!Number.isInteger(fiscalYear)||fiscalYear<2544||fiscalYear>2642)return fail('รายงานหรือปีงบประมาณไม่ถูกต้อง');
@@ -17,7 +15,9 @@ export async function GET(request:NextRequest){
   const start=`${year-1}-10-01`, end=`${year}-10-01`;
   const periods=[10,11,12,1,2,3,4,5,6,7,8,9].map(m=>`${m>=10?year-1:year}-${String(m).padStart(2,'0')}`);
   const client=db();
-  const {data:departments,error}=await client.from('departments').select('id,Department').order('Department');
+  // อ่านผู้ใช้กับรายชื่อหน่วยงานพร้อมกัน (ลดการรอเป็นทอด)
+  const [user,{data:departments,error}]=await Promise.all([currentUser(),client.from('departments').select('id,Department').order('Department')]);
+  if(!user)return fail('กรุณาเข้าสู่ระบบ',401);
   if(error)throw error;
   const wards=(departments??[]).filter(department=>{
    const name=department.Department??'';

@@ -7,6 +7,7 @@ import {ExecutiveSummary,ReportViewSwitch} from '@/components/ExecutiveSummary';
 import React, { useState, useEffect, useMemo } from 'react';
 import {auditNoteFields,reportPercent} from '@/lib/audits/report';
 import { createClient } from '@/utils/supabase/client';
+import { coalescedReload } from '@/lib/coalescedReload';
 
 export default function AuditChartPage() {
   const supabase = useMemo(()=>createClient(),[]);
@@ -46,20 +47,20 @@ export default function AuditChartPage() {
       }
     };
     fetchData();
+    const reload = coalescedReload(() => { fetchData(); });
 
     const channel = supabase
       .channel('public:audit_chart_data')
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'audit_chart_data' },
-        () => {
-          fetchData();
-        }
+        () => reload.trigger()
       )
-      .on('postgres_changes',{event:'*',schema:'public',table:'nursing_chart_audits'},()=>{fetchData();})
+      .on('postgres_changes',{event:'*',schema:'public',table:'nursing_chart_audits'},()=>reload.trigger())
       .subscribe();
 
     return () => {
+      reload.cancel();
       supabase.removeChannel(channel);
     };
   }, [supabase]);

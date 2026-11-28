@@ -90,11 +90,9 @@ export function ExecutiveSummary(p: ExecSummaryProps) {
 
       <section className="grid gap-3 lg:grid-cols-3">
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm lg:col-span-2">
-          <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-sm font-bold text-slate-800">แนวโน้มรายเดือน · {p.metric}</h3>{p.compare && <div className="flex min-w-0 flex-1 flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[11px] text-slate-600">
+          <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-sm font-bold text-slate-800">แนวโน้มรายเดือน · {p.metric}</h3>{p.compare && <div className="flex min-w-0 flex-1 items-center justify-center gap-4 whitespace-nowrap text-[11px] text-slate-600">
             <span className="flex items-center gap-1.5"><i className="inline-block h-2.5 w-2.5 rounded-sm bg-teal-600" />{p.compare.mainLabel}</span>
             <span className="flex items-center gap-1.5"><i className="inline-block h-2.5 w-2.5 rounded-sm bg-violet-400" />{p.compare.label}</span>
-            {!!p.lines?.length && <span className="flex items-center gap-1.5"><i className="inline-block w-4 border-t border-dashed border-amber-500" />เกณฑ์ {p.goodLabel}</span>}
-            <span className="flex items-center gap-1.5"><b className="text-rose-600">ตัวเลขสีแดง</b> = ไม่อยู่ในเกณฑ์</span>
           </div>}{p.chartControls}</div>
           <div className="mt-3 flex h-44 items-end gap-1.5 border-b border-slate-200 relative" role="img" aria-label={`กราฟแนวโน้มรายเดือน ${p.metric}`}>
             {(p.lines ?? []).map((l) => <div key={l} className="pointer-events-none absolute inset-x-0 border-t border-dashed border-amber-500" style={{ bottom: `${(l / max) * 100}%` }}><span className="absolute -top-4 right-0 text-[10px] font-semibold text-amber-700">{l}</span></div>)}

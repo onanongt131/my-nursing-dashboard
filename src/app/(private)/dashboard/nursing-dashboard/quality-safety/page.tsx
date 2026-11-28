@@ -6,7 +6,13 @@ import { ivPercent, type IvReportRow } from '@/lib/ivCareReport';
 type Month = { cases: number | null; days: number | null; riskDays: number | null; pending: boolean };
 type Row = { id: number; name: string; months: Month[] };
 type Status = 'green' | 'yellow' | 'red' | 'none';
-type Kpi = 'Fall' | 'Pressure Injury' | 'IV Care';
+type Kpi = 'Fall' | 'Pressure Injury' | 'IV Care' | 'IV Phlebitis' | 'IV Extravasation' | 'IV Infiltration';
+const IV_KPIS: { kpi: Kpi; metric: 'success' | 'phlebitis' | 'extravasation' | 'infiltration'; label: string }[] = [
+  { kpi: 'IV Care', metric: 'success', label: 'อัตราความสำเร็จ' },
+  { kpi: 'IV Phlebitis', metric: 'phlebitis', label: 'Phlebitis' },
+  { kpi: 'IV Extravasation', metric: 'extravasation', label: 'Extravasation' },
+  { kpi: 'IV Infiltration', metric: 'infiltration', label: 'Infiltration' },
+];
 
 const MONTHS = ['ต.ค.', 'พ.ย.', 'ธ.ค.', 'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.'];
 const MONTH_NUM = [10, 11, 12, 1, 2, 3, 4, 5, 6, 7, 8, 9];
@@ -14,7 +20,10 @@ const MONTH_NUM = [10, 11, 12, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 const TARGET: Record<Kpi, { value: number; higherBetter: boolean; unit: string; label: string }> = {
   Fall: { value: 0.5, higherBetter: false, unit: 'ครั้ง/1,000 วันนอน', label: '≤ 0.50' },
   'Pressure Injury': { value: 0.2, higherBetter: false, unit: 'ครั้ง/1,000 วันนอน', label: '≤ 0.20' },
-  'IV Care': { value: 80, higherBetter: true, unit: '%', label: '≥ 80%' },
+  'IV Care': { value: 80, higherBetter: true, unit: '% แทงเข็มสำเร็จครั้งแรก', label: '≥ 80%' },
+  'IV Phlebitis': { value: 0, higherBetter: false, unit: '% ระดับ 3–4 ต่อตำแหน่งให้สารน้ำ', label: '0%' },
+  'IV Extravasation': { value: 0, higherBetter: false, unit: '% ต่อตำแหน่งให้สารน้ำ', label: '0%' },
+  'IV Infiltration': { value: 0, higherBetter: false, unit: '% ต่อตำแหน่งให้สารน้ำ', label: '0%' },
 };
 const statusOf = (kpi: Kpi, v: number | null): Status => {
   if (v === null) return 'none';
@@ -56,15 +65,15 @@ export default function QualitySafetyDashboardPage() {
   const data = useMemo(() => {
     const fallRows = fall?.data?.items ?? [], pressRows = pressure?.data?.items ?? [];
     const ivRows = (iv?.data?.items ?? []).filter((r) => Number(r.fiscal_year) === year);
-    const monthly: Record<Kpi, (number | null)[]> = {
+    const monthly = {
       Fall: MONTH_NUM.map((_, i) => rate(fallRows.map((r) => r.months[i]).filter(Boolean))),
       'Pressure Injury': MONTH_NUM.map((_, i) => rate(pressRows.map((r) => r.months[i]).filter(Boolean))),
-      'IV Care': MONTH_NUM.map((m) => ivPercent(ivRows.filter((r) => Number(r.month) === m), 'success', 'overall')),
+      ...Object.fromEntries(IV_KPIS.map((k) => [k.kpi, MONTH_NUM.map((m) => ivPercent(ivRows.filter((r) => Number(r.month) === m), k.metric, 'overall'))])),
     };
-    const overall: Record<Kpi, number | null> = {
+    const overall = {
       Fall: rate(fallRows.flatMap((r) => r.months)),
       'Pressure Injury': rate(pressRows.flatMap((r) => r.months)),
-      'IV Care': ivRows.length ? ivPercent(ivRows, 'success', 'overall') : null,
+      ...Object.fromEntries(IV_KPIS.map((k) => [k.kpi, ivRows.length ? ivPercent(ivRows, k.metric, 'overall') : null])),
     };
     // Heatmap: รายหอจากรายงาน Fall / Pressure sore (ทั้งปีงบประมาณ)
     const wards = new Map<string, { name: string; fall: number | null; pi: number | null }>();
@@ -76,23 +85,24 @@ export default function QualitySafetyDashboardPage() {
       statusOf('Pressure Injury', w.pi) === 'red' ? { ward: w.name, kpi: 'Pressure Injury' as Kpi, value: w.pi! } : null,
     ]).filter((x): x is { ward: string; kpi: Kpi; value: number } => x !== null)
       .sort((a, b) => b.value / TARGET[b.kpi].value - a.value / TARGET[a.kpi].value);
-    return { monthly, overall, heat, attention };
+    return { monthly: monthly as Record<Kpi, (number | null)[]>, overall: overall as Record<Kpi, number | null>, heat, attention };
   }, [fall, pressure, iv, year]);
 
   const loading = !fall || !pressure || !iv;
   const errors = [fall?.error && `Fall: ${fall.error}`, pressure?.error && `Pressure sore: ${pressure.error}`, iv?.error && `IV Care: ${iv.error}`].filter(Boolean);
 
-  const cards: { name: string; kpi?: Kpi; value: string; status: Status }[] = [
+  const cards: { name: string; kpi?: Kpi; value: string; status: Status; iv?: boolean }[] = [
     { name: 'Fall', kpi: 'Fall', value: loading ? '…' : `${fmt(data.overall.Fall)} ครั้ง/พันวันนอน`, status: statusOf('Fall', data.overall.Fall) },
     { name: 'Pressure Injury', kpi: 'Pressure Injury', value: loading ? '…' : `${fmt(data.overall['Pressure Injury'])} ครั้ง/พันวันนอน`, status: statusOf('Pressure Injury', data.overall['Pressure Injury']) },
     { name: 'Medication Error', value: 'ยังไม่มีข้อมูล', status: 'none' },
-    { name: 'IV Care', kpi: 'IV Care', value: loading ? '…' : data.overall['IV Care'] === null ? '—' : `${fmt(data.overall['IV Care'], 1)}%`, status: statusOf('IV Care', data.overall['IV Care']) },
+    { name: 'IV Care', kpi: 'IV Care', value: loading ? '…' : data.overall['IV Care'] === null ? '—' : `สำเร็จ ${fmt(data.overall['IV Care'], 1)}%`, status: IV_KPIS.map((k) => statusOf(k.kpi, data.overall[k.kpi])).includes('red') ? 'red' : statusOf('IV Care', data.overall['IV Care']), iv: true },
     { name: 'Unplanned CPR', value: 'ยังไม่มีข้อมูล', status: 'none' },
     { name: 'Aspiration', value: 'ยังไม่มีข้อมูล', status: 'none' },
   ];
-  const trendKpis: { key: string; kpi?: Kpi }[] = [{ key: 'Fall', kpi: 'Fall' }, { key: 'Pressure Injury', kpi: 'Pressure Injury' }, { key: 'IV Care', kpi: 'IV Care' }, { key: 'Medication Error' }, { key: 'Unplanned CPR' }];
+  const trendKpis: { key: string; kpi?: Kpi }[] = [{ key: 'Fall', kpi: 'Fall' }, { key: 'Pressure Injury', kpi: 'Pressure Injury' }, ...IV_KPIS.map((k) => ({ key: `IV: ${k.label}`, kpi: k.kpi })), { key: 'Medication Error' }, { key: 'Unplanned CPR' }];
   const t = TARGET[selectedTrendKpi], values = data.monthly[selectedTrendKpi];
   const scale = Math.max(t.value * 1.5, ...values.filter((v): v is number => v !== null)) || 1;
+  const trendTitle = trendKpis.find((k) => k.kpi === selectedTrendKpi)?.key ?? selectedTrendKpi;
 
   return (
     <div className="min-h-screen bg-gray-50/50 px-4 pb-12 sm:px-6 lg:px-8">
@@ -121,7 +131,8 @@ export default function QualitySafetyDashboardPage() {
                 <Dot status={c.status} />
               </div>
               <p className={`mt-3 text-xs font-semibold ${c.kpi ? 'text-gray-600' : 'text-gray-400'}`}>{c.value}</p>
-              {c.kpi && <p className="mt-1 text-[10px] text-gray-400">เป้า {TARGET[c.kpi].label}</p>}
+              {c.iv && !loading && <ul className="mt-1 space-y-0.5 text-[10px]">{IV_KPIS.slice(1).map((k) => { const v = data.overall[k.kpi]; return <li key={k.kpi} className="flex justify-between gap-1"><span className="text-gray-500">{k.label}</span><b className={v === null ? 'text-gray-300' : v > 0 ? 'text-rose-600' : 'text-emerald-700'}>{v === null ? '—' : `${fmt(v)}%`}</b></li>; })}</ul>}
+              {c.kpi && <p className="mt-1 text-[10px] text-gray-400">เป้า {c.iv ? 'สำเร็จ ≥ 80% · ภาวะแทรกซ้อน 0%' : TARGET[c.kpi].label}</p>}
             </div>
           ))}
         </div>
@@ -144,7 +155,7 @@ export default function QualitySafetyDashboardPage() {
           </div>
           <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
             <div className="mb-4 flex items-center justify-between text-xs font-medium text-gray-500">
-              <span>ตัวชี้วัด: <strong className="text-gray-800">{selectedTrendKpi}</strong> ({t.unit})</span>
+              <span>ตัวชี้วัด: <strong className="text-gray-800">{trendTitle}</strong> ({t.unit})</span>
               <span>ค่าเป้าหมาย (Target): <strong className="text-emerald-700">{t.label}</strong></span>
             </div>
             <div className="grid grid-cols-6 gap-2 text-center sm:grid-cols-12">

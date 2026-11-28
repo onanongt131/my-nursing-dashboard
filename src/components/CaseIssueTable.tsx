@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import FiscalMonthSelect, { monthLabel } from '@/components/FiscalMonthSelect';
+import { isNoIssue } from '@/lib/noIssue';
 
 type Kind = 'fall' | 'pressure' | 'readmit';
 type Case = Record<string, any> & { id: number | string; status: string; date: string; department: string };
@@ -71,9 +72,11 @@ export default function CaseIssueTable({ kind, year, severeOnly = false, include
 
   const current = state?.key === key ? state : null;
   const cases = (current?.items ?? []).filter((c) => (!month || Number(String(c.date).slice(5, 7)) === month) && (includePending || c.status === 'approved') && (kind !== 'pressure' || ['2', '3', '4'].includes(String(c.wound_level))) && (!severeOnly || SEVERE.includes(String(c.severity || '').toUpperCase())));
-  const counts = cfg.issues.map((i) => cases.filter((c) => i.value(c)).length);
+  const counts = cfg.issues.map((i) => cases.filter((c) => isHit(i.value(c))).length);
   // รายละเอียดสาเหตุแสดงใต้ ✓ (ยกเว้น Pressure sore ที่ค่าเป็นแค่ระดับ/ผลลัพธ์)
   const detailUnderCheck = kind !== 'pressure';
+  // "-" หรือ "ไม่พบปัญหา" ไม่นับเป็นประเด็น (ไม่ติ๊ก ✓ และไม่นับจำนวนราย)
+  const isHit = (v: string | null) => !!v && (!detailUnderCheck || !isNoIssue(v));
 
   return (
     <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
@@ -116,10 +119,10 @@ export default function CaseIssueTable({ kind, year, severeOnly = false, include
                     <td className="border border-slate-200 px-3 py-2 text-slate-700">
                       <p className="whitespace-pre-line">{summary || <span className="text-slate-400">ไม่ได้บันทึกรายละเอียด</span>}</p>
                     </td>
-                    {cfg.issues.map((i) => { const v = i.value(c); return <td key={i.key} className="border border-slate-200 px-2 py-2 text-center">{v ? <>
-                      <span title={detailUnderCheck ? undefined : v} className="text-base font-bold text-teal-600">✓</span>
+                    {cfg.issues.map((i) => { const v = i.value(c), hit = isHit(v); return <td key={i.key} className="border border-slate-200 px-2 py-2 text-center">{hit ? <>
+                      <span title={detailUnderCheck ? undefined : v!} className="text-base font-bold text-teal-600">✓</span>
                       {detailUnderCheck && <p className="mt-1 whitespace-pre-line text-left text-xs text-slate-600">{v}</p>}
-                    </> : <span className="text-slate-300">—</span>}</td>; })}
+                    </> : v && detailUnderCheck && v.replace(/[-–—\s]/g, '') ? <p className="whitespace-pre-line text-left text-xs text-slate-400">{v}</p> : <span className="text-slate-300">—</span>}</td>; })}
                     {cfg.note && <td className="border border-slate-200 px-3 py-2 text-xs text-slate-600"><p className="whitespace-pre-line">{note || <span className="text-slate-300">—</span>}</p></td>}
                   </tr>
                 );

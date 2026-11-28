@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { IV_FACTOR_GROUPS } from '@/lib/ivCareFactors';
+import { isNoIssue } from '@/lib/noIssue';
 import FiscalMonthSelect, { monthLabel } from '@/components/FiscalMonthSelect';
 
 type Cause = { code?: string; label: string };
@@ -35,7 +36,7 @@ export default function IvFactorTable({ incidents, year, complication, name }: {
     .sort((a, b) => a.record_date.localeCompare(b.record_date));
   const groupsOf = (r: IvIncident) => r.contributing_factors?.groups ?? [];
   const codeOf = (g: Group) => g.code ?? GROUPS.find((x) => x.label === g.label)?.code ?? g.label;
-  const legacyOf = (r: IvIncident) => LEGACY.map(([k, label]) => ({ label, v: text(r[k]) })).filter((x) => x.v);
+  const legacyOf = (r: IvIncident) => LEGACY.map(([k, label]) => ({ label, v: text(r[k]) })).filter((x) => x.v && !isNoIssue(x.v));
 
   // ความถี่: นับจำนวนเหตุการณ์ที่มีปัจจัยนั้น ๆ
   const freq = new Map<string, { group: string; groupCode: string; label: string; count: number; causes: Map<string, number> }>();

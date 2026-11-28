@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import FiscalMonthSelect, { monthLabel } from '@/components/FiscalMonthSelect';
 import { isNoIssue } from '@/lib/noIssue';
+import { amaReasonCategory, amaRequester } from '@/lib/amaReasonCategory';
 
 type Kind = 'fall' | 'pressure' | 'readmit' | 'ama';
 type Case = Record<string, any> & { id: number | string; status: string; date: string; department: string };
@@ -11,7 +12,7 @@ type Issue = { key: string; label: string; value: (c: Case) => string | null };
 const text = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
 const SEVERE = ['E', 'F', 'G', 'H', 'I'];
 
-const CONFIG: Record<Kind, { title: string; summary: (c: Case) => string | null; extra: (c: Case) => (string | null)[]; dateSuffix?: (c: Case) => string | null; anInline?: boolean; caseWidth?: string; summaryWidth?: string; issueWidth?: string; summaryLabel?: string; groupKey?: (c: Case) => string | null; issues: Issue[]; note?: (c: Case) => string | null; noteLabel?: string }> = {
+const CONFIG: Record<Kind, { title: string; summary: (c: Case) => string | null; extra: (c: Case) => (string | null)[]; dateSuffix?: (c: Case) => string | null; anInline?: boolean; caseWidth?: string; summaryWidth?: string; issueWidth?: string; summaryLabel?: string; groupKey?: (c: Case) => string | null; summaryTag?: (c: Case) => string | null; issues: Issue[]; note?: (c: Case) => string | null; noteLabel?: string }> = {
   fall: {
     title: 'สรุปประเด็นรายกรณี · พลัดตกหกล้ม',
     summary: (c) => text(c.description),
@@ -44,12 +45,13 @@ const CONFIG: Record<Kind, { title: string; summary: (c: Case) => string | null;
     title: 'สรุปสาเหตุจำหน่ายไม่สมัครใจอยู่ (AMA)',
     summaryLabel: 'สาเหตุที่ไม่สมัครใจอยู่',
     summary: (c) => text(c.ama_reason),
-    extra: () => [],
+    extra: (c) => { const r = amaRequester(c.ama_reason); return [r ? `ประสงค์โดย${r}` : null]; },
     anInline: true,
     issues: [],
     note: (c) => text(c.treatment_right),
     noteLabel: 'สิทธิการรักษา',
-    groupKey: (c) => text(c.ama_reason)?.replace(/\s+/g, ' ') ?? null,
+    groupKey: (c) => amaReasonCategory(c.ama_reason),
+    summaryTag: (c) => amaReasonCategory(c.ama_reason),
   },
   readmit: {
     title: 'สรุปประเด็นรายกรณี · Re-admit',
@@ -106,9 +108,9 @@ export default function CaseIssueTable({ kind, year, severeOnly = false, include
         : current.error ? <p role="alert" className="p-4 text-sm text-red-700">{current.error}</p>
         : !cases.length ? <p className="p-6 text-sm text-slate-500">ไม่มีรายกรณี{month ? `ในเดือน${monthLabel(month, year)}` : `ในปีงบประมาณ ${year}`}</p>
         : <>{groups.length > 0 && <div className="border-b border-slate-100 px-4 py-3">
-          <p className="mb-2 text-xs font-semibold text-slate-600">สาเหตุที่พบ ({groups.length} สาเหตุ · เรียงจากพบมากไปน้อย)</p>
-          <ol className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">{groups.slice(0, 9).map(([k, n], i) => <li key={k} className="flex items-start gap-2 rounded-lg bg-slate-50 px-2.5 py-1.5 text-xs text-slate-700"><span className="w-4 shrink-0 text-right text-slate-400">{i + 1}</span><span className="min-w-0 flex-1">{k}</span><b className="shrink-0 tabular-nums text-rose-600">{n} ราย</b></li>)}</ol>
-          {groups.length > 9 && <p className="mt-1.5 text-xs text-slate-400">และอีก {groups.length - 9} สาเหตุ (ดูในตารางด้านล่าง)</p>}
+          <p className="mb-2 text-xs font-semibold text-slate-600">กลุ่มสาเหตุ ({groups.length} กลุ่ม · เรียงจากพบมากไปน้อย · จัดกลุ่มอัตโนมัติจากคำในข้อความ)</p>
+          <ol className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">{groups.slice(0, 9).map(([k, n], i) => <li key={k} className="flex items-start gap-2 rounded-lg bg-slate-50 px-2.5 py-1.5 text-xs text-slate-700"><span className="w-4 shrink-0 text-right text-slate-400">{i + 1}</span><span className="min-w-0 flex-1">{k}</span><b className="shrink-0 tabular-nums text-rose-600">{n} ราย</b><span className="w-12 shrink-0 text-right tabular-nums text-slate-400">{((n / cases.length) * 100).toFixed(0)}%</span></li>)}</ol>
+          {groups.length > 9 && <p className="mt-1.5 text-xs text-slate-400">และอีก {groups.length - 9} กลุ่ม (ดูในตารางด้านล่าง)</p>}
         </div>}
         <div className="max-h-[70vh] overflow-auto">
           <table className={`w-full border-collapse text-sm ${!hasIssues ? 'min-w-[760px]' : detailUnderCheck ? 'min-w-[1200px]' : 'min-w-[860px]'}`}>
@@ -137,6 +139,7 @@ export default function CaseIssueTable({ kind, year, severeOnly = false, include
                     </td>
                     <td className="border border-slate-200 px-3 py-2 text-slate-700">
                       <p className="whitespace-pre-line">{summary || <span className="text-slate-400">ไม่ได้บันทึกรายละเอียด</span>}</p>
+                      {cfg.summaryTag?.(c) && <span className="mt-1 inline-block rounded-full bg-teal-50 px-2 py-0.5 text-[11px] font-semibold text-teal-800">{cfg.summaryTag(c)}</span>}
                     </td>
                     {cfg.issues.map((i) => { const v = i.value(c), hit = isHit(v); return <td key={i.key} className="border border-slate-200 px-2 py-2 text-center">{hit ? <>
                       <span title={detailUnderCheck ? undefined : v!} className="text-base font-bold text-teal-600">✓</span>

@@ -70,7 +70,7 @@ const CONFIG: Record<Kind, { title: string; summary: (c: Case) => string | null;
   },
 };
 
-export default function CaseIssueTable({ kind, year, severeOnly = false, includePending = true }: { kind: Kind; year: number; severeOnly?: boolean; includePending?: boolean }) {
+export default function CaseIssueTable({ kind, year, severeOnly = false, includePending = true, wardFilter, scopeLabel }: { kind: Kind; year: number; severeOnly?: boolean; includePending?: boolean; wardFilter?: (department: string) => boolean; scopeLabel?: string }) {
   const cfg = CONFIG[kind];
   const [state, setState] = useState<{ key: string; items: Case[]; error?: string } | null>(null);
   const [month, setMonth] = useState(0); // 0 = ทั้งปี
@@ -86,7 +86,7 @@ export default function CaseIssueTable({ kind, year, severeOnly = false, include
   useEffect(() => setMonth(0), [year]);
 
   const current = state?.key === key ? state : null;
-  const cases = (current?.items ?? []).filter((c) => (!month || Number(String(c.date).slice(5, 7)) === month) && (includePending || c.status === 'approved') && (kind !== 'pressure' || ['2', '3', '4'].includes(String(c.wound_level))) && (!severeOnly || SEVERE.includes(String(c.severity || '').toUpperCase())));
+  const cases = (current?.items ?? []).filter((c) => (!wardFilter || wardFilter(c.department)) && (!month || Number(String(c.date).slice(5, 7)) === month) && (includePending || c.status === 'approved') && (kind !== 'pressure' || ['2', '3', '4'].includes(String(c.wound_level))) && (!severeOnly || SEVERE.includes(String(c.severity || '').toUpperCase())));
   // รายละเอียดสาเหตุแสดงใต้ ✓ (ยกเว้น Pressure sore ที่ค่าเป็นแค่ระดับ/ผลลัพธ์)
   const detailUnderCheck = kind !== 'pressure';
   // "-" หรือ "ไม่พบปัญหา" ไม่นับเป็นประเด็น (ไม่ติ๊ก ✓ และไม่นับจำนวนราย)
@@ -99,7 +99,7 @@ export default function CaseIssueTable({ kind, year, severeOnly = false, include
     <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
       <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-slate-100 px-4 py-3">
         <div className="flex flex-wrap items-center gap-3">
-          <h3 className="text-sm font-bold text-slate-800">{cfg.title}{severeOnly && ' (ระดับ E ขึ้นไป)'} <span className="font-normal text-slate-400">({cases.length} ราย)</span></h3>
+          <h3 className="text-sm font-bold text-slate-800">{cfg.title}{severeOnly && ' (ระดับ E ขึ้นไป)'}{scopeLabel && ` · ${scopeLabel}`} <span className="font-normal text-slate-400">({cases.length} ราย)</span></h3>
           <FiscalMonthSelect value={month} onChange={setMonth} year={year} />
         </div>
         <p className="text-xs text-slate-500">สรุปจากผลที่บันทึก{includePending ? ' รวมรายการรออนุมัติ' : 'ที่อนุมัติแล้ว'} ตามสิทธิ์{detailUnderCheck && hasIssues ? ' · รายละเอียดสาเหตุแสดงใต้เครื่องหมาย ✓' : ''}</p>

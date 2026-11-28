@@ -110,7 +110,7 @@ export default function SafetyMonthlyReport({kind}:{kind:'fall'|'pressure'}){
    </div>
   </header>
   {!current?<p role="status">กำลังโหลดข้อมูล…</p>:current.error?<p role="alert">{current.error}</p>:!current.items.length?<p>ไม่มีหน่วยงานในรายงานตามสิทธิ์ของบัญชี</p>:
-  <ReportViewSwitch summary={<><ExecutiveSummary metric={pressure?'อัตราแผลกดทับ':severeOnly?'อัตราพลัดตกหกล้ม ระดับ E ขึ้นไป':'อัตราพลัดตกหกล้ม'} unit={unit} good={v=>v===0} goodLabel="0 (ไม่เกิดเหตุการณ์)" badness={v=>v}
+  <ReportViewSwitch summary={<><ExecutiveSummary metric={pressure?'อัตราแผลกดทับ':severeOnly?'อัตราพลัดตกหกล้ม ระดับ E ขึ้นไป':'อัตราพลัดตกหกล้ม'} unit={unit} good={pressure?v=>v<2:v=>v===0} goodLabel={pressure?'< 2':'0 (ไม่เกิดเหตุการณ์)'} lines={pressure?[2]:undefined} badness={v=>v}
    overall={execOverall} monthly={execMonthly} rows={execRows} pendingCount={execPending}
    note={annualOnly?'ปีนี้มีเฉพาะข้อมูลรายปี จึงไม่มีแนวโน้มรายเดือน':undefined}/>
    <CaseIssueTable kind={kind} year={year} severeOnly={!pressure&&severeOnly}/></>}>

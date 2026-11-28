@@ -9,6 +9,9 @@ import CaseIssueTable from '@/components/CaseIssueTable';
 type Month={cases:number|null;severe?:number;days:number|null;riskDays:number|null;pending:boolean;reportedRate?:number|null};
 type Row={id:number;name:string;months:Month[];historical?:Partial<Record<'all'|'risk',{cases:number;days:number;rate:number|null}>>};
 const months=[10,11,12,1,2,3,4,5,6,7,8,9];
+// หอผู้ป่วยวิกฤต (ICU) สำหรับแยกกราฟแผลกดทับ · ICCU นับเป็นนอก ICU
+const isIcuWard=(name:string)=>{const n=name.toUpperCase().replace(/\s+/g,'');return n!=='ICCU'&&!n.startsWith('ICCU')&&(/ICU/.test(n)||n==='CCU');};
+type Scope='all'|'icu'|'nonicu';
 
 export default function SafetyMonthlyReport({kind}:{kind:'fall'|'pressure'}){
  const pressure=kind==='pressure';
@@ -17,6 +20,7 @@ export default function SafetyMonthlyReport({kind}:{kind:'fall'|'pressure'}){
  const [exportMonth,setExportMonth]=useState(10);
  const [risk,setRisk]=useState(false);
  const [severeOnly,setSevereOnly]=useState(false);
+ const [scope,setScope]=useState<Scope>('all');
  const [result,setResult]=useState<{year:number;items:Row[];error?:string}|null>(null);
  useEffect(()=>{
   const controller=new AbortController();
@@ -74,7 +78,9 @@ export default function SafetyMonthlyReport({kind}:{kind:'fall'|'pressure'}){
  }
 
  const num=(v:string|null)=>v===null?null:Number(v);
- const items=current?.items??[];
+ // แผลกดทับ: บทสรุปเลือกดูได้ทั้งหมด / ใน ICU / นอก ICU (ตารางรายหน่วยงานแสดงทุกหอเหมือนเดิม)
+ const items=(current?.items??[]).filter(r=>!pressure||scope==='all'||(scope==='icu')===isIcuWard(r.name));
+ const icuNames=(current?.items??[]).filter(r=>isIcuWard(r.name)).map(r=>r.name);
  const execRows:ExecRow[]=items.map(row=>({name:row.name,months:row.months.map(m=>num(rate(m))),annual:num(rate(annual(row))),pending:row.months.some(m=>m.pending)}));
  const ratio=(list:Month[])=>{const valid=list.filter(m=>denominator(m)>0);const days=valid.reduce((t,m)=>t+denominator(m),0);return days>0?valid.reduce((t,m)=>t+(m.cases??0),0)/days*1000:null;};
  const annuals=items.map(annual);
@@ -114,8 +120,8 @@ export default function SafetyMonthlyReport({kind}:{kind:'fall'|'pressure'}){
   </header>
   {!current?<p role="status">กำลังโหลดข้อมูล…</p>:current.error?<p role="alert">{current.error}</p>:!current.items.length?<p>ไม่มีหน่วยงานในรายงานตามสิทธิ์ของบัญชี</p>:
   <ReportViewSwitch summary={<><ExecutiveSummary metric={pressure?'อัตราแผลกดทับ':severeOnly?'อัตราพลัดตกหกล้ม ระดับ E ขึ้นไป':'อัตราพลัดตกหกล้ม'} unit={unit} good={pressure?v=>v<2:v=>v===0} goodLabel={pressure?'< 2':'0 (ไม่เกิดเหตุการณ์)'} lines={pressure?[2]:undefined} badness={v=>v}
-   overall={execOverall} monthly={pressureCompare?(risk?pressureCompare.riskMonthly:pressureCompare.mainMonthly):execMonthly} compare={pressureCompare?(risk?{monthly:pressureCompare.mainMonthly,label:'ต่อ 1,000 วันนอนทั้งหมด',mainLabel:'ต่อ 1,000 วันนอนกลุ่มเสี่ยง'}:{monthly:pressureCompare.riskMonthly,label:'ต่อ 1,000 วันนอนกลุ่มเสี่ยง',mainLabel:'ต่อ 1,000 วันนอนทั้งหมด'}):undefined} rows={execRows} pendingCount={execPending}
-   note={annualOnly?'ปีนี้มีเฉพาะข้อมูลรายปี จึงไม่มีแนวโน้มรายเดือน':undefined}/>
+   overall={execOverall} monthly={pressureCompare?(risk?pressureCompare.riskMonthly:pressureCompare.mainMonthly):execMonthly} chartControls={pressure?<div role="group" aria-label="กลุ่มหอผู้ป่วย" className="flex gap-1">{([['all','ทั้งหมด'],['icu','ใน ICU'],['nonicu','นอก ICU']] as [Scope,string][]).map(([k,l])=><button key={k} type="button" aria-pressed={scope===k} onClick={()=>setScope(k)} title={k==='icu'?icuNames.join(', '):k==='nonicu'?'รวม ICCU':undefined} className="rounded-lg border border-teal-200 px-2.5 py-1 text-xs font-semibold text-teal-800 aria-pressed:bg-teal-700 aria-pressed:text-white">{l}</button>)}</div>:undefined} compare={pressureCompare?(risk?{monthly:pressureCompare.mainMonthly,label:'ต่อ 1,000 วันนอนทั้งหมด',mainLabel:'ต่อ 1,000 วันนอนกลุ่มเสี่ยง'}:{monthly:pressureCompare.riskMonthly,label:'ต่อ 1,000 วันนอนกลุ่มเสี่ยง',mainLabel:'ต่อ 1,000 วันนอนทั้งหมด'}):undefined} rows={execRows} pendingCount={execPending}
+   note={annualOnly?'ปีนี้มีเฉพาะข้อมูลรายปี จึงไม่มีแนวโน้มรายเดือน':pressure?`${scope==='all'?'ทุกหอ':scope==='icu'?'เฉพาะใน ICU':'เฉพาะนอก ICU'} · หอ ICU: ${icuNames.join(', ')||'—'} · ICCU นับเป็นนอก ICU`:undefined}/>
    <CaseIssueTable kind={kind} year={year} severeOnly={!pressure&&severeOnly}/></>}>
   <MonthlyTableViewport label={title}>
    <table className="w-full min-w-[780px] bg-white text-xs">

@@ -24,6 +24,8 @@ export type ExecSummaryProps = {
   monthly: (number | null)[];
   /** กราฟแท่งคู่ (เช่น แผลกดทับ: ต่อวันนอนทั้งหมด vs ต่อวันนอนกลุ่มเสี่ยง) */
   compare?: { monthly: (number | null)[]; label: string; mainLabel: string };
+  /** ปุ่มควบคุมเพิ่มเติมที่หัวกราฟ */
+  chartControls?: ReactNode;
   rows: ExecRow[];
   rowLabel?: string;
   pendingCount?: number;
@@ -88,7 +90,7 @@ export function ExecutiveSummary(p: ExecSummaryProps) {
 
       <section className="grid gap-3 lg:grid-cols-3">
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm lg:col-span-2">
-          <h3 className="text-sm font-bold text-slate-800">แนวโน้มรายเดือน · {p.metric}</h3>
+          <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-sm font-bold text-slate-800">แนวโน้มรายเดือน · {p.metric}</h3>{p.chartControls}</div>
           <div className="mt-3 flex h-44 items-end gap-1.5 border-b border-slate-200 relative" role="img" aria-label={`กราฟแนวโน้มรายเดือน ${p.metric}`}>
             {(p.lines ?? []).map((l) => <div key={l} className="pointer-events-none absolute inset-x-0 border-t border-dashed border-amber-500" style={{ bottom: `${(l / max) * 100}%` }}><span className="absolute -top-4 right-0 text-[10px] font-semibold text-amber-700">{l}</span></div>)}
             {p.monthly.map((v, i) => {

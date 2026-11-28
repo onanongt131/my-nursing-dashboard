@@ -9,6 +9,10 @@ import CaseIssueTable from '@/components/CaseIssueTable';
 type Month={cases:number|null;severe?:number;days:number|null;riskDays:number|null;pending:boolean;reportedRate?:number|null};
 type Row={id:number;name:string;months:Month[];historical?:Partial<Record<'all'|'risk',{cases:number;days:number;rate:number|null}>>};
 const months=[10,11,12,1,2,3,4,5,6,7,8,9];
+// หอผู้ป่วยวิกฤต (ICU) สำหรับแยกกราฟแผลกดทับ: SICU NICU MICU CCU RCU PICU · ICCU และหออื่นนับเป็นนอก ICU
+const ICU_WARDS=new Set(['SICU','NICU','MICU','CCU','RCU','PICU']);
+const isIcuWard=(name:string)=>ICU_WARDS.has(name.toUpperCase().replace(/\s+/g,''));
+type Scope='all'|'icu'|'nonicu';
 
 export default function SafetyMonthlyReport({kind}:{kind:'fall'|'pressure'}){
  const pressure=kind==='pressure';
@@ -17,6 +21,7 @@ export default function SafetyMonthlyReport({kind}:{kind:'fall'|'pressure'}){
  const [exportMonth,setExportMonth]=useState(10);
  const [risk,setRisk]=useState(false);
  const [severeOnly,setSevereOnly]=useState(false);
+ const [scope,setScope]=useState<Scope>('all');
  const [result,setResult]=useState<{year:number;items:Row[];error?:string}|null>(null);
  useEffect(()=>{
   const controller=new AbortController();
@@ -74,12 +79,17 @@ export default function SafetyMonthlyReport({kind}:{kind:'fall'|'pressure'}){
  }
 
  const num=(v:string|null)=>v===null?null:Number(v);
- const items=current?.items??[];
+ // แผลกดทับ: บทสรุปเลือกดูได้ทั้งหมด / ใน ICU / นอก ICU (ตารางรายหน่วยงานแสดงทุกหอเหมือนเดิม)
+ const items=(current?.items??[]).filter(r=>!pressure||scope==='all'||(scope==='icu')===isIcuWard(r.name));
+ const icuNames=(current?.items??[]).filter(r=>isIcuWard(r.name)).map(r=>r.name);
  const execRows:ExecRow[]=items.map(row=>({name:row.name,months:row.months.map(m=>num(rate(m))),annual:num(rate(annual(row))),pending:row.months.some(m=>m.pending)}));
  const ratio=(list:Month[])=>{const valid=list.filter(m=>denominator(m)>0);const days=valid.reduce((t,m)=>t+denominator(m),0);return days>0?valid.reduce((t,m)=>t+(m.cases??0),0)/days*1000:null;};
  const annuals=items.map(annual);
  const execOverall=historical?(()=>{const v=annuals.filter(m=>Number(m.days)>0);const days=v.reduce((t,m)=>t+Number(m.days),0);return days>0?v.reduce((t,m)=>t+(m.cases??0),0)/days*1000:null;})():ratio(items.flatMap(r=>r.months));
  const execMonthly=months.map((_,i)=>annualOnly?null:ratio(items.map(r=>r.months[i])));
+ // แผลกดทับ: แสดงแท่งคู่ ต่อวันนอนทั้งหมด (ซ้าย) และต่อวันนอนกลุ่มเสี่ยง (ขวา) เสมอ ไม่ขึ้นกับปุ่มเลือกตัวหาร
+ const ratioBy=(list:Month[],useRisk:boolean)=>{const d=(m:Month)=>Number(useRisk?m.riskDays:m.days);const v=list.filter(m=>d(m)>0);const days=v.reduce((t,m)=>t+d(m),0);return days>0?v.reduce((t,m)=>t+(m.cases??0),0)/days*1000:null;};
+ const pressureCompare=pressure&&!annualOnly?{mainMonthly:months.map((_,i)=>ratioBy(items.map(r=>r.months[i]),false)),riskMonthly:months.map((_,i)=>ratioBy(items.map(r=>r.months[i]),true))}:null;
  const execPending=items.reduce((n,r)=>n+r.months.filter(m=>m.pending).length,0);
 
  return <div className="space-y-3 p-4">
@@ -110,10 +120,10 @@ export default function SafetyMonthlyReport({kind}:{kind:'fall'|'pressure'}){
    </div>
   </header>
   {!current?<p role="status">กำลังโหลดข้อมูล…</p>:current.error?<p role="alert">{current.error}</p>:!current.items.length?<p>ไม่มีหน่วยงานในรายงานตามสิทธิ์ของบัญชี</p>:
-  <ReportViewSwitch summary={<><ExecutiveSummary metric={pressure?'อัตราแผลกดทับ':severeOnly?'อัตราพลัดตกหกล้ม ระดับ E ขึ้นไป':'อัตราพลัดตกหกล้ม'} unit={unit} good={v=>v===0} goodLabel="0 (ไม่เกิดเหตุการณ์)" badness={v=>v}
-   overall={execOverall} monthly={execMonthly} rows={execRows} pendingCount={execPending}
-   note={annualOnly?'ปีนี้มีเฉพาะข้อมูลรายปี จึงไม่มีแนวโน้มรายเดือน':undefined}/>
-   <CaseIssueTable kind={kind} year={year} severeOnly={!pressure&&severeOnly}/></>}>
+  <ReportViewSwitch summary={<><ExecutiveSummary metric={pressure?'อัตราแผลกดทับ':severeOnly?'อัตราพลัดตกหกล้ม ระดับ E ขึ้นไป':'อัตราพลัดตกหกล้ม'} unit={unit} good={pressure?v=>v<2:v=>v===0} goodLabel={pressure?'< 2':'0 (ไม่เกิดเหตุการณ์)'} lines={pressure?[2]:undefined} badness={v=>v}
+   overall={execOverall} monthly={pressureCompare?(risk?pressureCompare.riskMonthly:pressureCompare.mainMonthly):execMonthly} chartControls={pressure?<div role="group" aria-label="กลุ่มหอผู้ป่วย" className="flex gap-1">{([['all','ทั้งหมด'],['icu','ใน ICU'],['nonicu','นอก ICU']] as [Scope,string][]).map(([k,l])=><button key={k} type="button" aria-pressed={scope===k} onClick={()=>setScope(k)} title={k==='icu'?icuNames.join(', '):k==='nonicu'?'รวม ICCU':undefined} className="rounded-lg border border-teal-200 px-2.5 py-1 text-xs font-semibold text-teal-800 aria-pressed:bg-teal-700 aria-pressed:text-white">{l}</button>)}</div>:undefined} compare={pressureCompare?(risk?{monthly:pressureCompare.mainMonthly,label:'วันนอนทั้งหมด',mainLabel:'วันนอนกลุ่มเสี่ยง'}:{monthly:pressureCompare.riskMonthly,label:'วันนอนกลุ่มเสี่ยง',mainLabel:'วันนอนทั้งหมด'}):undefined} rows={execRows} pendingCount={execPending}
+   note={annualOnly?'ปีนี้มีเฉพาะข้อมูลรายปี จึงไม่มีแนวโน้มรายเดือน':pressure?`${scope==='all'?'ทุกหอ':scope==='icu'?'เฉพาะใน ICU':'เฉพาะนอก ICU'} · หอ ICU: ${icuNames.join(', ')||'—'} · ICCU นับเป็นนอก ICU`:undefined}/>
+   <CaseIssueTable kind={kind} year={year} severeOnly={!pressure&&severeOnly} wardFilter={pressure&&scope!=='all'?(name:string)=>(scope==='icu')===isIcuWard(name):undefined} scopeLabel={pressure&&scope!=='all'?(scope==='icu'?'ใน ICU':'นอก ICU'):undefined}/></>}>
   <MonthlyTableViewport label={title}>
    <table className="w-full min-w-[780px] bg-white text-xs">
     <thead className="sticky top-0 z-10 bg-slate-50"><tr>

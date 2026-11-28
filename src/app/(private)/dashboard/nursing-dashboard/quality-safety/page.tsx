@@ -17,9 +17,9 @@ const IV_KPIS: { kpi: Kpi; metric: 'success' | 'phlebitis' | 'extravasation' | '
 const MONTHS = ['ต.ค.', 'พ.ย.', 'ธ.ค.', 'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.'];
 const MONTH_NUM = [10, 11, 12, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 // เป้าหมาย (ค่าเดิมของหน้านี้) · Fall / Pressure Injury ต่อ 1,000 วันนอน · IV Care อัตราแทงเข็มสำเร็จครั้งแรก (เกณฑ์เดียวกับรายงาน IV Care)
-const TARGET: Record<Kpi, { value: number; higherBetter: boolean; unit: string; label: string }> = {
+const TARGET: Record<Kpi, { value: number; higherBetter: boolean; unit: string; label: string; strict?: boolean }> = {
   Fall: { value: 0.5, higherBetter: false, unit: 'ครั้ง/1,000 วันนอน', label: '≤ 0.50' },
-  'Pressure Injury': { value: 0.2, higherBetter: false, unit: 'ครั้ง/1,000 วันนอน', label: '≤ 0.20' },
+  'Pressure Injury': { value: 2, higherBetter: false, unit: 'ครั้ง/1,000 วันนอน', label: '< 2', strict: true },
   'IV Care': { value: 80, higherBetter: true, unit: '% แทงเข็มสำเร็จครั้งแรก', label: '≥ 80%' },
   'IV Phlebitis': { value: 0, higherBetter: false, unit: '% ระดับ 3–4 ต่อตำแหน่งให้สารน้ำ', label: '0%' },
   'IV Extravasation': { value: 0, higherBetter: false, unit: '% ต่อตำแหน่งให้สารน้ำ', label: '0%' },
@@ -28,7 +28,7 @@ const TARGET: Record<Kpi, { value: number; higherBetter: boolean; unit: string; 
 const statusOf = (kpi: Kpi, v: number | null): Status => {
   if (v === null) return 'none';
   const t = TARGET[kpi];
-  return (t.higherBetter ? v >= t.value : v <= t.value) ? 'green' : 'red';
+  return (t.higherBetter ? v >= t.value : t.strict ? v < t.value : v <= t.value) ? 'green' : 'red';
 };
 
 const rate = (list: Month[], risk = false) => {

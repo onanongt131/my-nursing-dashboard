@@ -283,7 +283,6 @@ function RiskLegend() {
           <span className="min-w-0 flex-1">{l.items.join(' · ')}</span>
         </div>
       ))}
-      <p className="pt-1 text-gray-500">RN Available (WISN ratio) = RN ขึ้นเวรจริง ÷ อ.ว · Risk = ระดับที่แย่ที่สุดของตัวชี้วัดที่มีข้อมูล · — = ไม่มีข้อมูล</p>
     </div>
   );
 }

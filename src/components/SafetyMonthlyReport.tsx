@@ -80,6 +80,9 @@ export default function SafetyMonthlyReport({kind}:{kind:'fall'|'pressure'}){
  const annuals=items.map(annual);
  const execOverall=historical?(()=>{const v=annuals.filter(m=>Number(m.days)>0);const days=v.reduce((t,m)=>t+Number(m.days),0);return days>0?v.reduce((t,m)=>t+(m.cases??0),0)/days*1000:null;})():ratio(items.flatMap(r=>r.months));
  const execMonthly=months.map((_,i)=>annualOnly?null:ratio(items.map(r=>r.months[i])));
+ // แผลกดทับ: แสดงแท่งคู่ ต่อวันนอนทั้งหมด (ซ้าย) และต่อวันนอนกลุ่มเสี่ยง (ขวา) เสมอ ไม่ขึ้นกับปุ่มเลือกตัวหาร
+ const ratioBy=(list:Month[],useRisk:boolean)=>{const d=(m:Month)=>Number(useRisk?m.riskDays:m.days);const v=list.filter(m=>d(m)>0);const days=v.reduce((t,m)=>t+d(m),0);return days>0?v.reduce((t,m)=>t+(m.cases??0),0)/days*1000:null;};
+ const pressureCompare=pressure&&!annualOnly?{mainMonthly:months.map((_,i)=>ratioBy(items.map(r=>r.months[i]),false)),riskMonthly:months.map((_,i)=>ratioBy(items.map(r=>r.months[i]),true))}:null;
  const execPending=items.reduce((n,r)=>n+r.months.filter(m=>m.pending).length,0);
 
  return <div className="space-y-3 p-4">
@@ -111,7 +114,7 @@ export default function SafetyMonthlyReport({kind}:{kind:'fall'|'pressure'}){
   </header>
   {!current?<p role="status">กำลังโหลดข้อมูล…</p>:current.error?<p role="alert">{current.error}</p>:!current.items.length?<p>ไม่มีหน่วยงานในรายงานตามสิทธิ์ของบัญชี</p>:
   <ReportViewSwitch summary={<><ExecutiveSummary metric={pressure?'อัตราแผลกดทับ':severeOnly?'อัตราพลัดตกหกล้ม ระดับ E ขึ้นไป':'อัตราพลัดตกหกล้ม'} unit={unit} good={pressure?v=>v<2:v=>v===0} goodLabel={pressure?'< 2':'0 (ไม่เกิดเหตุการณ์)'} lines={pressure?[2]:undefined} badness={v=>v}
-   overall={execOverall} monthly={execMonthly} rows={execRows} pendingCount={execPending}
+   overall={execOverall} monthly={pressureCompare?(risk?pressureCompare.riskMonthly:pressureCompare.mainMonthly):execMonthly} compare={pressureCompare?(risk?{monthly:pressureCompare.mainMonthly,label:'ต่อ 1,000 วันนอนทั้งหมด',mainLabel:'ต่อ 1,000 วันนอนกลุ่มเสี่ยง'}:{monthly:pressureCompare.riskMonthly,label:'ต่อ 1,000 วันนอนกลุ่มเสี่ยง',mainLabel:'ต่อ 1,000 วันนอนทั้งหมด'}):undefined} rows={execRows} pendingCount={execPending}
    note={annualOnly?'ปีนี้มีเฉพาะข้อมูลรายปี จึงไม่มีแนวโน้มรายเดือน':undefined}/>
    <CaseIssueTable kind={kind} year={year} severeOnly={!pressure&&severeOnly}/></>}>
   <MonthlyTableViewport label={title}>

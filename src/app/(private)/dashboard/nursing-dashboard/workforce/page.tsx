@@ -8,6 +8,8 @@ type Unit = {
   np: number | null; shiftNp: Record<Shift, number | null>;
   pcs: number | null; pcsScoreSum: number; pcsPatients: number;
   shiftsRecorded: number; missingNp: number;
+  rnSum: number; reqSum: number; wisnShifts: number; wisnRatio: number | null;
+  skillMix: number | null; mixRn: number; mixAll: number;
 };
 type Level = 'green' | 'yellow' | 'red' | 'none';
 
@@ -28,6 +30,11 @@ const mean = (v: number[]) => (v.length ? v.reduce((a, b) => a + b, 0) / v.lengt
 // เกณฑ์เดิมของหน้า: Productivity 90–110 / PCS ≤ 3.2 ปกติ, 3.2–3.8 เฝ้าระวัง, > 3.8 สูง
 const npLevel = (v: number | null): Level => (v === null ? 'none' : v > 110 ? 'red' : v < 90 ? 'yellow' : 'green');
 const pcsLevel = (v: number | null): Level => (v === null ? 'none' : v > 3.8 ? 'red' : v > 3.2 ? 'yellow' : 'green');
+// WISN ratio ≥ 1.00 = เพียงพอ, 0.80–0.99 = ขาดเล็กน้อย, < 0.80 = ขาดมาก · Skill Mix ≥80% / 70–79% / <70% (เกณฑ์เดิมของหน้า)
+const wisnLevel = (v: number | null): Level => (v === null ? 'none' : v >= 1 ? 'green' : v >= 0.8 ? 'yellow' : 'red');
+const mixLevel = (v: number | null): Level => (v === null ? 'none' : v >= 80 ? 'green' : v >= 70 ? 'yellow' : 'red');
+const levelBadge = (l: Level) => (l === 'green' ? 'bg-emerald-50 text-emerald-700' : l === 'yellow' ? 'bg-amber-50 text-amber-700' : l === 'red' ? 'bg-rose-50 text-rose-700' : 'bg-gray-100 text-gray-500');
+const levelText = (l: Level) => (l === 'green' ? 'text-emerald-700' : l === 'yellow' ? 'text-amber-700' : l === 'red' ? 'text-rose-700' : 'text-gray-800');
 const npText = (v: number | null) => (v === null ? 'text-gray-300' : v > 110 ? 'text-rose-700' : v < 90 ? 'text-amber-700' : 'text-emerald-700');
 const npDot = (v: number | null) => (v === null ? 'bg-gray-300' : v > 110 ? 'bg-rose-500' : v < 90 ? 'bg-amber-400' : 'bg-emerald-500');
 const npCategory = (v: number | null) => (v === null ? 'ไม่มีข้อมูล' : v > 110 ? '>110 (High)' : v < 90 ? '<90 (Low)' : '90-110 (Target)');
@@ -44,7 +51,6 @@ function Dot({ level, title }: { level: Level; title?: string }) {
   const c = level === 'green' ? 'bg-emerald-500' : level === 'yellow' ? 'bg-amber-400' : 'bg-rose-500';
   return <div className={`mx-auto h-3.5 w-3.5 rounded-full ${c} shadow-2xs`} title={title} />;
 }
-const Pending = () => <span className="rounded-md bg-gray-100 px-1.5 py-0.5 text-[10px] font-semibold text-gray-400" title="ยังไม่มีข้อมูลในระบบ">รอข้อมูล</span>;
 
 function NpBar({ value, size = 'sm' }: { value: number | null; size?: 'sm' | 'md' }) {
   return (
@@ -84,7 +90,8 @@ export default function WorkforceDashboardPage() {
     return [...map.entries()].map(([name, list]) => {
       const nps = list.map((u) => u.np).filter((v): v is number => v !== null);
       const score = list.reduce((t, u) => t + u.pcsScoreSum, 0), patients = list.reduce((t, u) => t + u.pcsPatients, 0);
-      return { name, units: list, np: nps.length ? Number(mean(nps)!.toFixed(2)) : null, pcs: patients ? Number((score / patients).toFixed(2)) : null, withData: nps.length };
+      const rn = list.reduce((t, u) => t + u.rnSum, 0), req = list.reduce((t, u) => t + u.reqSum, 0), mr = list.reduce((t, u) => t + u.mixRn, 0), ma = list.reduce((t, u) => t + u.mixAll, 0);
+      return { name, units: list, np: nps.length ? Number(mean(nps)!.toFixed(2)) : null, pcs: patients ? Number((score / patients).toFixed(2)) : null, wisn: req ? Number((rn / req).toFixed(2)) : null, mix: ma ? Number((mr / ma * 100).toFixed(1)) : null, withData: nps.length };
     }).sort((a, b) => a.name.localeCompare(b.name, 'th'));
   }, [units]);
 
@@ -96,6 +103,7 @@ export default function WorkforceDashboardPage() {
       npUnits: nps.length,
       pcs: patients ? Number((score / patients).toFixed(2)) : null,
       reporting: units.filter((u) => u.shiftsRecorded > 0).length,
+      ...(() => { const rn = units.reduce((t, u) => t + u.rnSum, 0), req = units.reduce((t, u) => t + u.reqSum, 0), mr = units.reduce((t, u) => t + u.mixRn, 0), ma = units.reduce((t, u) => t + u.mixAll, 0); return { wisn: req ? Number((rn / req).toFixed(2)) : null, rn, req, wisnUnits: units.filter((u) => u.reqSum > 0).length, mix: ma ? Number((mr / ma * 100).toFixed(1)) : null }; })(),
     };
   }, [units]);
 
@@ -106,10 +114,10 @@ export default function WorkforceDashboardPage() {
       return units
         .filter((u) => !selectedRiskGroup || u.group === selectedRiskGroup)
         .filter((u) => u.name.toLowerCase().includes(q) || u.group.toLowerCase().includes(q))
-        .map((u) => ({ key: String(u.id), group: u.group, unit: u.name, np: u.np, pcs: u.pcs, risk: riskOf([npLevel(u.np), pcsLevel(u.pcs)]), count: 0 }));
+        .map((u) => ({ key: String(u.id), group: u.group, unit: u.name, np: u.np, pcs: u.pcs, wisn: u.wisnRatio, mix: u.skillMix, risk: riskOf([npLevel(u.np), pcsLevel(u.pcs), wisnLevel(u.wisnRatio), mixLevel(u.skillMix)]), count: 0 }));
     }
     return groups.filter((g) => g.name.toLowerCase().includes(q))
-      .map((g) => ({ key: g.name, group: g.name, unit: '', np: g.np, pcs: g.pcs, risk: riskOf([npLevel(g.np), pcsLevel(g.pcs)]), count: g.units.length }));
+      .map((g) => ({ key: g.name, group: g.name, unit: '', np: g.np, pcs: g.pcs, wisn: g.wisn, mix: g.mix, risk: riskOf([npLevel(g.np), pcsLevel(g.pcs), wisnLevel(g.wisn), mixLevel(g.mix)]), count: g.units.length }));
   }, [units, groups, riskViewMode, riskSearchTerm, selectedRiskGroup]);
 
   // ---------- Productivity by Unit & Group ----------
@@ -139,7 +147,9 @@ export default function WorkforceDashboardPage() {
 
         {/* การ์ดสรุป */}
         <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
-          <Card label="RN Available" value={null} badge="รอข้อมูล WISN" badgeCls="bg-gray-100 text-gray-500" note="RN ขึ้นเวรจริง ÷ RN ที่ต้องมีตาม WISN" />
+          <Card label="RN Available (WISN ratio)" value={loading ? '…' : summary.wisn === null ? null : summary.wisn.toFixed(2)} valueCls={levelText(wisnLevel(summary.wisn))}
+            badge={summary.wisn === null ? 'ไม่มีข้อมูล' : summary.wisn >= 1 ? 'เพียงพอ' : summary.wisn >= 0.8 ? 'ขาดเล็กน้อย' : 'ขาดมาก'} badgeCls={levelBadge(wisnLevel(summary.wisn))}
+            note={summary.wisn === null ? 'RN ขึ้นเวรจริง ÷ อัตรากำลังที่ต้องมี (required_staff)' : `RN ${summary.rn} ÷ ต้องมี ${summary.req} คน-เวร · ${summary.wisnUnits} หน่วยงาน`} />
           <Card label="Productivity" value={loading ? '…' : summary.np === null ? null : `${summary.np}%`} valueCls={npText(summary.np)}
             badge={summary.np === null ? 'ไม่มีข้อมูล' : npCategory(summary.np)} badgeCls={summary.np === null ? 'bg-gray-100 text-gray-500' : npLevel(summary.np) === 'green' ? 'bg-emerald-50 text-emerald-700' : npLevel(summary.np) === 'red' ? 'bg-rose-50 text-rose-700' : 'bg-amber-50 text-amber-700'}
             note={`เฉลี่ยจาก ${summary.npUnits} หน่วยงาน · สูตรเดียวกับรายงาน Productivity`} />
@@ -147,14 +157,16 @@ export default function WorkforceDashboardPage() {
             badge={summary.pcs === null ? 'ไม่มีข้อมูล' : summary.pcs > 3.8 ? 'สูง' : summary.pcs > 3.2 ? 'เฝ้าระวัง' : 'ปกติ'}
             badgeCls={pcsLevel(summary.pcs) === 'green' ? 'bg-blue-50 text-blue-700' : pcsLevel(summary.pcs) === 'red' ? 'bg-rose-50 text-rose-700' : pcsLevel(summary.pcs) === 'yellow' ? 'bg-amber-50 text-amber-700' : 'bg-gray-100 text-gray-500'}
             note="ค่าเฉลี่ยถ่วงน้ำหนักระดับความรุนแรง 1–6 ของผู้ป่วยทุกเวร" />
-          <Card label="Skill Mix" value={null} badge="รอข้อมูล" badgeCls="bg-gray-100 text-gray-500" note="ต้องมีจำนวน RN / PN / NA แยกรายเวร" />
+          <Card label="Skill Mix" value={loading ? '…' : summary.mix === null ? null : `${summary.mix}%`} valueCls={levelText(mixLevel(summary.mix))}
+            badge={summary.mix === null ? 'ไม่มีข้อมูล' : summary.mix >= 80 ? 'ตามมาตรฐาน' : summary.mix >= 70 ? 'เฝ้าระวัง' : 'ต่ำกว่ามาตรฐาน'} badgeCls={levelBadge(mixLevel(summary.mix))}
+            note={summary.mix === null ? 'ต้องบันทึกจำนวน TN / PN / NA รายเวร' : 'RN ÷ (RN + TN + PN + NA) ที่ขึ้นเวร'} />
         </div>
 
         {/* Risk Matrix */}
         <section className="w-full space-y-4 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
           <Header
             title={selectedRiskGroup ? `Workforce Risk Matrix (กลุ่ม: ${selectedRiskGroup})` : 'Workforce Risk Matrix'}
-            sub={riskViewMode === 'unit' ? (selectedRiskGroup ? `แสดงหน่วยงานในกลุ่ม ${selectedRiskGroup}` : 'ประเมินความเสี่ยงรายหน่วยงาน') : 'ประเมินความเสี่ยงตามกลุ่มงาน · Risk ใช้ Productivity และ PCS (RN Available / Skill Mix รอข้อมูล)'}
+            sub={riskViewMode === 'unit' ? (selectedRiskGroup ? `แสดงหน่วยงานในกลุ่ม ${selectedRiskGroup}` : 'ประเมินความเสี่ยงรายหน่วยงาน') : 'ประเมินความเสี่ยงตามกลุ่มงาน (กดดูข้อมูลกลุ่มงานเพื่อเจาะลึกรายหน่วยงาน)'}
             onBack={selectedRiskGroup ? () => { setSelectedRiskGroup(null); setRiskViewMode('group'); } : undefined}
             search={riskSearchTerm} onSearch={setRiskSearchTerm} mode={riskViewMode} selected={!!selectedRiskGroup}
             onMode={(m) => { setSelectedRiskGroup(null); setRiskViewMode(m); }} />
@@ -179,8 +191,8 @@ export default function WorkforceDashboardPage() {
                       {riskViewMode === 'unit' && <td className="px-6 py-4 font-medium text-gray-700">{r.unit}</td>}
                       <td className="px-4 py-4 text-center"><Dot level={npLevel(r.np)} title={r.np === null ? undefined : `NP ${r.np}`} /></td>
                       <td className="px-4 py-4 text-center"><Dot level={pcsLevel(r.pcs)} title={r.pcs === null ? undefined : `PCS ${r.pcs}`} /></td>
-                      <td className="px-4 py-4 text-center"><Pending /></td>
-                      <td className="px-4 py-4 text-center"><Pending /></td>
+                      <td className="px-4 py-4 text-center"><Dot level={mixLevel(r.mix)} title={r.mix === null ? undefined : `Skill Mix ${r.mix}%`} /></td>
+                      <td className="px-4 py-4 text-center"><Dot level={wisnLevel(r.wisn)} title={r.wisn === null ? undefined : `WISN ratio ${r.wisn.toFixed(2)}`} /></td>
                       <td className="px-6 py-4 text-right"><span className={`rounded-lg px-2.5 py-1 text-xs font-bold ${r.risk.cls}`}>{r.risk.label}</span></td>
                       {riskViewMode === 'group' && <td className="px-6 py-4 text-center">
                         <button type="button" onClick={() => { setSelectedRiskGroup(r.group); setRiskViewMode('unit'); }} className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-50 px-3.5 py-1.5 text-xs font-bold text-emerald-700 hover:bg-emerald-100">
@@ -192,7 +204,7 @@ export default function WorkforceDashboardPage() {
               </tbody>
             </table>
           </div>
-          <p className="text-[11px] text-gray-400">เกณฑ์: Productivity 90–110 = เขียว, &lt;90 = เหลือง, &gt;110 = แดง · PCS ≤3.2 = เขียว, 3.2–3.8 = เหลือง, &gt;3.8 = แดง · Risk = ระดับที่แย่ที่สุดของตัวชี้วัดที่มีข้อมูล</p>
+          <p className="text-[11px] text-gray-400">เกณฑ์: Productivity 90–110 = เขียว, &lt;90 = เหลือง, &gt;110 = แดง · PCS ≤3.2 = เขียว, 3.2–3.8 = เหลือง, &gt;3.8 = แดง · Skill Mix ≥80% = เขียว, 70–79% = เหลือง, &lt;70% = แดง · RN Available (WISN ratio) ≥1.00 = เขียว, 0.80–0.99 = เหลือง, &lt;0.80 = แดง · Risk = ระดับที่แย่ที่สุดของตัวชี้วัดที่มีข้อมูล</p>
         </section>
 
         {/* Productivity by Unit & Group */}

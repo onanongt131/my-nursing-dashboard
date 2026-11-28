@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
     const rows: Record<string, any>[] = [];
     for (let offset = 0; ; offset += 1000) {
       const { data, error } = await client.from('daily_staffing')
-        .select('id,department_id,date,shift,np,score_1,score_2,score_3,score_4,score_5,score_gt_5')
+        .select('*')
         .gte('date', start).lt('date', end).order('id').range(offset, offset + 999);
       if (error) throw error;
       rows.push(...(data ?? []).filter((r) => ids.has(Number(r.department_id))));
@@ -48,12 +48,19 @@ export async function GET(request: NextRequest) {
       const own = rows.filter((r) => Number(r.department_id) === u.id);
       const shifts: Record<Shift, { sum: number; count: number }> = { night: { sum: 0, count: 0 }, morning: { sum: 0, count: 0 }, evening: { sum: 0, count: 0 } };
       let scoreSum = 0, patients = 0, missingNp = 0;
+      // WISN ratio: RN ขึ้นเวรจริง ÷ อัตรากำลังที่ต้องมี (required_staff) เฉพาะเวรที่บันทึกทั้งสองค่า
+      let rnSum = 0, reqSum = 0, wisnShifts = 0, mixRn = 0, mixAll = 0;
       for (const r of own) {
         const np = usableNp(r.np), sh = shiftOf(r.shift);
         if (np === null) missingNp++; else if (sh) { shifts[sh].sum += np; shifts[sh].count++; }
         const c = [r.score_1, r.score_2, r.score_3, r.score_4, r.score_5, r.score_gt_5].map((v) => Number(v) || 0);
         scoreSum += c.reduce((t, v, i) => t + v * (i + 1), 0);
         patients += c.reduce((t, v) => t + v, 0);
+        const num = (v: unknown) => (v === null || v === undefined || v === '' ? null : Number.isFinite(Number(v)) ? Number(v) : null);
+        const rn = num(r.rn_count), req = num(r.required_staff);
+        if (rn !== null && req !== null && req > 0) { rnSum += rn; reqSum += req; wisnShifts++; }
+        const others = [r.tn_count, r.pn_count, r.na_count].map(num);
+        if (rn !== null && others.some((v) => v !== null)) { const total = rn + others.reduce<number>((t, v) => t + (v ?? 0), 0); if (total > 0) { mixRn += rn; mixAll += total; } }
       }
       const avg = (s: { sum: number; count: number }) => (s.count ? Number((s.sum / s.count).toFixed(2)) : null);
       return {
@@ -64,6 +71,10 @@ export async function GET(request: NextRequest) {
         pcsScoreSum: scoreSum,
         pcsPatients: patients,
         shiftsRecorded: own.length,
+        rnSum, reqSum, wisnShifts,
+        wisnRatio: reqSum > 0 ? Number((rnSum / reqSum).toFixed(2)) : null,
+        skillMix: mixAll > 0 ? Number((mixRn / mixAll * 100).toFixed(1)) : null,
+        mixRn, mixAll,
         missingNp,
       };
     });

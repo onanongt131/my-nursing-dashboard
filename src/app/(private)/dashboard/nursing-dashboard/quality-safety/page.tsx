@@ -31,9 +31,10 @@ const statusOf = (kpi: Kpi, v: number | null): Status => {
   return (t.higherBetter ? v >= t.value : v <= t.value) ? 'green' : 'red';
 };
 
-const rate = (list: Month[]) => {
-  const valid = list.filter((m) => Number(m.days) > 0);
-  const days = valid.reduce((t, m) => t + Number(m.days), 0);
+const rate = (list: Month[], risk = false) => {
+  const den = (m: Month) => Number(risk ? m.riskDays : m.days);
+  const valid = list.filter((m) => den(m) > 0);
+  const days = valid.reduce((t, m) => t + den(m), 0);
   return days > 0 ? (valid.reduce((t, m) => t + (m.cases ?? 0), 0) / days) * 1000 : null;
 };
 const fmt = (v: number | null, d = 2) => (v === null ? '—' : v.toFixed(d));
@@ -85,15 +86,17 @@ export default function QualitySafetyDashboardPage() {
       statusOf('Pressure Injury', w.pi) === 'red' ? { ward: w.name, kpi: 'Pressure Injury' as Kpi, value: w.pi! } : null,
     ]).filter((x): x is { ward: string; kpi: Kpi; value: number } => x !== null)
       .sort((a, b) => b.value / TARGET[b.kpi].value - a.value / TARGET[a.kpi].value);
-    return { monthly: monthly as Record<Kpi, (number | null)[]>, overall: overall as Record<Kpi, number | null>, heat, attention };
+    // Pressure sore: อัตราต่อ 1,000 วันนอนกลุ่มเสี่ยง (ตัวหาร at_risk_patient_days)
+    const pressureRisk = { monthly: MONTH_NUM.map((_, i) => rate(pressRows.map((r) => r.months[i]).filter(Boolean), true)), overall: rate(pressRows.flatMap((r) => r.months), true) };
+    return { monthly: monthly as Record<Kpi, (number | null)[]>, overall: overall as Record<Kpi, number | null>, heat, attention, pressureRisk };
   }, [fall, pressure, iv, year]);
 
   const loading = !fall || !pressure || !iv;
   const errors = [fall?.error && `Fall: ${fall.error}`, pressure?.error && `Pressure sore: ${pressure.error}`, iv?.error && `IV Care: ${iv.error}`].filter(Boolean);
 
-  const cards: { name: string; kpi?: Kpi; value: string; status: Status; iv?: boolean }[] = [
+  const cards: { name: string; kpi?: Kpi; value: string; status: Status; iv?: boolean; sub?: string }[] = [
     { name: 'Fall', kpi: 'Fall', value: loading ? '…' : `${fmt(data.overall.Fall)} ครั้ง/พันวันนอน`, status: statusOf('Fall', data.overall.Fall) },
-    { name: 'Pressure Injury', kpi: 'Pressure Injury', value: loading ? '…' : `${fmt(data.overall['Pressure Injury'])} ครั้ง/พันวันนอน`, status: statusOf('Pressure Injury', data.overall['Pressure Injury']) },
+    { name: 'Pressure Injury', kpi: 'Pressure Injury', value: loading ? '…' : `${fmt(data.overall['Pressure Injury'])} ครั้ง/พันวันนอน`, status: statusOf('Pressure Injury', data.overall['Pressure Injury']), sub: loading ? undefined : `กลุ่มเสี่ยง ${fmt(data.pressureRisk.overall)} ครั้ง/พันวันนอนกลุ่มเสี่ยง` },
     { name: 'Medication Error', value: 'ยังไม่มีข้อมูล', status: 'none' },
     { name: 'IV Care', kpi: 'IV Care', value: loading ? '…' : data.overall['IV Care'] === null ? '—' : `สำเร็จ ${fmt(data.overall['IV Care'], 1)}%`, status: IV_KPIS.map((k) => statusOf(k.kpi, data.overall[k.kpi])).includes('red') ? 'red' : statusOf('IV Care', data.overall['IV Care']), iv: true },
     { name: 'Unplanned CPR', value: 'ยังไม่มีข้อมูล', status: 'none' },
@@ -101,7 +104,9 @@ export default function QualitySafetyDashboardPage() {
   ];
   const trendKpis: { key: string; kpi?: Kpi }[] = [{ key: 'Fall', kpi: 'Fall' }, { key: 'Pressure Injury', kpi: 'Pressure Injury' }, ...IV_KPIS.map((k) => ({ key: `IV: ${k.label}`, kpi: k.kpi })), { key: 'Medication Error' }, { key: 'Unplanned CPR' }];
   const t = TARGET[selectedTrendKpi], values = data.monthly[selectedTrendKpi];
-  const scale = Math.max(t.value * 1.5, ...values.filter((v): v is number => v !== null)) || 1;
+  const isPressure = selectedTrendKpi === 'Pressure Injury';
+  const riskValues = isPressure ? data.pressureRisk.monthly : [];
+  const scale = Math.max(t.value * 1.5, ...values.filter((v): v is number => v !== null), ...riskValues.filter((v): v is number => v !== null)) || 1;
   const trendTitle = trendKpis.find((k) => k.kpi === selectedTrendKpi)?.key ?? selectedTrendKpi;
 
   return (
@@ -131,6 +136,7 @@ export default function QualitySafetyDashboardPage() {
                 <Dot status={c.status} />
               </div>
               <p className={`mt-3 text-xs font-semibold ${c.kpi ? 'text-gray-600' : 'text-gray-400'}`}>{c.value}</p>
+              {c.sub && <p className="mt-0.5 text-[10px] font-semibold text-gray-500">{c.sub}</p>}
               {c.iv && !loading && <ul className="mt-1 space-y-0.5 text-[10px]">{IV_KPIS.slice(1).map((k) => { const v = data.overall[k.kpi]; return <li key={k.kpi} className="flex justify-between gap-1"><span className="text-gray-500">{k.label}</span><b className={v === null ? 'text-gray-300' : v > 0 ? 'text-rose-600' : 'text-emerald-700'}>{v === null ? '—' : `${fmt(v)}%`}</b></li>; })}</ul>}
               {c.kpi && <p className="mt-1 text-[10px] text-gray-400">เป้า {c.iv ? 'สำเร็จ ≥ 80% · ภาวะแทรกซ้อน 0%' : TARGET[c.kpi].label}</p>}
             </div>
@@ -154,20 +160,25 @@ export default function QualitySafetyDashboardPage() {
             </div>
           </div>
           <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
-            <div className="mb-4 flex items-center justify-between text-xs font-medium text-gray-500">
-              <span>ตัวชี้วัด: <strong className="text-gray-800">{trendTitle}</strong> ({t.unit})</span>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2 text-xs font-medium text-gray-500">
+              <span>ตัวชี้วัด: <strong className="text-gray-800">{trendTitle}</strong> ({isPressure ? 'ครั้ง/1,000 วันนอน' : t.unit})</span>
+              {isPressure && <span className="flex items-center gap-3"><span className="flex items-center gap-1"><i className="inline-block h-2.5 w-2.5 rounded-sm bg-emerald-500" />ต่อวันนอนทั้งหมด (แท่งซ้าย)</span><span className="flex items-center gap-1"><i className="inline-block h-2.5 w-2.5 rounded-sm bg-emerald-300" />ต่อวันนอนกลุ่มเสี่ยง (แท่งขวา)</span></span>}
               <span>ค่าเป้าหมาย (Target): <strong className="text-emerald-700">{t.label}</strong></span>
             </div>
             <div className="grid grid-cols-6 gap-2 text-center sm:grid-cols-12">
               {MONTHS.map((m, i) => {
                 const v = values[i], st = statusOf(selectedTrendKpi, v);
+                const series = isPressure ? [{ v, light: false }, { v: riskValues[i], light: true }] : [{ v, light: false }];
+                const color = (x: number | null, light: boolean) => (statusOf(selectedTrendKpi, x) === 'red' ? (light ? 'bg-rose-300' : 'bg-rose-500') : (light ? 'bg-emerald-300' : 'bg-emerald-500'));
+                const textCls = (x: number | null) => (x === null ? 'text-gray-300' : statusOf(selectedTrendKpi, x) === 'red' ? 'text-rose-600' : 'text-emerald-700');
                 return (
-                  <div key={m} className="flex h-28 flex-col items-center justify-between rounded-lg border border-gray-100 bg-white p-2 shadow-2xs">
+                  <div key={m} className={`flex ${isPressure ? 'h-32' : 'h-28'} flex-col items-center justify-between rounded-lg border border-gray-100 bg-white p-2 shadow-2xs`}>
                     <span className="text-[10px] text-gray-400">{m}</span>
-                    <div className="relative flex h-16 w-full items-end justify-center overflow-hidden rounded bg-gray-100">
-                      {v !== null && <div className={`w-full rounded-t ${st === 'red' ? 'bg-rose-500' : 'bg-emerald-500'}`} style={{ height: `${Math.max(3, Math.min((v / scale) * 100, 100))}%` }} />}
+                    <div className="relative flex h-16 w-full items-end justify-center gap-0.5 overflow-hidden rounded bg-gray-100">
+                      {series.map((sr, k) => <div key={k} className="flex h-full flex-1 items-end">{sr.v !== null && <div className={`w-full rounded-t ${color(sr.v, sr.light)}`} style={{ height: `${Math.max(3, Math.min((sr.v / scale) * 100, 100))}%` }} title={`${k ? 'กลุ่มเสี่ยง' : 'ทั้งหมด'} ${fmt(sr.v)}`} />}</div>)}
                     </div>
-                    <span className={`text-[11px] font-bold ${v === null ? 'text-gray-300' : st === 'red' ? 'text-rose-600' : 'text-emerald-700'}`}>{v === null ? '—' : fmt(v, selectedTrendKpi === 'IV Care' ? 1 : 2)}</span>
+                    {isPressure ? <span className="flex w-full justify-between text-[10px] font-bold leading-tight"><span className={textCls(v)}>{fmt(v)}</span><span className={`${textCls(riskValues[i])} opacity-70`}>{fmt(riskValues[i])}</span></span>
+                      : <span className={`text-[11px] font-bold ${v === null ? 'text-gray-300' : st === 'red' ? 'text-rose-600' : 'text-emerald-700'}`}>{v === null ? '—' : fmt(v, selectedTrendKpi === 'IV Care' ? 1 : 2)}</span>}
                   </div>
                 );
               })}

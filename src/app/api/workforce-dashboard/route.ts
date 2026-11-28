@@ -5,7 +5,7 @@ import { monthlyProductivity, usableNp, type DailyProductivity } from '@/lib/pro
 export const dynamic = 'force-dynamic';
 
 // กลุ่มงานที่ไม่นำมาแสดง (คงตามหน้า Workforce เดิม)
-const EXCLUDED_GROUPS = ['ตรวจรักษาพิเศษ', 'OPD', 'การควบคุมและการป้องกันการติดเชื้อ', 'ผ่าตัด', 'วิสัญญี'];
+const EXCLUDED_GROUPS = ['ตรวจรักษาพิเศษ', 'OPD', 'การควบคุมและการป้องกันการติดเชื้อ', 'ผ่าตัด', 'วิสัญญี', 'บริการเฉพาะ'];
 type Shift = 'night' | 'morning' | 'evening';
 // required_staff (อ.ว) = ROUNDUP(ROUNDUP(ชั่วโมงการพยาบาล/7) × สัดส่วน RN) · สามัญ 70%, ICU 90%
 const isIcu = (name: string, group: string) => /icu|ccu|rcu|วิกฤต/i.test(name) || /วิกฤต|icu/i.test(group);

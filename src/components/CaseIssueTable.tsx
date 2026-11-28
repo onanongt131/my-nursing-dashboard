@@ -8,6 +8,8 @@ type Issue = { key: string; label: string; value: (c: Case) => string | null };
 
 const text = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
 const SEVERE = ['E', 'F', 'G', 'H', 'I'];
+const FISCAL = [10, 11, 12, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+const MONTH_TH = ['', 'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
 
 const CONFIG: Record<Kind, { title: string; summary: (c: Case) => string | null; extra: (c: Case) => (string | null)[]; issues: Issue[]; note?: (c: Case) => string | null; noteLabel?: string }> = {
   fall: {
@@ -50,7 +52,7 @@ const CONFIG: Record<Kind, { title: string; summary: (c: Case) => string | null;
 export default function CaseIssueTable({ kind, year, severeOnly = false, includePending = true }: { kind: Kind; year: number; severeOnly?: boolean; includePending?: boolean }) {
   const cfg = CONFIG[kind];
   const [state, setState] = useState<{ key: string; items: Case[]; error?: string } | null>(null);
-  const [open, setOpen] = useState<Set<string>>(new Set());
+  const [month, setMonth] = useState(0); // 0 = ทั้งปี
   const key = `${kind}:${year}`;
 
   useEffect(() => {
@@ -60,35 +62,45 @@ export default function CaseIssueTable({ kind, year, severeOnly = false, include
       .catch((e) => { if (!controller.signal.aborted) setState({ key, items: [], error: e.message }); });
     return () => controller.abort();
   }, [kind, year, key]);
+  useEffect(() => setMonth(0), [year]);
 
   const current = state?.key === key ? state : null;
-  const cases = (current?.items ?? []).filter((c) => (includePending || c.status === 'approved') && (kind !== 'pressure' || ['2', '3', '4'].includes(String(c.wound_level))) && (!severeOnly || SEVERE.includes(String(c.severity || '').toUpperCase())));
+  const cases = (current?.items ?? []).filter((c) => (!month || Number(String(c.date).slice(5, 7)) === month) && (includePending || c.status === 'approved') && (kind !== 'pressure' || ['2', '3', '4'].includes(String(c.wound_level))) && (!severeOnly || SEVERE.includes(String(c.severity || '').toUpperCase())));
   const counts = cfg.issues.map((i) => cases.filter((c) => i.value(c)).length);
-  const toggle = (id: string) => setOpen((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  // รายละเอียดสาเหตุแสดงใต้ ✓ (ยกเว้น Pressure sore ที่ค่าเป็นแค่ระดับ/ผลลัพธ์)
+  const detailUnderCheck = kind !== 'pressure';
 
   return (
     <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
       <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-slate-100 px-4 py-3">
-        <h3 className="text-sm font-bold text-slate-800">{cfg.title}{severeOnly && ' (ระดับ E ขึ้นไป)'} <span className="font-normal text-slate-400">({cases.length} ราย)</span></h3>
-        <p className="text-xs text-slate-500">สรุปจากผลที่บันทึก{includePending ? ' รวมรายการรออนุมัติ' : 'ที่อนุมัติแล้ว'} ตามสิทธิ์ · กด &quot;อ่านต่อ&quot; เพื่อดูรายละเอียด</p>
+        <div className="flex flex-wrap items-center gap-3">
+          <h3 className="text-sm font-bold text-slate-800">{cfg.title}{severeOnly && ' (ระดับ E ขึ้นไป)'} <span className="font-normal text-slate-400">({cases.length} ราย)</span></h3>
+          <label className="flex items-center gap-1.5 text-xs text-slate-600">เลือกเดือน
+            <select value={month} onChange={(e) => setMonth(Number(e.target.value))} className="rounded-lg border border-teal-200 bg-white px-2 py-1 text-xs text-slate-800">
+              <option value={0}>ทั้งปีงบประมาณ</option>
+              {FISCAL.map((m) => <option key={m} value={m}>{MONTH_TH[m]} {m >= 10 ? year - 1 : year}</option>)}
+            </select>
+          </label>
+        </div>
+        <p className="text-xs text-slate-500">สรุปจากผลที่บันทึก{includePending ? ' รวมรายการรออนุมัติ' : 'ที่อนุมัติแล้ว'} ตามสิทธิ์{detailUnderCheck ? ' · รายละเอียดสาเหตุแสดงใต้เครื่องหมาย ✓' : ''}</p>
       </div>
       {!current ? <p className="p-6 text-sm text-slate-500">กำลังโหลดรายกรณี…</p>
         : current.error ? <p role="alert" className="p-4 text-sm text-red-700">{current.error}</p>
-        : !cases.length ? <p className="p-6 text-sm text-slate-500">ไม่มีรายกรณีในปีงบประมาณ {year}</p>
+        : !cases.length ? <p className="p-6 text-sm text-slate-500">ไม่มีรายกรณี{month ? `ในเดือน${MONTH_TH[month]} ${month >= 10 ? year - 1 : year}` : `ในปีงบประมาณ ${year}`}</p>
         : <div className="max-h-[70vh] overflow-auto">
-          <table className="w-full min-w-[860px] border-collapse text-sm">
+          <table className={`w-full border-collapse text-sm ${detailUnderCheck ? 'min-w-[1200px]' : 'min-w-[860px]'}`}>
             <thead className="sticky top-0 z-10 bg-slate-50 text-xs text-slate-600">
               <tr>
                 <th rowSpan={2} className="w-48 border border-slate-200 px-3 py-2 text-center">เคส</th>
                 <th rowSpan={2} className="border border-slate-200 px-3 py-2 text-center">สรุปอาการและเหตุการณ์สำคัญ</th>
                 <th colSpan={cfg.issues.length} className="border border-slate-200 px-3 py-2 text-center">ประเด็นที่พบ</th>
+                {cfg.note && <th rowSpan={2} className="min-w-[220px] border border-slate-200 px-3 py-2 text-center">{cfg.noteLabel}</th>}
               </tr>
-              <tr>{cfg.issues.map((i, k) => <th key={i.key} className="w-24 border border-slate-200 px-2 py-2 text-center font-semibold">{i.label}<span className="block text-[10px] font-normal text-slate-400">{counts[k]} ราย</span></th>)}</tr>
+              <tr>{cfg.issues.map((i, k) => <th key={i.key} className={`${detailUnderCheck ? 'min-w-[140px]' : 'w-24'} border border-slate-200 px-2 py-2 text-center font-semibold`}>{i.label}<span className="block text-[10px] font-normal text-slate-400">{counts[k]} ราย</span></th>)}</tr>
             </thead>
             <tbody>
               {cases.map((c) => {
-                const id = String(c.id), expanded = open.has(id), summary = cfg.summary(c), note = cfg.note?.(c), extra = cfg.extra(c).filter(Boolean);
-                const found = cfg.issues.map((i) => ({ ...i, v: i.value(c) })).filter((i) => i.v);
+                const id = String(c.id), summary = cfg.summary(c), note = cfg.note?.(c), extra = cfg.extra(c).filter(Boolean);
                 return (
                   <tr key={id} className="align-top">
                     <td className="border border-slate-200 px-3 py-2 text-xs text-slate-700">
@@ -99,14 +111,13 @@ export default function CaseIssueTable({ kind, year, severeOnly = false, include
                       {c.status === 'pending' && <span className="mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">รออนุมัติ</span>}
                     </td>
                     <td className="border border-slate-200 px-3 py-2 text-slate-700">
-                      <p className={`whitespace-pre-line ${expanded ? '' : 'line-clamp-3'}`}>{summary || <span className="text-slate-400">ไม่ได้บันทึกรายละเอียด</span>}</p>
-                      {expanded && (found.length > 0 || note) && <dl className="mt-2 space-y-1 rounded-lg bg-slate-50 p-2 text-xs">
-                        {kind !== 'pressure' && found.map((i) => <div key={i.key}><dt className="inline font-semibold text-slate-700">{i.label}: </dt><dd className="inline whitespace-pre-line text-slate-600">{i.v}</dd></div>)}
-                        {note && <div><dt className="inline font-semibold text-slate-700">{cfg.noteLabel}: </dt><dd className="inline whitespace-pre-line text-slate-600">{note}</dd></div>}
-                      </dl>}
-                      <button type="button" onClick={() => toggle(id)} className="mt-1.5 rounded-lg border border-slate-200 px-2.5 py-0.5 text-xs text-teal-700 hover:bg-teal-50">{expanded ? 'ย่อ' : 'อ่านต่อ'}</button>
+                      <p className="whitespace-pre-line">{summary || <span className="text-slate-400">ไม่ได้บันทึกรายละเอียด</span>}</p>
                     </td>
-                    {cfg.issues.map((i) => { const v = i.value(c); return <td key={i.key} className="border border-slate-200 px-2 py-2 text-center">{v ? <span title={v} className="text-base font-bold text-teal-600">✓</span> : <span className="text-slate-300">—</span>}</td>; })}
+                    {cfg.issues.map((i) => { const v = i.value(c); return <td key={i.key} className="border border-slate-200 px-2 py-2 text-center">{v ? <>
+                      <span title={detailUnderCheck ? undefined : v} className="text-base font-bold text-teal-600">✓</span>
+                      {detailUnderCheck && <p className="mt-1 whitespace-pre-line text-left text-xs text-slate-600">{v}</p>}
+                    </> : <span className="text-slate-300">—</span>}</td>; })}
+                    {cfg.note && <td className="border border-slate-200 px-3 py-2 text-xs text-slate-600"><p className="whitespace-pre-line">{note || <span className="text-slate-300">—</span>}</p></td>}
                   </tr>
                 );
               })}

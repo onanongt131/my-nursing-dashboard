@@ -181,7 +181,8 @@ export default function QualitySafetyDashboardPage() {
             <h3 className="mb-1 text-base font-bold text-gray-800">Unit Heatmap (ตรวจจับความเสี่ยงรายหน่วยงาน)</h3>
             <p className="mb-4 text-xs text-gray-500">ทั้งปีงบประมาณ {year} · เขียว = อยู่ในเป้า · แดง = เกินเป้า · เทา = ยังไม่มีข้อมูล</p>
             <div className="max-h-[480px] overflow-auto">
-              <table className="w-full text-left text-sm">
+              <table className="w-full table-fixed text-left text-sm">
+                <colgroup><col className="w-[30%]" />{[0, 1, 2, 3, 4].map((i) => <col key={i} className="w-[14%]" />)}</colgroup>
                 <thead className="sticky top-0 bg-white">
                   <tr className="border-b border-gray-100 text-xs font-semibold uppercase text-gray-400">
                     <th className="pb-3">หน่วยงาน</th>
@@ -197,7 +198,7 @@ export default function QualitySafetyDashboardPage() {
                     : !data.heat.length ? <tr><td colSpan={6} className="py-6 text-center text-gray-400">ไม่มีข้อมูล</td></tr>
                     : data.heat.map((w) => (
                       <tr key={w.name} className="hover:bg-gray-50/50">
-                        <td className="py-3 font-medium text-gray-700">{w.name}</td>
+                        <td className="truncate py-3 pr-2 font-medium text-gray-700" title={w.name}>{w.name}</td>
                         <td className="py-3 text-center"><Dot status={statusOf('Fall', w.fall)} title={w.fall === null ? undefined : `${fmt(w.fall)} ครั้ง/พันวันนอน`} /></td>
                         <td className="py-3 text-center"><Dot status={statusOf('Pressure Injury', w.pi)} title={w.pi === null ? undefined : `${fmt(w.pi)} ครั้ง/พันวันนอน`} /></td>
                         <td className="py-3 text-center"><Dot status="none" /></td>

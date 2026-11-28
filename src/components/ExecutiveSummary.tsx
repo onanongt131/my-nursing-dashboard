@@ -90,7 +90,12 @@ export function ExecutiveSummary(p: ExecSummaryProps) {
 
       <section className="grid gap-3 lg:grid-cols-3">
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm lg:col-span-2">
-          <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-sm font-bold text-slate-800">แนวโน้มรายเดือน · {p.metric}</h3>{p.chartControls}</div>
+          <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="text-sm font-bold text-slate-800">แนวโน้มรายเดือน · {p.metric}</h3>{p.compare && <div className="flex min-w-0 flex-1 flex-wrap items-center justify-center gap-x-4 gap-y-1 text-[11px] text-slate-600">
+            <span className="flex items-center gap-1.5"><i className="inline-block h-2.5 w-2.5 rounded-sm bg-teal-600" />{p.compare.mainLabel}</span>
+            <span className="flex items-center gap-1.5"><i className="inline-block h-2.5 w-2.5 rounded-sm bg-violet-400" />{p.compare.label}</span>
+            {!!p.lines?.length && <span className="flex items-center gap-1.5"><i className="inline-block w-4 border-t border-dashed border-amber-500" />เกณฑ์ {p.goodLabel}</span>}
+            <span className="flex items-center gap-1.5"><b className="text-rose-600">ตัวเลขสีแดง</b> = ไม่อยู่ในเกณฑ์</span>
+          </div>}{p.chartControls}</div>
           <div className="mt-3 flex h-44 items-end gap-1.5 border-b border-slate-200 relative" role="img" aria-label={`กราฟแนวโน้มรายเดือน ${p.metric}`}>
             {(p.lines ?? []).map((l) => <div key={l} className="pointer-events-none absolute inset-x-0 border-t border-dashed border-amber-500" style={{ bottom: `${(l / max) * 100}%` }}><span className="absolute -top-4 right-0 text-[10px] font-semibold text-amber-700">{l}</span></div>)}
             {p.monthly.map((v, i) => {
@@ -100,8 +105,8 @@ export function ExecutiveSummary(p: ExecSummaryProps) {
                   {bars.map((b, k) => (
                     <div key={k} className="flex h-full min-w-0 flex-1 flex-col items-center justify-end">
                       {isNum(b) ? <>
-                        <span className={`mb-0.5 text-[10px] font-semibold tabular-nums ${k ? 'text-slate-400' : 'text-slate-600'}`}>{b.toFixed(p.chartDecimals ?? Math.min(d, 1))}</span>
-                        <div title={`${MONTHS_TH[i]}${p.compare ? ` · ${k ? p.compare.label : p.compare.mainLabel}` : ''}: ${f(b)}`} className={`w-full max-w-10 rounded-t ${p.good(b) ? (k ? 'bg-emerald-300' : 'bg-emerald-500') : (k ? 'bg-rose-200' : 'bg-rose-400')}`} style={{ height: `${Math.max(2, (b / max) * 100)}%` }} />
+                        <span className={`mb-0.5 text-[10px] font-semibold tabular-nums ${p.compare ? (p.good(b) ? 'text-slate-600' : 'text-rose-600') : 'text-slate-600'}`}>{b.toFixed(p.chartDecimals ?? Math.min(d, 1))}</span>
+                        <div title={`${MONTHS_TH[i]}${p.compare ? ` · ${k ? p.compare.label : p.compare.mainLabel}` : ''}: ${f(b)}`} className={`w-full max-w-10 rounded-t ${p.compare ? (k ? 'bg-violet-400' : 'bg-teal-600') : p.good(b) ? 'bg-emerald-500' : 'bg-rose-400'}`} style={{ height: `${Math.max(2, (b / max) * 100)}%` }} />
                       </> : <span className="mb-1 text-[10px] text-slate-300">—</span>}
                     </div>
                   ))}
@@ -110,7 +115,7 @@ export function ExecutiveSummary(p: ExecSummaryProps) {
             })}
           </div>
           <div className="mt-1 flex gap-1.5">{MONTHS_TH.map((m) => <span key={m} className="flex-1 text-center text-[10px] text-slate-500">{m}</span>)}</div>
-          <p className="mt-2 flex flex-wrap gap-3 text-[11px] text-slate-500"><span><i className="mr-1 inline-block h-2 w-2 rounded-sm bg-emerald-500" />อยู่ในเกณฑ์</span><span><i className="mr-1 inline-block h-2 w-2 rounded-sm bg-rose-400" />ไม่อยู่ในเกณฑ์</span>{!!p.lines?.length && <span><i className="mr-1 inline-block w-3 border-t border-dashed border-amber-500 align-middle" />เส้นเกณฑ์</span>}{p.compare && <><span><i className="mr-1 inline-block h-2 w-2 rounded-sm bg-slate-500" />แท่งซ้าย = {p.compare.mainLabel}</span><span><i className="mr-1 inline-block h-2 w-2 rounded-sm bg-slate-300" />แท่งขวา (สีอ่อน) = {p.compare.label}</span></>}</p>
+          {!p.compare && <p className="mt-2 flex flex-wrap gap-3 text-[11px] text-slate-500"><span><i className="mr-1 inline-block h-2 w-2 rounded-sm bg-emerald-500" />อยู่ในเกณฑ์</span><span><i className="mr-1 inline-block h-2 w-2 rounded-sm bg-rose-400" />ไม่อยู่ในเกณฑ์</span>{!!p.lines?.length && <span><i className="mr-1 inline-block w-3 border-t border-dashed border-amber-500 align-middle" />เส้นเกณฑ์</span>}</p>}
         </div>
         <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <h3 className="text-sm font-bold text-slate-800">ประเด็นสำคัญ</h3>

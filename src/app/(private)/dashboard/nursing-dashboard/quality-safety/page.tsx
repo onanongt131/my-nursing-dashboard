@@ -102,12 +102,13 @@ export default function QualitySafetyDashboardPage() {
     { name: 'Unplanned CPR', value: 'ยังไม่มีข้อมูล', status: 'none' },
     { name: 'Aspiration', value: 'ยังไม่มีข้อมูล', status: 'none' },
   ];
-  const trendKpis: { key: string; kpi?: Kpi }[] = [{ key: 'Fall', kpi: 'Fall' }, { key: 'Pressure Injury', kpi: 'Pressure Injury' }, ...IV_KPIS.map((k) => ({ key: `IV: ${k.label}`, kpi: k.kpi })), { key: 'Medication Error' }, { key: 'Unplanned CPR' }];
+  const trendKpis: { key: string; kpi?: Kpi }[] = [{ key: 'Fall', kpi: 'Fall' }, { key: 'Pressure Injury', kpi: 'Pressure Injury' }, { key: 'IV Care', kpi: 'IV Care' }, { key: 'Medication Error' }, { key: 'Unplanned CPR' }];
   const t = TARGET[selectedTrendKpi], values = data.monthly[selectedTrendKpi];
   const isPressure = selectedTrendKpi === 'Pressure Injury';
   const riskValues = isPressure ? data.pressureRisk.monthly : [];
   const scale = Math.max(t.value * 1.5, ...values.filter((v): v is number => v !== null), ...riskValues.filter((v): v is number => v !== null)) || 1;
-  const trendTitle = trendKpis.find((k) => k.kpi === selectedTrendKpi)?.key ?? selectedTrendKpi;
+  const isIv = IV_KPIS.some((k) => k.kpi === selectedTrendKpi);
+  const trendTitle = isIv ? `IV Care: ${IV_KPIS.find((k) => k.kpi === selectedTrendKpi)!.label}` : selectedTrendKpi;
 
   return (
     <div className="min-h-screen bg-gray-50/50 px-4 pb-12 sm:px-6 lg:px-8">
@@ -152,8 +153,8 @@ export default function QualitySafetyDashboardPage() {
             </div>
             <div className="flex flex-wrap gap-2">
               {trendKpis.map((k) => (
-                <button key={k.key} type="button" disabled={!k.kpi} onClick={() => k.kpi && setSelectedTrendKpi(k.kpi)} title={k.kpi ? undefined : 'ยังไม่มีข้อมูลในระบบ'}
-                  className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${!k.kpi ? 'cursor-not-allowed bg-gray-100 text-gray-300' : selectedTrendKpi === k.kpi ? 'bg-emerald-600 text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                <button key={k.key} type="button" disabled={!k.kpi} onClick={() => { if (k.kpi && !(k.kpi === 'IV Care' && isIv)) setSelectedTrendKpi(k.kpi); }} title={k.kpi ? undefined : 'ยังไม่มีข้อมูลในระบบ'}
+                  className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${!k.kpi ? 'cursor-not-allowed bg-gray-100 text-gray-300' : (selectedTrendKpi === k.kpi || (k.kpi === 'IV Care' && isIv)) ? 'bg-emerald-600 text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
                   {k.key}
                 </button>
               ))}
@@ -161,7 +162,13 @@ export default function QualitySafetyDashboardPage() {
           </div>
           <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
             <div className="mb-4 flex flex-wrap items-center justify-between gap-2 text-xs font-medium text-gray-500">
-              <span>ตัวชี้วัด: <strong className="text-gray-800">{trendTitle}</strong> ({isPressure ? 'ครั้ง/1,000 วันนอน' : t.unit})</span>
+              {isIv ? <label className="flex items-center gap-2">ตัวชี้วัด IV Care
+                <select value={selectedTrendKpi} onChange={(e) => setSelectedTrendKpi(e.target.value as Kpi)} className="rounded-lg border border-emerald-200 bg-white px-2 py-1 text-xs font-bold text-gray-800">
+                  {IV_KPIS.map((k) => <option key={k.kpi} value={k.kpi}>{k.label}</option>)}
+                </select>
+                <span>({t.unit})</span>
+              </label>
+              : <span>ตัวชี้วัด: <strong className="text-gray-800">{trendTitle}</strong> ({isPressure ? 'ครั้ง/1,000 วันนอน' : t.unit})</span>}
               {isPressure && <span className="flex items-center gap-3"><span className="flex items-center gap-1"><i className="inline-block h-2.5 w-2.5 rounded-sm bg-emerald-500" />ต่อวันนอนทั้งหมด (แท่งซ้าย)</span><span className="flex items-center gap-1"><i className="inline-block h-2.5 w-2.5 rounded-sm bg-emerald-300" />ต่อวันนอนกลุ่มเสี่ยง (แท่งขวา)</span></span>}
               <span>ค่าเป้าหมาย (Target): <strong className="text-emerald-700">{t.label}</strong></span>
             </div>

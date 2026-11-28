@@ -1,6 +1,5 @@
 'use client';
 
-import { useState } from 'react';
 import { IV_FACTOR_GROUPS } from '@/lib/ivCareFactors';
 
 type Cause = { code?: string; label: string };
@@ -26,7 +25,6 @@ const text = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : nul
 
 /** ตารางปัจจัยที่ส่งผลให้เกิดภาวะแทรกซ้อน IV (สรุปความถี่ + รายกรณี) */
 export default function IvFactorTable({ incidents, year, complication, name }: { incidents: IvIncident[]; year: number; complication: string | null; name: (id: string | number) => string }) {
-  const [open, setOpen] = useState<Set<string>>(new Set());
   const from = `${year - 544}-10-01`, to = `${year - 543}-10-01`;
   const cases = incidents
     .filter((r) => r.record_date >= from && r.record_date < to && (!complication || r.complication === complication))
@@ -53,7 +51,6 @@ export default function IvFactorTable({ incidents, year, complication, name }: {
   const groupCounts = GROUPS.map((g) => cases.filter((r) => groupsOf(r).some((x) => codeOf(x) === g.code)).length);
   const legacyCount = cases.filter((r) => legacyOf(r).length).length;
   const title = complication ?? 'ภาวะแทรกซ้อนทั้งหมด';
-  const toggle = (id: string) => setOpen((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
   return (
     <div className="space-y-3">
@@ -93,23 +90,23 @@ export default function IvFactorTable({ incidents, year, complication, name }: {
       <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-slate-100 px-4 py-3">
           <h3 className="text-sm font-bold text-slate-800">ปัจจัยที่ส่งผลรายกรณี · {title} <span className="font-normal text-slate-400">({cases.length} ราย)</span></h3>
-          <p className="text-xs text-slate-500">กด &quot;อ่านต่อ&quot; เพื่อดูปัจจัยและสาเหตุทั้งหมด</p>
+          <p className="text-xs text-slate-500">รายละเอียดปัจจัยและสาเหตุแสดงใต้เครื่องหมาย ✓ ของแต่ละกลุ่ม</p>
         </div>
         {!cases.length ? <p className="p-6 text-sm text-slate-500">ไม่มีเหตุการณ์ในปีงบประมาณ {year}</p> :
-          <div className="max-h-[70vh] overflow-auto"><table className="w-full min-w-[860px] border-collapse text-sm">
+          <div className="max-h-[70vh] overflow-auto"><table className="w-full min-w-[1150px] border-collapse text-sm">
             <thead className="sticky top-0 z-10 bg-slate-50 text-xs text-slate-600">
               <tr>
                 <th rowSpan={2} className="w-48 border border-slate-200 px-3 py-2 text-center">เคส</th>
-                <th rowSpan={2} className="border border-slate-200 px-3 py-2 text-center">ปัจจัยที่ระบุ</th>
+                <th rowSpan={2} className="w-48 border border-slate-200 px-3 py-2 text-center">ปัจจัยที่ระบุ</th>
                 <th colSpan={GROUPS.length + 1} className="border border-slate-200 px-3 py-2 text-center">กลุ่มปัจจัยที่พบ</th>
               </tr>
               <tr>
-                {GROUPS.map((g, k) => <th key={g.code} className="w-24 border border-slate-200 px-2 py-2 text-center font-semibold">{g.label}<span className="block text-[10px] font-normal text-slate-400">{groupCounts[k]} ราย</span></th>)}
-                <th className="w-24 border border-slate-200 px-2 py-2 text-center font-semibold">บันทึกแบบเดิม<span className="block text-[10px] font-normal text-slate-400">{legacyCount} ราย</span></th>
+                {GROUPS.map((g, k) => <th key={g.code} className="min-w-[150px] border border-slate-200 px-2 py-2 text-center font-semibold">{g.label}<span className="block text-[10px] font-normal text-slate-400">{groupCounts[k]} ราย</span></th>)}
+                <th className="min-w-[150px] border border-slate-200 px-2 py-2 text-center font-semibold">บันทึกแบบเดิม<span className="block text-[10px] font-normal text-slate-400">{legacyCount} ราย</span></th>
               </tr>
             </thead>
             <tbody>{cases.map((r, i) => {
-              const id = String(r.id ?? i), expanded = open.has(id), gs = groupsOf(r), legacy = legacyOf(r);
+              const id = String(r.id ?? i), gs = groupsOf(r), legacy = legacyOf(r);
               const items = gs.flatMap((g) => (g.items ?? []).map((it) => ({ g: g.label, it })));
               return <tr key={id} className="align-top">
                 <td className="border border-slate-200 px-3 py-2 text-xs text-slate-700">
@@ -119,16 +116,29 @@ export default function IvFactorTable({ incidents, year, complication, name }: {
                   {r.status === 'pending' && <span className="ml-1 mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">รออนุมัติ</span>}
                 </td>
                 <td className="border border-slate-200 px-3 py-2 text-slate-700">
-                  {!items.length && !legacy.length ? <span className="text-slate-400">ไม่ได้ระบุปัจจัย</span> : <>
-                    <p className={expanded ? '' : 'line-clamp-2'}>{[...items.map(({ it }) => it.label), ...legacy.map((l) => `${l.label}: ${l.v}`)].join(' · ')}</p>
-                    {expanded && items.length > 0 && <dl className="mt-2 space-y-1 rounded-lg bg-slate-50 p-2 text-xs">
-                      {items.map(({ g, it }, k) => <div key={k}><dt className="inline font-semibold text-slate-700">{g} › {it.label}: </dt><dd className="inline text-slate-600">{[...(it.causes ?? []).map((c) => c.label), text(it.detail)].filter(Boolean).join(' · ') || '—'}</dd></div>)}
-                    </dl>}
-                    <button type="button" onClick={() => toggle(id)} className="mt-1.5 rounded-lg border border-slate-200 px-2.5 py-0.5 text-xs text-teal-700 hover:bg-teal-50">{expanded ? 'ย่อ' : 'อ่านต่อ'}</button>
-                  </>}
+                  {!items.length && !legacy.length ? <span className="text-slate-400">ไม่ได้ระบุปัจจัย</span>
+                    : [...items.map(({ it }) => it.label), ...legacy.map((l) => l.label)].join(' · ')}
                 </td>
-                {GROUPS.map((g) => { const hit = gs.find((x) => codeOf(x) === g.code); return <td key={g.code} className="border border-slate-200 px-2 py-2 text-center">{hit ? <span title={(hit.items ?? []).map((x) => x.label).join(', ')} className="text-base font-bold text-teal-600">✓</span> : <span className="text-slate-300">—</span>}</td>; })}
-                <td className="border border-slate-200 px-2 py-2 text-center">{legacy.length ? <span title={legacy.map((l) => `${l.label}: ${l.v}`).join('\n')} className="text-base font-bold text-teal-600">✓</span> : <span className="text-slate-300">—</span>}</td>
+                {GROUPS.map((g) => {
+                  const hit = gs.find((x) => codeOf(x) === g.code);
+                  return <td key={g.code} className="border border-slate-200 px-2 py-2 text-center">
+                    {hit ? <>
+                      <span className="text-base font-bold text-teal-600">✓</span>
+                      <ul className="mt-1 space-y-1 text-left text-xs text-slate-600">
+                        {(hit.items ?? []).map((it, k) => {
+                          const d = [...(it.causes ?? []).map((c) => c.label), text(it.detail)].filter(Boolean).join(' · ');
+                          return <li key={k}><b className="text-slate-800">{it.label}</b>{d && <>: {d}</>}</li>;
+                        })}
+                      </ul>
+                    </> : <span className="text-slate-300">—</span>}
+                  </td>;
+                })}
+                <td className="border border-slate-200 px-2 py-2 text-center">
+                  {legacy.length ? <>
+                    <span className="text-base font-bold text-teal-600">✓</span>
+                    <ul className="mt-1 space-y-1 text-left text-xs text-slate-600">{legacy.map((l) => <li key={l.label}><b className="text-slate-800">{l.label}</b>: {l.v}</li>)}</ul>
+                  </> : <span className="text-slate-300">—</span>}
+                </td>
               </tr>;
             })}</tbody>
           </table></div>}

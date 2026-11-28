@@ -10,7 +10,7 @@ type Issue = { key: string; label: string; value: (c: Case) => string | null };
 const text = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
 const SEVERE = ['E', 'F', 'G', 'H', 'I'];
 
-const CONFIG: Record<Kind, { title: string; summary: (c: Case) => string | null; extra: (c: Case) => (string | null)[]; dateSuffix?: (c: Case) => string | null; anInline?: boolean; issues: Issue[]; note?: (c: Case) => string | null; noteLabel?: string }> = {
+const CONFIG: Record<Kind, { title: string; summary: (c: Case) => string | null; extra: (c: Case) => (string | null)[]; dateSuffix?: (c: Case) => string | null; anInline?: boolean; caseWidth?: string; issues: Issue[]; note?: (c: Case) => string | null; noteLabel?: string }> = {
   fall: {
     title: 'สรุปประเด็นรายกรณี · พลัดตกหกล้ม',
     summary: (c) => text(c.description),
@@ -44,6 +44,7 @@ const CONFIG: Record<Kind, { title: string; summary: (c: Case) => string | null;
     summary: (c) => [text(c.admit_diagnosis) && `Admit: ${c.admit_diagnosis}`, text(c.discharge_diagnosis) && `จำหน่ายครั้งก่อน: ${c.discharge_diagnosis}`].filter(Boolean).join(' · ') || null,
     dateSuffix: (c) => (c.age != null ? `อายุ ${c.age} ปี` : null),
     anInline: true,
+    caseWidth: 'w-64 min-w-[250px]',
     extra: (c) => [c.previous_discharge_date || text(c.discharge_ward) ? ['จำหน่าย', c.previous_discharge_date, text(c.discharge_ward) && `จาก ${c.discharge_ward}`].filter(Boolean).join(' ') : null],
     issues: [
       { key: 'p', label: 'ผู้ป่วย', value: (c) => text(c.cause_patient) },
@@ -90,7 +91,7 @@ export default function CaseIssueTable({ kind, year, severeOnly = false, include
           <table className={`w-full border-collapse text-sm ${detailUnderCheck ? 'min-w-[1200px]' : 'min-w-[860px]'}`}>
             <thead className="sticky top-0 z-10 bg-slate-50 text-xs text-slate-600">
               <tr>
-                <th rowSpan={2} className="w-40 min-w-[150px] border border-slate-200 px-3 py-2 text-center">เคส</th>
+                <th rowSpan={2} className={`${cfg.caseWidth ?? 'w-40 min-w-[150px]'} border border-slate-200 px-3 py-2 text-center`}>เคส</th>
                 <th rowSpan={2} className="min-w-[340px] border border-slate-200 px-3 py-2 text-center">สรุปอาการและเหตุการณ์สำคัญ</th>
                 <th colSpan={cfg.issues.length} className="border border-slate-200 px-3 py-2 text-center">ประเด็นที่พบ</th>
                 {cfg.note && <th rowSpan={2} className="min-w-[220px] border border-slate-200 px-3 py-2 text-center">{cfg.noteLabel}</th>}
@@ -105,7 +106,7 @@ export default function CaseIssueTable({ kind, year, severeOnly = false, include
                     <td className="border border-slate-200 px-3 py-2 text-xs text-slate-700">
                       <div className="font-semibold text-slate-900">{c.department}</div>
                       <div>{c.date}{cfg.dateSuffix?.(c) && ` · ${cfg.dateSuffix(c)}`}</div>
-                      {cfg.anInline ? <div className="text-slate-500">HN {c.hn || '—'}{c.an ? ` · AN ${c.an}` : ''}</div> : <>
+                      {cfg.anInline ? <div className="whitespace-nowrap text-slate-500">HN {c.hn || '—'}{c.an ? ` · AN ${c.an}` : ''}</div> : <>
                         <div className="whitespace-nowrap text-slate-500">HN {c.hn || '—'}</div>
                         {c.an && <div className="whitespace-nowrap text-slate-500">AN {c.an}</div>}
                       </>}

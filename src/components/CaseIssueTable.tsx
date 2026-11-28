@@ -26,8 +26,11 @@ const CONFIG: Record<Kind, { title: string; summary: (c: Case) => string | null;
   },
   pressure: {
     title: 'สรุปประเด็นรายกรณี · แผลกดทับระดับ 2–4',
-    summary: (c) => [text(c.diagnosis), text(c.wound_site) && `ตำแหน่งแผล ${c.wound_site}`].filter(Boolean).join(' · ') || null,
-    extra: (c) => [c.age != null ? `อายุ ${c.age} ปี` : null, c.admission_bs != null || c.found_bs != null ? `Braden แรกรับ ${c.admission_bs ?? '—'} → พบแผล ${c.found_bs ?? '—'}` : null],
+    summary: (c) => [
+      [text(c.diagnosis), text(c.wound_site) && `ตำแหน่งแผล ${c.wound_site}`].filter(Boolean).join(' · '),
+      [c.age != null ? `อายุ ${c.age} ปี` : null, c.admission_bs != null || c.found_bs != null ? `Braden แรกรับ ${c.admission_bs ?? '—'} → พบแผล ${c.found_bs ?? '—'}` : null].filter(Boolean).join(' · '),
+    ].filter(Boolean).join('\n') || null,
+    extra: () => [],
     issues: [
       { key: '2', label: 'ระดับ 2', value: (c) => (String(c.wound_level) === '2' ? 'ระดับ 2' : null) },
       { key: '3', label: 'ระดับ 3', value: (c) => (String(c.wound_level) === '3' ? 'ระดับ 3' : null) },

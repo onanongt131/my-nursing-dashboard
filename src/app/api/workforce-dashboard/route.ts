@@ -7,6 +7,8 @@ export const dynamic = 'force-dynamic';
 // กลุ่มงานที่ไม่นำมาแสดง (คงตามหน้า Workforce เดิม)
 const EXCLUDED_GROUPS = ['ตรวจรักษาพิเศษ', 'OPD', 'การควบคุมและการป้องกันการติดเชื้อ', 'ผ่าตัด', 'วิสัญญี'];
 type Shift = 'night' | 'morning' | 'evening';
+// required_staff (อ.ว) = ROUNDUP(ROUNDUP(ชั่วโมงการพยาบาล/7) × สัดส่วน RN) · สามัญ 70%, ICU 90%
+const isIcu = (name: string, group: string) => /icu|ccu|rcu|วิกฤต/i.test(name) || /วิกฤต|icu/i.test(group);
 const shiftOf = (raw: unknown): Shift | null => {
   const s = String(raw ?? '').toLowerCase();
   if (s.includes('ดึก') || s.includes('night')) return 'night';
@@ -63,8 +65,11 @@ export async function GET(request: NextRequest) {
         if (rn !== null && others.some((v) => v !== null)) { const total = rn + others.reduce<number>((t, v) => t + (v ?? 0), 0); if (total > 0) { mixRn += rn; mixAll += total; } }
       }
       const avg = (s: { sum: number; count: number }) => (s.count ? Number((s.sum / s.count).toFixed(2)) : null);
+      const icu = isIcu(u.name, u.group);
       return {
         ...u,
+        icu,
+        rnTarget: icu ? 90 : 70,
         np: monthly.get(u.id) ?? null,
         shiftNp: { night: avg(shifts.night), morning: avg(shifts.morning), evening: avg(shifts.evening) },
         pcs: patients > 0 ? Number((scoreSum / patients).toFixed(2)) : null,

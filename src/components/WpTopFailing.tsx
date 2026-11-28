@@ -1,13 +1,18 @@
 'use client';
 
+import { useEffect, useState } from 'react';
+import FiscalMonthSelect, { monthLabel } from '@/components/FiscalMonthSelect';
+
 type Rec = { department_id: number | string; month: number; name: string; wp: number | null; reasons?: string[]; pending?: boolean };
 
 /** 5 อันดับตัวชี้วัด WP/QA ที่ไม่ผ่านเกณฑ์ (< 90) มากที่สุดจากทุกหอ */
-export default function WpTopFailing({ records, deptName, limit = 5 }: { records: Rec[]; deptName: (id: string) => string; limit?: number }) {
+export default function WpTopFailing({ records, deptName, year, limit = 5 }: { records: Rec[]; deptName: (id: string) => string; year: number; limit?: number }) {
+  const [month, setMonth] = useState(0);
+  useEffect(() => setMonth(0), [year]);
   const by = new Map<string, Map<string, number[]>>();
   const reasons = new Map<string, Map<string, number>>();
   const failMonths = new Map<string, number>();
-  for (const r of records) {
+  for (const r of records.filter((x) => !month || Number(x.month) === month)) {
     if (!r.name || r.wp === null || r.wp === undefined || !Number.isFinite(Number(r.wp))) continue;
     const score = Number(r.wp), dept = String(r.department_id);
     if (!by.has(r.name)) by.set(r.name, new Map());
@@ -32,10 +37,10 @@ export default function WpTopFailing({ records, deptName, limit = 5 }: { records
   return (
     <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
       <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-slate-100 px-4 py-3">
-        <h3 className="text-sm font-bold text-rose-700">ตัวชี้วัดที่ไม่ผ่านเกณฑ์ {limit} อันดับแรก · ทุกหอ</h3>
-        <p className="text-xs text-slate-500">เรียงตามจำนวนหอที่คะแนนเฉลี่ยทั้งปี &lt; 90 · รองลงมาจำนวนครั้ง (เดือน) ที่ไม่ผ่าน</p>
+        <div className="flex flex-wrap items-center gap-3"><h3 className="text-sm font-bold text-rose-700">ตัวชี้วัดที่ไม่ผ่านเกณฑ์ {limit} อันดับแรก · ทุกหอ{month ? ` · ${monthLabel(month, year)}` : ''}</h3><FiscalMonthSelect value={month} onChange={setMonth} year={year} /></div>
+        <p className="text-xs text-slate-500">เรียงตามจำนวนหอที่คะแนนเฉลี่ย{month ? 'ของเดือน' : 'ทั้งปี'} &lt; 90 · รองลงมาจำนวนครั้ง (เดือน) ที่ไม่ผ่าน</p>
       </div>
-      {!rows.length ? <p className="p-6 text-sm text-slate-500">ไม่มีตัวชี้วัดที่ไม่ผ่านเกณฑ์ในปีงบประมาณนี้</p> :
+      {!rows.length ? <p className="p-6 text-sm text-slate-500">ไม่มีตัวชี้วัดที่ไม่ผ่านเกณฑ์{month ? 'ในเดือนนี้' : 'ในปีงบประมาณนี้'}</p> :
         <div className="overflow-x-auto"><table className="w-full min-w-[820px] border-collapse text-sm">
           <thead className="bg-slate-50 text-xs text-slate-600"><tr>
             <th className="w-12 border border-slate-200 px-2 py-2 text-center">อันดับ</th>

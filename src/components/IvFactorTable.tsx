@@ -1,6 +1,8 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { IV_FACTOR_GROUPS } from '@/lib/ivCareFactors';
+import FiscalMonthSelect, { monthLabel } from '@/components/FiscalMonthSelect';
 
 type Cause = { code?: string; label: string };
 type Item = { code?: string; label: string; detail?: string; causes?: Cause[] };
@@ -25,9 +27,11 @@ const text = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : nul
 
 /** ตารางปัจจัยที่ส่งผลให้เกิดภาวะแทรกซ้อน IV (สรุปความถี่ + รายกรณี) */
 export default function IvFactorTable({ incidents, year, complication, name }: { incidents: IvIncident[]; year: number; complication: string | null; name: (id: string | number) => string }) {
+  const [month, setMonth] = useState(0);
+  useEffect(() => setMonth(0), [year]);
   const from = `${year - 544}-10-01`, to = `${year - 543}-10-01`;
   const cases = incidents
-    .filter((r) => r.record_date >= from && r.record_date < to && (!complication || r.complication === complication))
+    .filter((r) => r.record_date >= from && r.record_date < to && (!complication || r.complication === complication) && (!month || Number(r.record_date.slice(5, 7)) === month))
     .sort((a, b) => a.record_date.localeCompare(b.record_date));
   const groupsOf = (r: IvIncident) => r.contributing_factors?.groups ?? [];
   const codeOf = (g: Group) => g.code ?? GROUPS.find((x) => x.label === g.label)?.code ?? g.label;
@@ -50,16 +54,16 @@ export default function IvFactorTable({ incidents, year, complication, name }: {
   const withFactors = cases.filter((r) => groupsOf(r).length || legacyOf(r).length).length;
   const groupCounts = GROUPS.map((g) => cases.filter((r) => groupsOf(r).some((x) => codeOf(x) === g.code)).length);
   const legacyCount = cases.filter((r) => legacyOf(r).length).length;
-  const title = complication ?? 'ภาวะแทรกซ้อนทั้งหมด';
+  const title = (complication ?? 'ภาวะแทรกซ้อนทั้งหมด') + (month ? ` · ${monthLabel(month, year)}` : '');
 
   return (
     <div className="space-y-3">
       <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-slate-100 px-4 py-3">
-          <h3 className="text-sm font-bold text-slate-800">ปัจจัยที่ส่งผล · {title} <span className="font-normal text-slate-400">({cases.length} เหตุการณ์ · ระบุปัจจัย {withFactors})</span></h3>
+          <div className="flex flex-wrap items-center gap-3"><h3 className="text-sm font-bold text-slate-800">ปัจจัยที่ส่งผล · {title} <span className="font-normal text-slate-400">({cases.length} เหตุการณ์ · ระบุปัจจัย {withFactors})</span></h3><FiscalMonthSelect value={month} onChange={setMonth} year={year} /></div>
           <p className="text-xs text-slate-500">นับจำนวนเหตุการณ์ที่เลือกปัจจัยนั้น (1 เหตุการณ์เลือกได้หลายปัจจัย) · ทุกระดับ · รวมรายการรออนุมัติ</p>
         </div>
-        {!freqRows.length ? <p className="p-6 text-sm text-slate-500">ยังไม่มีการระบุปัจจัยในปีงบประมาณ {year}</p> :
+        {!freqRows.length ? <p className="p-6 text-sm text-slate-500">ยังไม่มีการระบุปัจจัย{month ? `ในเดือน${monthLabel(month, year)}` : `ในปีงบประมาณ ${year}`}</p> :
           <div className="overflow-x-auto"><table className="w-full min-w-[720px] border-collapse text-sm">
             <thead className="bg-slate-50 text-xs text-slate-600"><tr>
               <th className="border border-slate-200 px-3 py-2 text-left">กลุ่มปัจจัย</th>
@@ -89,15 +93,14 @@ export default function IvFactorTable({ incidents, year, complication, name }: {
 
       <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-slate-100 px-4 py-3">
-          <h3 className="text-sm font-bold text-slate-800">ปัจจัยที่ส่งผลรายกรณี · {title} <span className="font-normal text-slate-400">({cases.length} ราย)</span></h3>
+          <div className="flex flex-wrap items-center gap-3"><h3 className="text-sm font-bold text-slate-800">ปัจจัยที่ส่งผลรายกรณี · {title} <span className="font-normal text-slate-400">({cases.length} ราย)</span></h3><FiscalMonthSelect value={month} onChange={setMonth} year={year} /></div>
           <p className="text-xs text-slate-500">รายละเอียดปัจจัยและสาเหตุแสดงใต้เครื่องหมาย ✓ ของแต่ละกลุ่ม</p>
         </div>
-        {!cases.length ? <p className="p-6 text-sm text-slate-500">ไม่มีเหตุการณ์ในปีงบประมาณ {year}</p> :
-          <div className="max-h-[70vh] overflow-auto"><table className="w-full min-w-[1150px] border-collapse text-sm">
+        {!cases.length ? <p className="p-6 text-sm text-slate-500">ไม่มีเหตุการณ์{month ? `ในเดือน${monthLabel(month, year)}` : `ในปีงบประมาณ ${year}`}</p> :
+          <div className="max-h-[70vh] overflow-auto"><table className="w-full min-w-[960px] border-collapse text-sm">
             <thead className="sticky top-0 z-10 bg-slate-50 text-xs text-slate-600">
               <tr>
                 <th rowSpan={2} className="w-48 border border-slate-200 px-3 py-2 text-center">เคส</th>
-                <th rowSpan={2} className="w-48 border border-slate-200 px-3 py-2 text-center">ปัจจัยที่ระบุ</th>
                 <th colSpan={GROUPS.length + 1} className="border border-slate-200 px-3 py-2 text-center">กลุ่มปัจจัยที่พบ</th>
               </tr>
               <tr>
@@ -107,17 +110,12 @@ export default function IvFactorTable({ incidents, year, complication, name }: {
             </thead>
             <tbody>{cases.map((r, i) => {
               const id = String(r.id ?? i), gs = groupsOf(r), legacy = legacyOf(r);
-              const items = gs.flatMap((g) => (g.items ?? []).map((it) => ({ g: g.label, it })));
               return <tr key={id} className="align-top">
                 <td className="border border-slate-200 px-3 py-2 text-xs text-slate-700">
                   <div className="font-semibold text-slate-900">{name(r.department_id)}</div>
                   <div>{r.record_date}</div>
                   <span className="mt-1 inline-block rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-600">{r.complication} ระดับ {r.grade}</span>
                   {r.status === 'pending' && <span className="ml-1 mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">รออนุมัติ</span>}
-                </td>
-                <td className="border border-slate-200 px-3 py-2 text-slate-700">
-                  {!items.length && !legacy.length ? <span className="text-slate-400">ไม่ได้ระบุปัจจัย</span>
-                    : [...items.map(({ it }) => it.label), ...legacy.map((l) => l.label)].join(' · ')}
                 </td>
                 {GROUPS.map((g) => {
                   const hit = gs.find((x) => codeOf(x) === g.code);

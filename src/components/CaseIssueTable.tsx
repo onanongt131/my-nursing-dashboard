@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import FiscalMonthSelect, { monthLabel } from '@/components/FiscalMonthSelect';
 
 type Kind = 'fall' | 'pressure' | 'readmit';
 type Case = Record<string, any> & { id: number | string; status: string; date: string; department: string };
@@ -8,8 +9,6 @@ type Issue = { key: string; label: string; value: (c: Case) => string | null };
 
 const text = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
 const SEVERE = ['E', 'F', 'G', 'H', 'I'];
-const FISCAL = [10, 11, 12, 1, 2, 3, 4, 5, 6, 7, 8, 9];
-const MONTH_TH = ['', 'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน', 'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม'];
 
 const CONFIG: Record<Kind, { title: string; summary: (c: Case) => string | null; extra: (c: Case) => (string | null)[]; issues: Issue[]; note?: (c: Case) => string | null; noteLabel?: string }> = {
   fall: {
@@ -75,24 +74,19 @@ export default function CaseIssueTable({ kind, year, severeOnly = false, include
       <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-slate-100 px-4 py-3">
         <div className="flex flex-wrap items-center gap-3">
           <h3 className="text-sm font-bold text-slate-800">{cfg.title}{severeOnly && ' (ระดับ E ขึ้นไป)'} <span className="font-normal text-slate-400">({cases.length} ราย)</span></h3>
-          <label className="flex items-center gap-1.5 text-xs text-slate-600">เลือกเดือน
-            <select value={month} onChange={(e) => setMonth(Number(e.target.value))} className="rounded-lg border border-teal-200 bg-white px-2 py-1 text-xs text-slate-800">
-              <option value={0}>ทั้งปีงบประมาณ</option>
-              {FISCAL.map((m) => <option key={m} value={m}>{MONTH_TH[m]} {m >= 10 ? year - 1 : year}</option>)}
-            </select>
-          </label>
+          <FiscalMonthSelect value={month} onChange={setMonth} year={year} />
         </div>
         <p className="text-xs text-slate-500">สรุปจากผลที่บันทึก{includePending ? ' รวมรายการรออนุมัติ' : 'ที่อนุมัติแล้ว'} ตามสิทธิ์{detailUnderCheck ? ' · รายละเอียดสาเหตุแสดงใต้เครื่องหมาย ✓' : ''}</p>
       </div>
       {!current ? <p className="p-6 text-sm text-slate-500">กำลังโหลดรายกรณี…</p>
         : current.error ? <p role="alert" className="p-4 text-sm text-red-700">{current.error}</p>
-        : !cases.length ? <p className="p-6 text-sm text-slate-500">ไม่มีรายกรณี{month ? `ในเดือน${MONTH_TH[month]} ${month >= 10 ? year - 1 : year}` : `ในปีงบประมาณ ${year}`}</p>
+        : !cases.length ? <p className="p-6 text-sm text-slate-500">ไม่มีรายกรณี{month ? `ในเดือน${monthLabel(month, year)}` : `ในปีงบประมาณ ${year}`}</p>
         : <div className="max-h-[70vh] overflow-auto">
           <table className={`w-full border-collapse text-sm ${detailUnderCheck ? 'min-w-[1200px]' : 'min-w-[860px]'}`}>
             <thead className="sticky top-0 z-10 bg-slate-50 text-xs text-slate-600">
               <tr>
-                <th rowSpan={2} className="w-48 border border-slate-200 px-3 py-2 text-center">เคส</th>
-                <th rowSpan={2} className="border border-slate-200 px-3 py-2 text-center">สรุปอาการและเหตุการณ์สำคัญ</th>
+                <th rowSpan={2} className="w-40 min-w-[150px] border border-slate-200 px-3 py-2 text-center">เคส</th>
+                <th rowSpan={2} className="min-w-[340px] border border-slate-200 px-3 py-2 text-center">สรุปอาการและเหตุการณ์สำคัญ</th>
                 <th colSpan={cfg.issues.length} className="border border-slate-200 px-3 py-2 text-center">ประเด็นที่พบ</th>
                 {cfg.note && <th rowSpan={2} className="min-w-[220px] border border-slate-200 px-3 py-2 text-center">{cfg.noteLabel}</th>}
               </tr>
@@ -106,7 +100,8 @@ export default function CaseIssueTable({ kind, year, severeOnly = false, include
                     <td className="border border-slate-200 px-3 py-2 text-xs text-slate-700">
                       <div className="font-semibold text-slate-900">{c.department}</div>
                       <div>{c.date}</div>
-                      <div className="text-slate-500">HN {c.hn || '—'}{c.an ? ` · AN ${c.an}` : ''}</div>
+                      <div className="whitespace-nowrap text-slate-500">HN {c.hn || '—'}</div>
+                      {c.an && <div className="whitespace-nowrap text-slate-500">AN {c.an}</div>}
                       {extra.length > 0 && <div className="mt-1 flex flex-wrap gap-1">{extra.map((x) => <span key={x} className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-600">{x}</span>)}</div>}
                       {c.status === 'pending' && <span className="mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">รออนุมัติ</span>}
                     </td>

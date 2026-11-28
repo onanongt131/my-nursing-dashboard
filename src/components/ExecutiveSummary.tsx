@@ -11,6 +11,8 @@ export type ExecSummaryProps = {
   /** หน่วย เช่น "%", "ต่อ 1,000 วันนอน" */
   unit: string;
   decimals?: number;
+  /** ทศนิยมของตัวเลขบนกราฟ (ค่าเริ่มต้น 1) */
+  chartDecimals?: number;
   /** เกณฑ์ผ่าน (ใช้เกณฑ์เดียวกับสีในตาราง) */
   good: (v: number) => boolean;
   goodLabel: string;
@@ -90,7 +92,7 @@ export function ExecutiveSummary(p: ExecSummaryProps) {
             {p.monthly.map((v, i) => (
               <div key={i} className="flex h-full flex-1 flex-col items-center justify-end">
                 {isNum(v) ? <>
-                  <span className="mb-0.5 text-[10px] font-semibold tabular-nums text-slate-600">{v.toFixed(Math.min(d, 1))}</span>
+                  <span className="mb-0.5 text-[10px] font-semibold tabular-nums text-slate-600">{v.toFixed(p.chartDecimals ?? Math.min(d, 1))}</span>
                   <div title={`${MONTHS_TH[i]}: ${f(v)} ${p.unit}`} className={`w-full max-w-10 rounded-t ${p.good(v) ? 'bg-emerald-500' : 'bg-rose-400'}`} style={{ height: `${Math.max(2, (v / max) * 100)}%` }} />
                 </> : <span className="mb-1 text-[10px] text-slate-300">—</span>}
               </div>

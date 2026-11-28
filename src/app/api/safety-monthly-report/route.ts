@@ -65,7 +65,8 @@ export async function GET(request:NextRequest){
     const approved=wardSummaries.filter(row=>row.status==='approved');
     const summary=approved.length===1?approved[0]:undefined;
     const cases=records.filter(row=>row.status==='approved'&&(!pressure||['2','3','4'].includes(String(row.wound_level)))).length;
-    return {cases:summary||cases?cases:null,days:summary?.[pressure?'surveillance_patient_days':'patient_days']??null,
+    const severe=pressure?undefined:records.filter(row=>row.status==='approved'&&['E','F','G','H','I'].includes(String(row.severity||'').toUpperCase())).length;
+    return {cases:summary||cases?cases:null,severe:summary||cases?severe:undefined,days:summary?.[pressure?'surveillance_patient_days':'patient_days']??null,
      riskDays:summary?.at_risk_patient_days??null,pending:[...records,...wardSummaries].some(row=>row.status==='pending')};
    });
    return {id:ward.id,name:ward.Department,months};

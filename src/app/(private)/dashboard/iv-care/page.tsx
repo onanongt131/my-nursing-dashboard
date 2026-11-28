@@ -107,7 +107,7 @@ export default function IvCarePage(){
  const success=tab==='success';
  const execRows=units.map(id=>({name:name(id),months:months.map(m=>ivPercent(monthRows.get(id+':'+m.id)||[],tab)),annual:unitAverage(id),pending:months.some(m=>hasPending(id,m.id))}));
  const execPending=units.reduce((n,id)=>n+months.filter(m=>hasPending(id,m.id)).length,0);
- const execSummary=<ExecutiveSummary metric={tabs.find(t=>t.key===tab)?.label||'IV Care'} unit="%" good={v=>success?v>=80:v===0} goodLabel={success?'≥ 80%':'0%'} badness={v=>success?-v:v} lines={success?[80]:undefined}
+ const execSummary=<ExecutiveSummary metric={tabs.find(t=>t.key===tab)?.label||'IV Care'} unit="%" good={v=>success?v>=80:v===0} goodLabel={success?'≥ 80%':'0%'} badness={v=>success?-v:v} lines={success?[80]:undefined} chartDecimals={success?1:2}
    overall={ivPercent(selected,tab,'overall')} monthly={monthlyMetrics.map(m=>m.values[tab])} rows={execRows} pendingCount={execPending} note={tabs.find(t=>t.key===tab)?.detail}/>;
  return <div className="mx-auto w-full min-w-0 max-w-[1480px] space-y-3 px-3 py-4 sm:px-5 lg:px-6"><header className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2 rounded-2xl border border-teal-100 bg-white px-4 py-3 shadow-sm">
    <h1 className="text-lg font-extrabold text-slate-900">รายงาน IV Care</h1>

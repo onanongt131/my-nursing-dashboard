@@ -5,6 +5,11 @@ import { getProductivityData } from '@/lib/kpiService';
 import { ProductivityTable } from '@/components/ProductivityTable'; // ปรับ path ให้ตรงกับของท่าน
 import { productivityDepartmentName } from '@/lib/productivityReport';
 import { NP_EXPORT_MONTHS, productivityMonthlyExport } from '@/lib/productivityExport';
+import { ExecutiveSummary, ReportViewSwitch } from '@/components/ExecutiveSummary';
+
+const NP_MONTHS = [10, 11, 12, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+const mean = (v: number[]) => (v.length ? v.reduce((a, b) => a + b, 0) / v.length : null);
+const npBadness = (v: number) => (v < 90 ? 90 - v : v > 110 ? v - 110 : 0);
 
 export default function ProductivityPage() {
   const [loadError, setLoadError] = useState('');
@@ -99,6 +104,21 @@ export default function ProductivityPage() {
       ? {...current, loading: false, data: historyResults} : current);
   };
 
+  const npValid = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
+  const npByDept = new Map<string, Map<number, number>>();
+  for (const entry of data) {
+    if (!npValid(entry.np_value)) continue;
+    const name = productivityDepartmentName(entry.department_name || 'ไม่ระบุหน่วยงาน', selectedYear);
+    if (!npByDept.has(name)) npByDept.set(name, new Map());
+    npByDept.get(name)!.set(Number(entry.month), entry.np_value);
+  }
+  const execRows = [...npByDept.entries()].sort((a, b) => a[0].localeCompare(b[0], 'th')).map(([name, m]) => {
+    const months = NP_MONTHS.map(x => m.get(x) ?? null);
+    return { name, months, annual: mean(months.filter(npValid)) };
+  });
+  const execMonthly = NP_MONTHS.map((_, i) => mean(execRows.map(r => r.months[i]).filter(npValid)));
+  const execOverall = mean(execRows.flatMap(r => r.months).filter(npValid));
+
   return (
     <div className="flex flex-col mb-6"> 
       <div className="mb-2 rounded-xl border border-teal-100 bg-white px-3 py-1.5 shadow-sm">
@@ -150,11 +170,15 @@ export default function ProductivityPage() {
       ) : loadError ? (
         <p role="alert" className="text-red-700 bg-red-50 border border-red-200 rounded-xl p-4">{loadError}</p>
       ) : data.length > 0 ? (
+        <ReportViewSwitch summary={<ExecutiveSummary metric="Nursing Productivity" unit="" decimals={1} good={v => v >= 90 && v <= 110} goodLabel="90–110" badness={npBadness} lines={[90, 110]}
+          overall={execOverall} monthly={execMonthly} rows={execRows}
+          note="ค่าทั้งปีของหน่วยงาน = ค่าเฉลี่ยรายเดือน · ต่ำกว่า 90 หรือสูงกว่า 110 ถือว่าไม่อยู่ในเกณฑ์ (ตามเกณฑ์สีในตาราง)" />}>
         <ProductivityTable key={selectedYear}
           data={data} 
           selectedYear={selectedYear} 
           onViewHistory={handleViewHistory} 
         />
+        </ReportViewSwitch>
       ) : (
         <p className="text-gray-500 text-center py-8">ไม่พบข้อมูลในปีงบประมาณ {selectedYear}</p>
       )}

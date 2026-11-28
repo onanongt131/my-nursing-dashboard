@@ -3,8 +3,10 @@
 import {useEffect,useState} from 'react';
 import {MonthlyTableViewport,ReportStatusIcon,ReportStatusLegend,ReportValue} from '@/components/MonthlyReportStatus';
 import ReportMonthHeading from '@/components/ReportMonthHeading';
+import {ExecutiveSummary,ReportViewSwitch,type ExecRow} from '@/components/ExecutiveSummary';
+import CaseIssueTable from '@/components/CaseIssueTable';
 
-type Month={cases:number|null;days:number|null;riskDays:number|null;pending:boolean;reportedRate?:number|null};
+type Month={cases:number|null;severe?:number;days:number|null;riskDays:number|null;pending:boolean;reportedRate?:number|null};
 type Row={id:number;name:string;months:Month[];historical?:Partial<Record<'all'|'risk',{cases:number;days:number;rate:number|null}>>};
 const months=[10,11,12,1,2,3,4,5,6,7,8,9];
 
@@ -14,6 +16,7 @@ export default function SafetyMonthlyReport({kind}:{kind:'fall'|'pressure'}){
  const [year,setYear]=useState(2570);
  const [exportMonth,setExportMonth]=useState(10);
  const [risk,setRisk]=useState(false);
+ const [severeOnly,setSevereOnly]=useState(false);
  const [result,setResult]=useState<{year:number;items:Row[];error?:string}|null>(null);
  useEffect(()=>{
   const controller=new AbortController();
@@ -30,7 +33,9 @@ export default function SafetyMonthlyReport({kind}:{kind:'fall'|'pressure'}){
 
  const historical=pressure&&[2567,2568,2569].includes(year);
  const annualOnly=historical&&year!==2569;
- const current=result?.year===year?result:null;
+ const loaded=result?.year===year?result:null;
+ // Fall: แยก "ทุกระดับ" กับ "ระดับ E ขึ้นไป" (E–I) โดยใช้ตัวหารเดิม
+ const current=loaded&&!pressure&&severeOnly?{...loaded,items:loaded.items.map(row=>({...row,months:row.months.map(m=>({...m,cases:m.cases===null?null:(m.severe??0)}))}))}:loaded;
  const denominator=(month:Month)=>Number(risk?month.riskDays:month.days);
  function annual(row:Row):Month{
   if(historical){
@@ -47,7 +52,7 @@ export default function SafetyMonthlyReport({kind}:{kind:'fall'|'pressure'}){
  function download(){
   const monthIndex=months.indexOf(exportMonth);
   const rows=[
-   [title,'ปีงบประมาณ',year,annualOnly?'รวมทั้งปี':'เดือน',annualOnly?'':exportMonth,unit],
+   [title+(severeOnly&&!pressure?' (ระดับ E ขึ้นไป)':''),'ปีงบประมาณ',year,annualOnly?'รวมทั้งปี':'เดือน',annualOnly?'':exportMonth,unit],
    ['หน่วยงาน','ตัวตั้ง','ตัวหาร (วันนอน)','อัตรา','สถานะ'],
    ...(current?.items??[]).map(row=>{
     const month=annualOnly?annual(row):row.months[monthIndex];
@@ -63,10 +68,19 @@ export default function SafetyMonthlyReport({kind}:{kind:'fall'|'pressure'}){
   const url=URL.createObjectURL(new Blob(['\uFEFF',csv],{type:'text/csv;charset=utf-8'}));
   const link=document.createElement('a');
   link.href=url;
-  link.download=`${kind}-${year}-${annualOnly?'annual':String(exportMonth).padStart(2,'0')}${risk?'-risk':''}.csv`;
+  link.download=`${kind}-${year}-${annualOnly?'annual':String(exportMonth).padStart(2,'0')}${risk?'-risk':''}${severeOnly&&!pressure?'-E-up':''}.csv`;
   link.click();
   window.setTimeout(()=>URL.revokeObjectURL(url),1000);
  }
+
+ const num=(v:string|null)=>v===null?null:Number(v);
+ const items=current?.items??[];
+ const execRows:ExecRow[]=items.map(row=>({name:row.name,months:row.months.map(m=>num(rate(m))),annual:num(rate(annual(row))),pending:row.months.some(m=>m.pending)}));
+ const ratio=(list:Month[])=>{const valid=list.filter(m=>denominator(m)>0);const days=valid.reduce((t,m)=>t+denominator(m),0);return days>0?valid.reduce((t,m)=>t+(m.cases??0),0)/days*1000:null;};
+ const annuals=items.map(annual);
+ const execOverall=historical?(()=>{const v=annuals.filter(m=>Number(m.days)>0);const days=v.reduce((t,m)=>t+Number(m.days),0);return days>0?v.reduce((t,m)=>t+(m.cases??0),0)/days*1000:null;})():ratio(items.flatMap(r=>r.months));
+ const execMonthly=months.map((_,i)=>annualOnly?null:ratio(items.map(r=>r.months[i])));
+ const execPending=items.reduce((n,r)=>n+r.months.filter(m=>m.pending).length,0);
 
  return <div className="space-y-3 p-4">
   <header className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-teal-100 bg-white p-3 lg:flex-nowrap">
@@ -81,6 +95,12 @@ export default function SafetyMonthlyReport({kind}:{kind:'fall'|'pressure'}){
      {months.map(month=><option key={month} value={month}>{new Intl.DateTimeFormat('th-TH',{month:'long',timeZone:'UTC'}).format(new Date(Date.UTC(2026,month-1,1)))}</option>)}
     </select></label>}
     <button type="button" onClick={download} aria-label={annualOnly?'Download CSV รายปี':'Download CSV รายเดือน'} disabled={!current?.items.length} className="rounded-lg bg-teal-700 px-3 py-1.5 text-white disabled:opacity-50">Download</button>
+    {!pressure&&<div role="group" aria-label="ระดับความรุนแรง" className="flex flex-wrap gap-2">
+     {[false,true].map(value=><button key={String(value)} type="button" aria-pressed={severeOnly===value} onClick={()=>setSevereOnly(value)}
+      className="rounded-lg border border-teal-200 whitespace-nowrap px-2 py-1.5 text-xs aria-pressed:bg-teal-700 aria-pressed:text-white">
+      {value?'ระดับ E ขึ้นไป':'ทุกระดับ'}
+     </button>)}
+    </div>}
     {pressure&&<div role="group" aria-label="ตัวหารแผลกดทับ" className="flex flex-wrap gap-2">
      {[false,true].map(value=><button key={String(value)} type="button" aria-pressed={risk===value} onClick={()=>setRisk(value)}
       className="rounded-lg border border-teal-200 whitespace-nowrap px-2 py-1.5 text-xs aria-pressed:bg-teal-700 aria-pressed:text-white">
@@ -90,6 +110,10 @@ export default function SafetyMonthlyReport({kind}:{kind:'fall'|'pressure'}){
    </div>
   </header>
   {!current?<p role="status">กำลังโหลดข้อมูล…</p>:current.error?<p role="alert">{current.error}</p>:!current.items.length?<p>ไม่มีหน่วยงานในรายงานตามสิทธิ์ของบัญชี</p>:
+  <ReportViewSwitch summary={<><ExecutiveSummary metric={pressure?'อัตราแผลกดทับ':severeOnly?'อัตราพลัดตกหกล้ม ระดับ E ขึ้นไป':'อัตราพลัดตกหกล้ม'} unit={unit} good={v=>v===0} goodLabel="0 (ไม่เกิดเหตุการณ์)" badness={v=>v}
+   overall={execOverall} monthly={execMonthly} rows={execRows} pendingCount={execPending}
+   note={annualOnly?'ปีนี้มีเฉพาะข้อมูลรายปี จึงไม่มีแนวโน้มรายเดือน':undefined}/>
+   <CaseIssueTable kind={kind} year={year} severeOnly={!pressure&&severeOnly}/></>}>
   <MonthlyTableViewport label={title}>
    <table className="w-full min-w-[780px] bg-white text-xs">
     <thead className="sticky top-0 z-10 bg-slate-50"><tr>
@@ -111,6 +135,7 @@ export default function SafetyMonthlyReport({kind}:{kind:'fall'|'pressure'}){
      })}
     </tr>)}</tbody>
    </table>
-  </MonthlyTableViewport>}
+  </MonthlyTableViewport>
+  </ReportViewSwitch>}
  </div>;
 }

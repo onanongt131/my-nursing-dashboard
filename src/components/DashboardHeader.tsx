@@ -172,7 +172,7 @@ export const DashboardHeader = ({ departmentId,onNavigate,title, activeTab, onTa
     onSidebarSelect?.(section);
     if(destination&&pathname!==destination)router.push(destination);
   };
-  const active = (id:string) => id==='dashboard' ? pathname.startsWith('/dashboard/nursing-dashboard') : id==='nso' ? pathname.startsWith('/dashboard/nso-strategy') : id==='work' ? ['/dashboard/work','/dashboard/departments','/dashboard/nursing/','/dashboard/committee','/dashboard/staffing','/dashboard/p4p'].some(p=>pathname.startsWith(p)) : false;
+  const active = (id:string) => id==='dashboard' ? pathname.startsWith('/dashboard/nursing-dashboard') : id==='nso' ? pathname.startsWith('/dashboard/nso-strategy') : id==='work' ? ['/dashboard/work','/dashboard/pressure-sore-entry','/dashboard/departments','/dashboard/nursing/','/dashboard/committee','/dashboard/staffing','/dashboard/p4p'].some(p=>pathname.startsWith(p)) : false;
   const hasDepartment = departmentId != null && String(departmentId).trim() !== '';
   const myDeptHref = hasDepartment ? `/dashboard/departments/${encodeURIComponent(String(departmentId))}` : '/dashboard/departments';
   const onMyDept = !!userName && (pathname===myDeptHref || pathname.startsWith(myDeptHref+'/'));

@@ -50,6 +50,7 @@ function sectionFor(path:string){
   if(path.startsWith('/dashboard/p4p'))return 'staff';
   if(path.startsWith('/dashboard/staffing'))return 'staff';
   if(path.startsWith('/dashboard/committee'))return 'committee';
+  if(path.startsWith('/dashboard/pressure-sore-entry'))return 'entry';
   if(['/dashboard/category','/dashboard/strategy','/dashboard/rm'].some(p=>path===p||path.startsWith(p+'/')))return 'kpis';
   if(['/dashboard/productivity','/dashboard/wp-qa','/dashboard/iv-care','/dashboard/audit-chart','/dashboard/fall-report','/dashboard/pressure-sore-report','/dashboard/readmit-report','/dashboard/ama-report','/dashboard/readmit-ama'].some(p=>path===p||path.startsWith(p+'/')))return 'monthly';
   return 'all';
@@ -80,16 +81,17 @@ export default function UniversalDashboardSidebar({departmentId,departments=[],s
     {label:'16 กลุ่มงาน',items:nursingBranches},
     {label:'คณะกรรมการ',items:committees},
     {label:'อัตรากำลัง',items:workforce},
+    {label:'บันทึกข้อมูล',items:pressureSoreEntry?[{label:'บันทึก Pressure sore (ทุกหน่วยงาน)',href:'/dashboard/pressure-sore-entry'}]:[]},
     {label:'ตัวชี้วัดตามแผน',items:kpis},
-    {label:'ตัวชี้วัดรายเดือน',items:pressureSoreEntry?[...monthly,{label:'บันทึก Pressure sore (ทุกหน่วยงาน)',href:'/dashboard/pressure-sore-entry'}]:monthly},
+    {label:'ตัวชี้วัดรายเดือน',items:monthly},
   ],[units,pressureSoreEntry]);
-  const groupIndex:Record<string,number>={dash:0,nso:1,units:2,branches:3,committee:4,staff:5,kpis:6,monthly:7};
+  const groupIndex:Record<string,number>={dash:0,nso:1,units:2,branches:3,committee:4,staff:5,entry:6,kpis:7,monthly:8};
   const sectionGroups = useMemo(() => {
     if (selectedSection === 'dashboard') return groups.slice(0,1);
     if (selectedSection === 'nso') return groups.slice(1,2);
-    if (selectedSection === 'work') return groups.slice(2,6);
-    if (selectedSection === 'report') return groups.slice(6,8);
-    return groups;
+    if (selectedSection === 'work') return groups.slice(2,7).filter(g=>g.items.length>0);
+    if (selectedSection === 'report') return groups.slice(7,9);
+    return groups.filter(g=>g.items.length>0);
   }, [selectedSection, groups]);
   useEffect(() => {
     const preferred = groups[groupIndex[context]]?.label;

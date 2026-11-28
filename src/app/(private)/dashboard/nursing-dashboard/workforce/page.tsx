@@ -73,6 +73,7 @@ export default function WorkforceDashboardPage() {
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
   const [riskViewMode, setRiskViewMode] = useState<'unit' | 'group'>('group');
   const [riskSearchTerm, setRiskSearchTerm] = useState('');
+  const [tab, setTab] = useState<'risk' | 'productivity'>('risk');
   const [selectedRiskGroup, setSelectedRiskGroup] = useState<string | null>(null);
 
   useEffect(() => {
@@ -164,8 +165,15 @@ export default function WorkforceDashboardPage() {
             note={summary.mix === null ? 'ต้องบันทึกจำนวน TN / PN / NA รายเวร · เป้า RN สามัญ 70% ICU 90%' : `RN ÷ (RN + TN + PN + NA) · เป้า ${Math.round(summary.target)}% (สามัญ 70% ICU 90%)`} />
         </div>
 
+        <div role="tablist" aria-label="มุมมองข้อมูลอัตรากำลัง" className="inline-flex rounded-xl border border-emerald-200 bg-white p-1 shadow-sm">
+          {([['risk', 'Workforce Risk Matrix'], ['productivity', 'Productivity by Unit & Group']] as const).map(([k, label]) => (
+            <button key={k} type="button" role="tab" aria-selected={tab === k} onClick={() => setTab(k)}
+              className={`rounded-lg px-4 py-2 text-sm font-bold transition-colors ${tab === k ? 'bg-emerald-800 text-amber-300' : 'text-emerald-900 hover:bg-emerald-50'}`}>{label}</button>
+          ))}
+        </div>
+
         {/* Risk Matrix */}
-        <section className="w-full space-y-4 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+        {tab === 'risk' && <section className="w-full space-y-4 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
           <Header
             title={selectedRiskGroup ? `Workforce Risk Matrix (กลุ่ม: ${selectedRiskGroup})` : 'Workforce Risk Matrix'}
             sub={riskViewMode === 'unit' ? (selectedRiskGroup ? `แสดงหน่วยงานในกลุ่ม ${selectedRiskGroup}` : 'ประเมินความเสี่ยงรายหน่วยงาน') : 'ประเมินความเสี่ยงตามกลุ่มงาน (กดดูข้อมูลกลุ่มงานเพื่อเจาะลึกรายหน่วยงาน)'}
@@ -207,10 +215,10 @@ export default function WorkforceDashboardPage() {
             </table>
           </div>
           <RiskLegend />
-        </section>
+        </section>}
 
         {/* Productivity by Unit & Group */}
-        <section className="w-full space-y-4 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+        {tab === 'productivity' && <section className="w-full space-y-4 rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
           <Header
             title={selectedGroup ? `กลุ่มงาน: ${selectedGroup}` : 'Productivity by Unit & Group'}
             sub={viewMode === 'unit' ? (selectedGroup ? `แสดงหน่วยงานภายใต้กลุ่ม ${selectedGroup}` : 'รายหน่วยงาน · ค่าเฉลี่ยรายเวรของเดือน + ค่ารายเดือน') : 'ภาพรวมตามกลุ่มงาน (ค่าเฉลี่ยของหน่วยงานที่มีข้อมูล)'}
@@ -253,7 +261,7 @@ export default function WorkforceDashboardPage() {
                 </div>
               ))}
           </div>
-        </section>
+        </section>}
       </div>
     </div>
   );

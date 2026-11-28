@@ -7,10 +7,10 @@ export const runtime='nodejs';export const dynamic='force-dynamic';
 // Re-admit and AMA cases (approved + pending) and monthly summaries for one fiscal year,
 // limited to the departments the signed-in user may read.
 export async function GET(request:NextRequest){try{
- const user=await currentUser();if(!user)return fail('กรุณาเข้าสู่ระบบ',401);
  const year=Number(request.nextUrl.searchParams.get('fiscal_year')||2570);if(!Number.isInteger(year)||year<2560||year>2600)return fail('ปีงบประมาณไม่ถูกต้อง');
- const roster=await monthlyNpRoster();
- const {data:departments,error}=await db().from('departments').select('id,Department,group').order('id');if(error)return unexpected(error);
+ // อ่านผู้ใช้ roster และหน่วยงานพร้อมกัน (ลดการรอเป็นทอด)
+ const [user,roster,{data:departments,error}]=await Promise.all([currentUser(),monthlyNpRoster(),db().from('departments').select('id,Department,group').order('id')]);
+ if(!user)return fail('กรุณาเข้าสู่ระบบ',401);if(error)return unexpected(error);
  const allowed=(await Promise.all((departments||[]).filter(d=>roster.has(String(d.id))).map(async (d:Record<string,any>)=>(await canRead(user,Number(d.id)))?d:null))).filter(Boolean) as Record<string,any>[];
  const ids=allowed.map(d=>Number(d.id));if(!ids.length)return NextResponse.json({fiscal_year:year,departments:[],readmit:[],ama:[],readmitSummaries:[],amaSummaries:[]},{headers:{'Cache-Control':'no-store'}});
  const {from,to}=fiscalRange(year),calendarYears=[year-1,year];

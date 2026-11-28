@@ -206,7 +206,7 @@ export default function WorkforceDashboardPage() {
               </tbody>
             </table>
           </div>
-          <p className="text-[11px] text-gray-400">เกณฑ์: Productivity 90–110 = เขียว, &lt;90 = เหลือง, &gt;110 = แดง · PCS ≤3.2 = เขียว, 3.2–3.8 = เหลือง, &gt;3.8 = แดง · Skill Mix เทียบเป้า RN (สามัญ 70%, ICU 90%): ถึงเป้า = เขียว, ต่ำกว่าไม่เกิน 10% = เหลือง, ต่ำกว่านั้น = แดง · RN Available (WISN ratio = RN ขึ้นจริง ÷ อ.ว) ≥1.00 = เขียว, 0.80–0.99 = เหลือง, &lt;0.80 = แดง · Risk = ระดับที่แย่ที่สุดของตัวชี้วัดที่มีข้อมูล</p>
+          <RiskLegend />
         </section>
 
         {/* Productivity by Unit & Group */}
@@ -255,6 +255,27 @@ export default function WorkforceDashboardPage() {
           </div>
         </section>
       </div>
+    </div>
+  );
+}
+
+const LEGEND: { dot: string; label: string; items: string[] }[] = [
+  { dot: 'bg-emerald-500', label: 'เขียว (ปกติ)', items: ['Productivity 90–110', 'PCS ≤ 3.2', 'Skill Mix ถึงเป้า RN (สามัญ ≥ 70%, ICU ≥ 90%)', 'RN Available (WISN ratio) ≥ 1.00'] },
+  { dot: 'bg-amber-400', label: 'เหลือง (เฝ้าระวัง)', items: ['Productivity < 90', 'PCS 3.21–3.8', 'Skill Mix ต่ำกว่าเป้าไม่เกิน 10%', 'RN Available 0.80–0.99'] },
+  { dot: 'bg-rose-500', label: 'แดง (เสี่ยง)', items: ['Productivity > 110', 'PCS > 3.8', 'Skill Mix ต่ำกว่าเป้าเกิน 10%', 'RN Available < 0.80'] },
+];
+
+function RiskLegend() {
+  return (
+    <div className="space-y-1.5 rounded-xl bg-gray-50 p-3 text-[11px] text-gray-600">
+      <p className="font-bold text-gray-700">เกณฑ์</p>
+      {LEGEND.map((l) => (
+        <div key={l.label} className="flex flex-wrap items-start gap-x-2 gap-y-0.5">
+          <span className="flex w-32 shrink-0 items-center gap-1.5 font-semibold"><span className={`inline-block h-2.5 w-2.5 rounded-full ${l.dot}`} />{l.label}</span>
+          <span className="min-w-0 flex-1">{l.items.join(' · ')}</span>
+        </div>
+      ))}
+      <p className="pt-1 text-gray-500">RN Available (WISN ratio) = RN ขึ้นเวรจริง ÷ อ.ว · Risk = ระดับที่แย่ที่สุดของตัวชี้วัดที่มีข้อมูล · — = ไม่มีข้อมูล</p>
     </div>
   );
 }

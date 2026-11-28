@@ -10,7 +10,7 @@ type Issue = { key: string; label: string; value: (c: Case) => string | null };
 const text = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
 const SEVERE = ['E', 'F', 'G', 'H', 'I'];
 
-const CONFIG: Record<Kind, { title: string; summary: (c: Case) => string | null; extra: (c: Case) => (string | null)[]; issues: Issue[]; note?: (c: Case) => string | null; noteLabel?: string }> = {
+const CONFIG: Record<Kind, { title: string; summary: (c: Case) => string | null; extra: (c: Case) => (string | null)[]; dateSuffix?: (c: Case) => string | null; issues: Issue[]; note?: (c: Case) => string | null; noteLabel?: string }> = {
   fall: {
     title: 'สรุปประเด็นรายกรณี · พลัดตกหกล้ม',
     summary: (c) => text(c.description),
@@ -42,7 +42,8 @@ const CONFIG: Record<Kind, { title: string; summary: (c: Case) => string | null;
   readmit: {
     title: 'สรุปประเด็นรายกรณี · Re-admit',
     summary: (c) => [text(c.admit_diagnosis) && `Admit: ${c.admit_diagnosis}`, text(c.discharge_diagnosis) && `จำหน่ายครั้งก่อน: ${c.discharge_diagnosis}`].filter(Boolean).join(' · ') || null,
-    extra: (c) => [c.age != null ? `อายุ ${c.age} ปี` : null, c.previous_discharge_date ? `จำหน่าย ${c.previous_discharge_date}` : null, text(c.discharge_ward)],
+    dateSuffix: (c) => (c.age != null ? `อายุ ${c.age} ปี` : null),
+    extra: (c) => [c.previous_discharge_date || text(c.discharge_ward) ? ['จำหน่าย', c.previous_discharge_date, text(c.discharge_ward) && `จาก ${c.discharge_ward}`].filter(Boolean).join(' ') : null],
     issues: [
       { key: 'p', label: 'ผู้ป่วย', value: (c) => text(c.cause_patient) },
       { key: 'd', label: 'การวางแผนจำหน่าย', value: (c) => text(c.cause_discharge_planning) },
@@ -102,7 +103,7 @@ export default function CaseIssueTable({ kind, year, severeOnly = false, include
                   <tr key={id} className="align-top">
                     <td className="border border-slate-200 px-3 py-2 text-xs text-slate-700">
                       <div className="font-semibold text-slate-900">{c.department}</div>
-                      <div>{c.date}</div>
+                      <div>{c.date}{cfg.dateSuffix?.(c) && ` · ${cfg.dateSuffix(c)}`}</div>
                       <div className="whitespace-nowrap text-slate-500">HN {c.hn || '—'}</div>
                       {c.an && <div className="whitespace-nowrap text-slate-500">AN {c.an}</div>}
                       {extra.length > 0 && <div className="mt-1 flex flex-wrap gap-1">{extra.map((x) => <span key={x} className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-600">{x}</span>)}</div>}

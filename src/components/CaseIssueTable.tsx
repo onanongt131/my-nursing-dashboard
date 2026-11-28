@@ -11,7 +11,7 @@ type Issue = { key: string; label: string; value: (c: Case) => string | null };
 const text = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
 const SEVERE = ['E', 'F', 'G', 'H', 'I'];
 
-const CONFIG: Record<Kind, { title: string; summary: (c: Case) => string | null; extra: (c: Case) => (string | null)[]; dateSuffix?: (c: Case) => string | null; anInline?: boolean; caseWidth?: string; issues: Issue[]; note?: (c: Case) => string | null; noteLabel?: string }> = {
+const CONFIG: Record<Kind, { title: string; summary: (c: Case) => string | null; extra: (c: Case) => (string | null)[]; dateSuffix?: (c: Case) => string | null; anInline?: boolean; caseWidth?: string; summaryWidth?: string; issueWidth?: string; issues: Issue[]; note?: (c: Case) => string | null; noteLabel?: string }> = {
   fall: {
     title: 'สรุปประเด็นรายกรณี · พลัดตกหกล้ม',
     summary: (c) => text(c.description),
@@ -42,10 +42,12 @@ const CONFIG: Record<Kind, { title: string; summary: (c: Case) => string | null;
   },
   readmit: {
     title: 'สรุปประเด็นรายกรณี · Re-admit',
-    summary: (c) => [text(c.admit_diagnosis) && `Admit: ${c.admit_diagnosis}`, text(c.discharge_diagnosis) && `จำหน่ายครั้งก่อน: ${c.discharge_diagnosis}`].filter(Boolean).join(' · ') || null,
+    summary: (c) => [text(c.admit_diagnosis) && `Admit: ${c.admit_diagnosis}`, text(c.discharge_diagnosis) && `จำหน่ายครั้งก่อน: ${c.discharge_diagnosis}`].filter(Boolean).join('\n') || null,
     dateSuffix: (c) => (c.age != null ? `อายุ ${c.age} ปี` : null),
     anInline: true,
     caseWidth: 'w-64 min-w-[250px]',
+    summaryWidth: 'w-56 min-w-[200px]',
+    issueWidth: 'min-w-[260px]',
     extra: (c) => [c.previous_discharge_date || text(c.discharge_ward) ? ['จำหน่าย', c.previous_discharge_date, text(c.discharge_ward) && `จาก ${c.discharge_ward}`].filter(Boolean).join(' ') : null],
     issues: [
       { key: 'p', label: 'ผู้ป่วย', value: (c) => text(c.cause_patient) },
@@ -95,11 +97,11 @@ export default function CaseIssueTable({ kind, year, severeOnly = false, include
             <thead className="sticky top-0 z-10 bg-slate-50 text-xs text-slate-600">
               <tr>
                 <th rowSpan={2} className={`${cfg.caseWidth ?? 'w-40 min-w-[150px]'} border border-slate-200 px-3 py-2 text-center`}>เคส</th>
-                <th rowSpan={2} className="min-w-[340px] border border-slate-200 px-3 py-2 text-center">สรุปอาการและเหตุการณ์สำคัญ</th>
+                <th rowSpan={2} className={`${cfg.summaryWidth ?? 'min-w-[340px]'} border border-slate-200 px-3 py-2 text-center`}>สรุปอาการและเหตุการณ์สำคัญ</th>
                 <th colSpan={cfg.issues.length} className="border border-slate-200 px-3 py-2 text-center">ประเด็นที่พบ</th>
                 {cfg.note && <th rowSpan={2} className="min-w-[220px] border border-slate-200 px-3 py-2 text-center">{cfg.noteLabel}</th>}
               </tr>
-              <tr>{cfg.issues.map((i, k) => <th key={i.key} className={`${detailUnderCheck ? 'min-w-[140px]' : 'w-24'} border border-slate-200 px-2 py-2 text-center font-semibold`}>{i.label}<span className="block text-[10px] font-normal text-slate-400">{counts[k]} ราย</span></th>)}</tr>
+              <tr>{cfg.issues.map((i, k) => <th key={i.key} className={`${cfg.issueWidth ?? (detailUnderCheck ? 'min-w-[140px]' : 'w-24')} border border-slate-200 px-2 py-2 text-center font-semibold`}>{i.label}<span className="block text-[10px] font-normal text-slate-400">{counts[k]} ราย</span></th>)}</tr>
             </thead>
             <tbody>
               {cases.map((c) => {

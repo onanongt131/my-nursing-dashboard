@@ -109,14 +109,13 @@ export default function CaseIssueTable({ kind, year, severeOnly = false, include
                 return (
                   <tr key={id} className="align-top">
                     <td className="border border-slate-200 px-3 py-2 text-xs text-slate-700">
-                      <div className="font-semibold text-slate-900">{c.department}</div>
+                      <div className="font-semibold text-slate-900">{c.department}{c.status === 'pending' && <span className="ml-1.5 inline-block rounded-full bg-amber-100 px-2 py-0.5 align-middle text-[10px] font-semibold text-amber-800">รออนุมัติ</span>}</div>
                       <div>{c.date}{cfg.dateSuffix?.(c) && ` · ${cfg.dateSuffix(c)}`}</div>
                       {cfg.anInline ? <div className="whitespace-nowrap text-slate-500">HN {c.hn || '—'}{c.an ? ` · AN ${c.an}` : ''}</div> : <>
                         <div className="whitespace-nowrap text-slate-500">HN {c.hn || '—'}</div>
                         {c.an && <div className="whitespace-nowrap text-slate-500">AN {c.an}</div>}
                       </>}
                       {extra.length > 0 && <div className="mt-1 flex flex-wrap gap-1">{extra.map((x) => <span key={x} className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-600">{x}</span>)}</div>}
-                      {c.status === 'pending' && <span className="mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">รออนุมัติ</span>}
                     </td>
                     <td className="border border-slate-200 px-3 py-2 text-slate-700">
                       <p className="whitespace-pre-line">{summary || <span className="text-slate-400">ไม่ได้บันทึกรายละเอียด</span>}</p>

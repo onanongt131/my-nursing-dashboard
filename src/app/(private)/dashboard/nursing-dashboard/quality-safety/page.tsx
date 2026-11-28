@@ -1,133 +1,191 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { ivPercent, type IvReportRow } from '@/lib/ivCareReport';
+
+type Month = { cases: number | null; days: number | null; riskDays: number | null; pending: boolean };
+type Row = { id: number; name: string; months: Month[] };
+type Status = 'green' | 'yellow' | 'red' | 'none';
+type Kpi = 'Fall' | 'Pressure Injury' | 'IV Care' | 'IV Phlebitis' | 'IV Extravasation' | 'IV Infiltration';
+const IV_KPIS: { kpi: Kpi; metric: 'success' | 'phlebitis' | 'extravasation' | 'infiltration'; label: string }[] = [
+  { kpi: 'IV Care', metric: 'success', label: 'อัตราความสำเร็จ' },
+  { kpi: 'IV Phlebitis', metric: 'phlebitis', label: 'Phlebitis' },
+  { kpi: 'IV Extravasation', metric: 'extravasation', label: 'Extravasation' },
+  { kpi: 'IV Infiltration', metric: 'infiltration', label: 'Infiltration' },
+];
+
+const MONTHS = ['ต.ค.', 'พ.ย.', 'ธ.ค.', 'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.'];
+const MONTH_NUM = [10, 11, 12, 1, 2, 3, 4, 5, 6, 7, 8, 9];
+// เป้าหมาย (ค่าเดิมของหน้านี้) · Fall / Pressure Injury ต่อ 1,000 วันนอน · IV Care อัตราแทงเข็มสำเร็จครั้งแรก (เกณฑ์เดียวกับรายงาน IV Care)
+const TARGET: Record<Kpi, { value: number; higherBetter: boolean; unit: string; label: string }> = {
+  Fall: { value: 0.5, higherBetter: false, unit: 'ครั้ง/1,000 วันนอน', label: '≤ 0.50' },
+  'Pressure Injury': { value: 0.2, higherBetter: false, unit: 'ครั้ง/1,000 วันนอน', label: '≤ 0.20' },
+  'IV Care': { value: 80, higherBetter: true, unit: '% แทงเข็มสำเร็จครั้งแรก', label: '≥ 80%' },
+  'IV Phlebitis': { value: 0, higherBetter: false, unit: '% ระดับ 3–4 ต่อตำแหน่งให้สารน้ำ', label: '0%' },
+  'IV Extravasation': { value: 0, higherBetter: false, unit: '% ต่อตำแหน่งให้สารน้ำ', label: '0%' },
+  'IV Infiltration': { value: 0, higherBetter: false, unit: '% ต่อตำแหน่งให้สารน้ำ', label: '0%' },
+};
+const statusOf = (kpi: Kpi, v: number | null): Status => {
+  if (v === null) return 'none';
+  const t = TARGET[kpi];
+  return (t.higherBetter ? v >= t.value : v <= t.value) ? 'green' : 'red';
+};
+
+const rate = (list: Month[], risk = false) => {
+  const den = (m: Month) => Number(risk ? m.riskDays : m.days);
+  const valid = list.filter((m) => den(m) > 0);
+  const days = valid.reduce((t, m) => t + den(m), 0);
+  return days > 0 ? (valid.reduce((t, m) => t + (m.cases ?? 0), 0) / days) * 1000 : null;
+};
+const fmt = (v: number | null, d = 2) => (v === null ? '—' : v.toFixed(d));
+
+function useJson<T>(url: string) {
+  const [state, setState] = useState<{ url: string; data?: T; error?: string } | null>(null);
+  useEffect(() => {
+    const c = new AbortController();
+    fetch(url, { cache: 'no-store', signal: c.signal })
+      .then(async (r) => { const d = await r.json(); if (!r.ok) throw new Error(d.error || 'อ่านข้อมูลไม่สำเร็จ'); setState({ url, data: d }); })
+      .catch((e) => { if (!c.signal.aborted) setState({ url, error: e.message }); });
+    return () => c.abort();
+  }, [url]);
+  return state?.url === url ? state : null;
+}
+
+function Dot({ status, title }: { status: Status; title?: string }) {
+  const cls = status === 'green' ? 'bg-emerald-500' : status === 'yellow' ? 'bg-amber-400' : status === 'red' ? 'bg-rose-500' : 'bg-gray-300';
+  return <span className={`inline-block h-3.5 w-3.5 rounded-full shadow-sm ${cls}`} title={title ?? (status === 'none' ? 'ยังไม่มีข้อมูล' : undefined)} />;
+}
 
 export default function QualitySafetyDashboardPage() {
-  // State สำหรับเลือก KPI เพื่อดู Trend 12 เดือน
-  const [selectedTrendKpi, setSelectedTrendKpi] = useState('Fall');
+  const [year, setYear] = useState(2570);
+  const [selectedTrendKpi, setSelectedTrendKpi] = useState<Kpi>('Fall');
+  const fall = useJson<{ items: Row[] }>(`/api/safety-monthly-report?kind=fall&year=${year}`);
+  const pressure = useJson<{ items: Row[] }>(`/api/safety-monthly-report?kind=pressure&year=${year}`);
+  const iv = useJson<{ items: IvReportRow[]; departments: { id: number | string; Department: string }[] }>(`/api/iv-care-report?fiscal_year=${year}`);
 
-  // ข้อมูลจำลอง Trend 12 เดือน (สามารถเชื่อมต่อฐานข้อมูลรายเดือนจริงภายหลังได้)
-  const trendData: Record<string, { months: string[]; values: number[]; target: number }> = {
-    Fall: {
-      months: ['ต.ค.', 'พ.ย.', 'ธ.ค.', 'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.'],
-      values: [0.45, 0.52, 0.38, 0.40, 0.35, 0.42, 0.31, 0.30, 0.38, 0.33, 0.29, 0.31],
-      target: 0.50
-    },
-    'Pressure Injury': {
-      months: ['ต.ค.', 'พ.ย.', 'ธ.ค.', 'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.'],
-      values: [0.20, 0.18, 0.25, 0.15, 0.12, 0.19, 0.14, 0.12, 0.15, 0.10, 0.11, 0.12],
-      target: 0.20
-    },
-    'Medication Error': {
-      months: ['ต.ค.', 'พ.ย.', 'ธ.ค.', 'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.'],
-      values: [0.18, 0.22, 0.15, 0.12, 0.14, 0.10, 0.16, 0.15, 0.13, 0.11, 0.09, 0.10],
-      target: 0.10
-    },
-    'Unplanned CPR': {
-      months: ['ต.ค.', 'พ.ย.', 'ธ.ค.', 'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.'],
-      values: [2.1, 1.8, 2.5, 3.0, 2.2, 1.9, 2.4, 2.0, 1.7, 2.1, 1.8, 1.9],
-      target: 2.0
-    }
-  };
+  const data = useMemo(() => {
+    const fallRows = fall?.data?.items ?? [], pressRows = pressure?.data?.items ?? [];
+    const ivRows = (iv?.data?.items ?? []).filter((r) => Number(r.fiscal_year) === year);
+    const monthly = {
+      Fall: MONTH_NUM.map((_, i) => rate(fallRows.map((r) => r.months[i]).filter(Boolean))),
+      'Pressure Injury': MONTH_NUM.map((_, i) => rate(pressRows.map((r) => r.months[i]).filter(Boolean))),
+      ...Object.fromEntries(IV_KPIS.map((k) => [k.kpi, MONTH_NUM.map((m) => ivPercent(ivRows.filter((r) => Number(r.month) === m), k.metric, 'overall'))])),
+    };
+    const overall = {
+      Fall: rate(fallRows.flatMap((r) => r.months)),
+      'Pressure Injury': rate(pressRows.flatMap((r) => r.months)),
+      ...Object.fromEntries(IV_KPIS.map((k) => [k.kpi, ivRows.length ? ivPercent(ivRows, k.metric, 'overall') : null])),
+    };
+    // Heatmap: รายหอจากรายงาน Fall / Pressure sore (ทั้งปีงบประมาณ)
+    const wards = new Map<string, { name: string; fall: number | null; pi: number | null }>();
+    for (const r of fallRows) wards.set(r.name, { name: r.name, fall: rate(r.months), pi: null });
+    for (const r of pressRows) wards.set(r.name, { ...(wards.get(r.name) ?? { name: r.name, fall: null, pi: null }), pi: rate(r.months) });
+    const heat = [...wards.values()].sort((a, b) => a.name.localeCompare(b.name, 'th'));
+    const attention = heat.flatMap((w) => [
+      statusOf('Fall', w.fall) === 'red' ? { ward: w.name, kpi: 'Fall' as Kpi, value: w.fall! } : null,
+      statusOf('Pressure Injury', w.pi) === 'red' ? { ward: w.name, kpi: 'Pressure Injury' as Kpi, value: w.pi! } : null,
+    ]).filter((x): x is { ward: string; kpi: Kpi; value: number } => x !== null)
+      .sort((a, b) => b.value / TARGET[b.kpi].value - a.value / TARGET[a.kpi].value);
+    // Pressure sore: อัตราต่อ 1,000 วันนอนกลุ่มเสี่ยง (ตัวหาร at_risk_patient_days)
+    const pressureRisk = { monthly: MONTH_NUM.map((_, i) => rate(pressRows.map((r) => r.months[i]).filter(Boolean), true)), overall: rate(pressRows.flatMap((r) => r.months), true) };
+    return { monthly: monthly as Record<Kpi, (number | null)[]>, overall: overall as Record<Kpi, number | null>, heat, attention, pressureRisk };
+  }, [fall, pressure, iv, year]);
 
-  // ข้อมูล Unit Heatmap
-  const heatmapData = [
-    { ward: 'Ward A (อายุรกรรม)', fall: 'green', pi: 'green', medError: 'red', ews: 'yellow', cnpG: 'green' },
-    { ward: 'Ward B (ศัลยกรรม)', fall: 'yellow', pi: 'green', medError: 'green', ews: 'green', cnpG: 'yellow' },
-    { ward: 'ICU (หอผู้ป่วยหนัก)', fall: 'green', pi: 'yellow', medError: 'green', ews: 'green', cnpG: 'green' },
-    { ward: 'LR / Post-Partum', fall: 'green', pi: 'green', medError: 'green', ews: 'yellow', cnpG: 'green' },
-    { ward: 'ER (อุบัติเหตุฉุกเฉิน)', fall: 'yellow', pi: 'green', medError: 'red', ews: 'green', cnpG: 'green' }
+  const loading = !fall || !pressure || !iv;
+  const errors = [fall?.error && `Fall: ${fall.error}`, pressure?.error && `Pressure sore: ${pressure.error}`, iv?.error && `IV Care: ${iv.error}`].filter(Boolean);
+
+  const cards: { name: string; kpi?: Kpi; value: string; status: Status; iv?: boolean; sub?: string }[] = [
+    { name: 'Fall', kpi: 'Fall', value: loading ? '…' : `${fmt(data.overall.Fall)} ครั้ง/พันวันนอน`, status: statusOf('Fall', data.overall.Fall) },
+    { name: 'Pressure Injury', kpi: 'Pressure Injury', value: loading ? '…' : `${fmt(data.overall['Pressure Injury'])} ครั้ง/พันวันนอน`, status: statusOf('Pressure Injury', data.overall['Pressure Injury']), sub: loading ? undefined : `กลุ่มเสี่ยง ${fmt(data.pressureRisk.overall)} ครั้ง/พันวันนอนกลุ่มเสี่ยง` },
+    { name: 'Medication Error', value: 'ยังไม่มีข้อมูล', status: 'none' },
+    { name: 'IV Care', kpi: 'IV Care', value: loading ? '…' : data.overall['IV Care'] === null ? '—' : `สำเร็จ ${fmt(data.overall['IV Care'], 1)}%`, status: IV_KPIS.map((k) => statusOf(k.kpi, data.overall[k.kpi])).includes('red') ? 'red' : statusOf('IV Care', data.overall['IV Care']), iv: true },
+    { name: 'Unplanned CPR', value: 'ยังไม่มีข้อมูล', status: 'none' },
+    { name: 'Aspiration', value: 'ยังไม่มีข้อมูล', status: 'none' },
   ];
-
-  const getStatusDot = (status: string) => {
-    switch (status) {
-      case 'green': return <span className="w-3.5 h-3.5 rounded-full bg-emerald-500 inline-block shadow-sm" title="ผ่านเกณฑ์ / ปกติ"></span>;
-      case 'yellow': return <span className="w-3.5 h-3.5 rounded-full bg-amber-400 inline-block shadow-sm" title="ต้องเฝ้าระวัง"></span>;
-      case 'red': return <span className="w-3.5 h-3.5 rounded-full bg-rose-500 inline-block shadow-sm" title="เกินเกณฑ์ / ความเสี่ยงสูง"></span>;
-      default: return null;
-    }
-  };
+  const trendKpis: { key: string; kpi?: Kpi }[] = [{ key: 'Fall', kpi: 'Fall' }, { key: 'Pressure Injury', kpi: 'Pressure Injury' }, { key: 'IV Care', kpi: 'IV Care' }, { key: 'Medication Error' }, { key: 'Unplanned CPR' }];
+  const t = TARGET[selectedTrendKpi], values = data.monthly[selectedTrendKpi];
+  const isPressure = selectedTrendKpi === 'Pressure Injury';
+  const riskValues = isPressure ? data.pressureRisk.monthly : [];
+  const scale = Math.max(t.value * 1.5, ...values.filter((v): v is number => v !== null), ...riskValues.filter((v): v is number => v !== null)) || 1;
+  const isIv = IV_KPIS.some((k) => k.kpi === selectedTrendKpi);
+  const trendTitle = isIv ? `IV Care: ${IV_KPIS.find((k) => k.kpi === selectedTrendKpi)!.label}` : selectedTrendKpi;
 
   return (
-    <div className="min-h-screen bg-gray-50/50 pb-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-7xl mx-auto space-y-6">
-        
-        {/* หัวข้อหน้า Dashboard */}
-        <div className="pt-6">
-          <span className="text-xs font-bold px-3 py-1 bg-emerald-100 text-emerald-800 rounded-full">
-            Nursing Safety Command Center
-          </span>
-          <h2 className="text-2xl font-extrabold text-gray-900 mt-2">วิเคราะห์จุดเสี่ยงและอุบัติการณ์ความปลอดภัย</h2>
-          <p className="text-sm text-gray-600 mt-1">ติดตามอุบัติการณ์สำคัญ ความคลาดเคลื่อนทางยา และจุดเสี่ยงในกระบวนการพยาบาลแบบเรียลไทม์</p>
+    <div className="min-h-screen bg-gray-50/50 px-4 pb-12 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-7xl space-y-6">
+        <div className="flex flex-wrap items-end justify-between gap-4 pt-6">
+          <div>
+            <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-800">Nursing Safety Command Center</span>
+            <h2 className="mt-2 text-2xl font-extrabold text-gray-900">วิเคราะห์จุดเสี่ยงและอุบัติการณ์ความปลอดภัย</h2>
+            <p className="mt-1 text-sm text-gray-600">จากข้อมูลที่หน่วยงานบันทึกและอนุมัติแล้ว · ปีงบประมาณ {year} · ตัวชี้วัดสีเทา = ยังไม่มีข้อมูลในระบบ</p>
+          </div>
+          <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">ปีงบประมาณ
+            <select value={year} onChange={(e) => setYear(Number(e.target.value))} className="rounded-xl border border-emerald-200 bg-white px-3 py-2 text-sm font-bold text-emerald-900">
+              {[2570, 2569].map((y) => <option key={y} value={y}>{y}</option>)}
+            </select>
+          </label>
         </div>
 
-        {/* ส่วนที่ 1: Safety Cards ด้านบน */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-          {[
-            { name: 'Fall', status: 'green', value: '0.31 ครั้ง/พันวันนอน' },
-            { name: 'Pressure Injury', status: 'yellow', value: '0.12%' },
-            { name: 'Medication Error', status: 'red', value: '0.15%' },
-            { name: 'IV Care', status: 'green', value: '98.2%' },
-            { name: 'Unplanned CPR', status: 'red', value: '2.1 ครั้ง/พัน' },
-            { name: 'Aspiration', status: 'green', value: '0%' }
-          ].map((card, idx) => (
-            <div key={idx} className="bg-white p-4 rounded-2xl border border-gray-100 shadow-sm flex flex-col justify-between">
+        {errors.length > 0 && <p role="alert" className="rounded-xl bg-red-50 p-3 text-sm text-red-700">{errors.join(' · ')}</p>}
+
+        {/* Safety Cards */}
+        <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
+          {cards.map((c) => (
+            <div key={c.name} className={`flex flex-col justify-between rounded-2xl border p-4 shadow-sm ${c.kpi ? 'border-gray-100 bg-white' : 'border-gray-200 bg-gray-100'}`}>
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-gray-700">{card.name}</span>
-                {getStatusDot(card.status)}
+                <span className={`text-xs font-bold ${c.kpi ? 'text-gray-700' : 'text-gray-400'}`}>{c.name}</span>
+                <Dot status={c.status} />
               </div>
-              <p className="text-xs font-semibold text-gray-500 mt-3">{card.value}</p>
+              <p className={`mt-3 text-xs font-semibold ${c.kpi ? 'text-gray-600' : 'text-gray-400'}`}>{c.value}</p>
+              {c.sub && <p className="mt-0.5 text-[10px] font-semibold text-gray-500">{c.sub}</p>}
+              {c.iv && !loading && <ul className="mt-1 space-y-0.5 text-[10px]">{IV_KPIS.slice(1).map((k) => { const v = data.overall[k.kpi]; return <li key={k.kpi} className="flex justify-between gap-1"><span className="text-gray-500">{k.label}</span><b className={v === null ? 'text-gray-300' : v > 0 ? 'text-rose-600' : 'text-emerald-700'}>{v === null ? '—' : `${fmt(v)}%`}</b></li>; })}</ul>}
+              {c.kpi && <p className="mt-1 text-[10px] text-gray-400">เป้า {c.iv ? 'สำเร็จ ≥ 80% · ภาวะแทรกซ้อน 0%' : TARGET[c.kpi].label}</p>}
             </div>
           ))}
         </div>
 
-        {/* ส่วนที่ 2: Trend 12 เดือน (เลือก KPI แล้วกราฟเปลี่ยนตาม) */}
-        <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
+        {/* Trend */}
+        <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+          <div className="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
             <div>
-              <h3 className="text-base font-bold text-gray-800">แนวโน้มอุบัติการณ์ 12 เดือนย้อนหลัง (12-Month Trend)</h3>
+              <h3 className="text-base font-bold text-gray-800">แนวโน้มอุบัติการณ์รายเดือน ปีงบประมาณ {year}</h3>
               <p className="text-xs text-gray-500">เลือกตัวชี้วัดเพื่อวิเคราะห์ทิศทางความเสี่ยงเปรียบเทียบกับค่าเป้าหมาย</p>
             </div>
             <div className="flex flex-wrap gap-2">
-              {Object.keys(trendData).map((kpiKey) => (
-                <button
-                  key={kpiKey}
-                  onClick={() => setSelectedTrendKpi(kpiKey)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all ${
-                    selectedTrendKpi === kpiKey
-                      ? 'bg-emerald-600 text-white shadow-sm'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  {kpiKey}
+              {trendKpis.map((k) => (
+                <button key={k.key} type="button" disabled={!k.kpi} onClick={() => { if (k.kpi && !(k.kpi === 'IV Care' && isIv)) setSelectedTrendKpi(k.kpi); }} title={k.kpi ? undefined : 'ยังไม่มีข้อมูลในระบบ'}
+                  className={`rounded-xl px-3 py-1.5 text-xs font-semibold transition-all ${!k.kpi ? 'cursor-not-allowed bg-gray-100 text-gray-300' : (selectedTrendKpi === k.kpi || (k.kpi === 'IV Care' && isIv)) ? 'bg-emerald-600 text-white shadow-sm' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>
+                  {k.key}
                 </button>
               ))}
             </div>
           </div>
-
-          {/* จำลองการแสดงผลกราฟแนวโน้มแบบสี่เหลี่ยมมินิมอลรายเดือน */}
-          <div className="bg-gray-50 rounded-xl p-4 border border-gray-100">
-            <div className="flex justify-between items-center mb-4 text-xs font-medium text-gray-500">
-              <span>ตัวชี้วัด: <strong className="text-gray-800">{selectedTrendKpi}</strong></span>
-              <span>ค่าเป้าหมาย (Target): <strong className="text-emerald-700">{trendData[selectedTrendKpi].target}</strong></span>
+          <div className="rounded-xl border border-gray-100 bg-gray-50 p-4">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2 text-xs font-medium text-gray-500">
+              {isIv ? <label className="flex items-center gap-2">ตัวชี้วัด IV Care
+                <select value={selectedTrendKpi} onChange={(e) => setSelectedTrendKpi(e.target.value as Kpi)} className="rounded-lg border border-emerald-200 bg-white px-2 py-1 text-xs font-bold text-gray-800">
+                  {IV_KPIS.map((k) => <option key={k.kpi} value={k.kpi}>{k.label}</option>)}
+                </select>
+                <span>({t.unit})</span>
+              </label>
+              : <span>ตัวชี้วัด: <strong className="text-gray-800">{trendTitle}</strong> ({isPressure ? 'ครั้ง/1,000 วันนอน' : t.unit})</span>}
+              {isPressure && <span className="flex items-center gap-3"><span className="flex items-center gap-1"><i className="inline-block h-2.5 w-2.5 rounded-sm bg-emerald-500" />ต่อวันนอนทั้งหมด (แท่งซ้าย)</span><span className="flex items-center gap-1"><i className="inline-block h-2.5 w-2.5 rounded-sm bg-emerald-300" />ต่อวันนอนกลุ่มเสี่ยง (แท่งขวา)</span></span>}
+              <span>ค่าเป้าหมาย (Target): <strong className="text-emerald-700">{t.label}</strong></span>
             </div>
-            <div className="grid grid-cols-6 sm:grid-cols-12 gap-2 text-center">
-              {trendData[selectedTrendKpi].months.map((m, idx) => {
-                const val = trendData[selectedTrendKpi].values[idx];
-                const target = trendData[selectedTrendKpi].target;
-                const isExceed = val > target;
+            <div className="grid grid-cols-6 gap-2 text-center sm:grid-cols-12">
+              {MONTHS.map((m, i) => {
+                const v = values[i], st = statusOf(selectedTrendKpi, v);
+                const series = isPressure ? [{ v, light: false }, { v: riskValues[i], light: true }] : [{ v, light: false }];
+                const color = (x: number | null, light: boolean) => (statusOf(selectedTrendKpi, x) === 'red' ? (light ? 'bg-rose-300' : 'bg-rose-500') : (light ? 'bg-emerald-300' : 'bg-emerald-500'));
+                const textCls = (x: number | null) => (x === null ? 'text-gray-300' : statusOf(selectedTrendKpi, x) === 'red' ? 'text-rose-600' : 'text-emerald-700');
                 return (
-                  <div key={idx} className="bg-white p-2 rounded-lg border border-gray-100 shadow-2xs flex flex-col items-center justify-between h-28">
+                  <div key={m} className={`flex ${isPressure ? 'h-32' : 'h-28'} flex-col items-center justify-between rounded-lg border border-gray-100 bg-white p-2 shadow-2xs`}>
                     <span className="text-[10px] text-gray-400">{m}</span>
-                    <div className="w-full bg-gray-100 h-16 rounded flex items-end justify-center overflow-hidden relative">
-                      <div 
-                        className={`w-full rounded-t transition-all duration-300 ${isExceed ? 'bg-rose-500' : 'bg-emerald-500'}`} 
-                        style={{ height: `${Math.min((val / (target * 1.5)) * 100, 100)}%` }}
-                      ></div>
+                    <div className="relative flex h-16 w-full items-end justify-center gap-0.5 overflow-hidden rounded bg-gray-100">
+                      {series.map((sr, k) => <div key={k} className="flex h-full flex-1 items-end">{sr.v !== null && <div className={`w-full rounded-t ${color(sr.v, sr.light)}`} style={{ height: `${Math.max(3, Math.min((sr.v / scale) * 100, 100))}%` }} title={`${k ? 'กลุ่มเสี่ยง' : 'ทั้งหมด'} ${fmt(sr.v)}`} />}</div>)}
                     </div>
-                    <span className={`text-[11px] font-bold ${isExceed ? 'text-rose-600' : 'text-emerald-700'}`}>
-                      {val}
-                    </span>
+                    {isPressure ? <span className="flex w-full justify-between text-[10px] font-bold leading-tight"><span className={textCls(v)}>{fmt(v)}</span><span className={`${textCls(riskValues[i])} opacity-70`}>{fmt(riskValues[i])}</span></span>
+                      : <span className={`text-[11px] font-bold ${v === null ? 'text-gray-300' : st === 'red' ? 'text-rose-600' : 'text-emerald-700'}`}>{v === null ? '—' : fmt(v, selectedTrendKpi === 'IV Care' ? 1 : 2)}</span>}
                   </div>
                 );
               })}
@@ -135,74 +193,61 @@ export default function QualitySafetyDashboardPage() {
           </div>
         </div>
 
-        {/* ส่วนที่ 3: Unit Heatmap & Top Risks */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          
-          {/* Unit Heatmap (กินพื้นที่ 2 คอลัมน์) */}
-          <div className="lg:col-span-2 bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
-            <h3 className="text-base font-bold text-gray-800 mb-1">Unit Heatmap (ตรวจจับความเสี่ยงรายหน่วยงาน)</h3>
-            <p className="text-xs text-gray-500 mb-4">ผู้บริหารสามารถมองเห็นทันทีว่าหน่วยงานใดมีหลายปัญหาเกิดขึ้นพร้อมกัน</p>
-            
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
-                <thead>
-                  <tr className="border-b border-gray-100 text-xs text-gray-400 font-semibold uppercase">
+        <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+          {/* Unit Heatmap */}
+          <div className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm lg:col-span-2">
+            <h3 className="mb-1 text-base font-bold text-gray-800">Unit Heatmap (ตรวจจับความเสี่ยงรายหน่วยงาน)</h3>
+            <p className="mb-4 text-xs text-gray-500">ทั้งปีงบประมาณ {year} · เขียว = อยู่ในเป้า · แดง = เกินเป้า · เทา = ยังไม่มีข้อมูล</p>
+            <div className="max-h-[480px] overflow-auto">
+              <table className="w-full table-fixed text-left text-sm">
+                <colgroup><col className="w-[30%]" />{[0, 1, 2, 3, 4].map((i) => <col key={i} className="w-[14%]" />)}</colgroup>
+                <thead className="sticky top-0 bg-white">
+                  <tr className="border-b border-gray-100 text-xs font-semibold uppercase text-gray-400">
                     <th className="pb-3">หน่วยงาน</th>
                     <th className="pb-3 text-center">Fall</th>
                     <th className="pb-3 text-center">PI</th>
-                    <th className="pb-3 text-center">Med Error</th>
-                    <th className="pb-3 text-center">NEWS/EWS</th>
-                    <th className="pb-3 text-center">CNPG</th>
+                    <th className="pb-3 text-center text-gray-300">Med Error</th>
+                    <th className="pb-3 text-center text-gray-300">NEWS/EWS</th>
+                    <th className="pb-3 text-center text-gray-300">CNPG</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50 text-xs">
-                  {heatmapData.map((row, idx) => (
-                    <tr key={idx} className="hover:bg-gray-50/50">
-                      <td className="py-3 font-medium text-gray-700">{row.ward}</td>
-                      <td className="py-3 text-center">{getStatusDot(row.fall)}</td>
-                      <td className="py-3 text-center">{getStatusDot(row.pi)}</td>
-                      <td className="py-3 text-center">{getStatusDot(row.medError)}</td>
-                      <td className="py-3 text-center">{getStatusDot(row.ews)}</td>
-                      <td className="py-3 text-center">{getStatusDot(row.cnpG)}</td>
-                    </tr>
-                  ))}
+                  {loading ? <tr><td colSpan={6} className="py-6 text-center text-gray-400">กำลังโหลดข้อมูล…</td></tr>
+                    : !data.heat.length ? <tr><td colSpan={6} className="py-6 text-center text-gray-400">ไม่มีข้อมูล</td></tr>
+                    : data.heat.map((w) => (
+                      <tr key={w.name} className="hover:bg-gray-50/50">
+                        <td className="truncate py-3 pr-2 font-medium text-gray-700" title={w.name}>{w.name}</td>
+                        <td className="py-3 text-center"><Dot status={statusOf('Fall', w.fall)} title={w.fall === null ? undefined : `${fmt(w.fall)} ครั้ง/พันวันนอน`} /></td>
+                        <td className="py-3 text-center"><Dot status={statusOf('Pressure Injury', w.pi)} title={w.pi === null ? undefined : `${fmt(w.pi)} ครั้ง/พันวันนอน`} /></td>
+                        <td className="py-3 text-center"><Dot status="none" /></td>
+                        <td className="py-3 text-center"><Dot status="none" /></td>
+                        <td className="py-3 text-center"><Dot status="none" /></td>
+                      </tr>
+                    ))}
                 </tbody>
               </table>
             </div>
           </div>
 
-          {/* Top Risks / Management Attention (กินพื้นที่ 1 คอลัมน์) */}
-          <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between mb-3">
-                <h3 className="text-base font-bold text-gray-800">Top Risks / Attention</h3>
-                <span className="px-2 py-0.5 bg-rose-100 text-rose-800 rounded text-[10px] font-bold">High Priority</span>
-              </div>
-              <p className="text-xs text-gray-500 mb-4">ประเด็นเร่งด่วนที่ต้องติดตามการแก้ไขอย่างใกล้ชิด</p>
-
-              <div className="bg-rose-50/60 border border-rose-100 rounded-xl p-4 space-y-2 text-xs">
-                <div className="flex items-center gap-2 font-bold text-rose-900">
-                  <span className="w-2.5 h-2.5 rounded-full bg-rose-600 inline-block animate-pulse"></span>
-                  Unplanned CPR เพิ่มขึ้นในหอผู้ป่วยวิกฤต
-                </div>
-                <div className="grid grid-cols-2 gap-y-1 text-gray-600 pt-1">
-                  <span>หน่วยงาน: <strong className="text-gray-800">ICU / Ward A</strong></span>
-                  <span>RCA: <strong className="text-emerald-700">Completed</strong></span>
-                  <span>Corrective Action: <strong className="text-gray-800">3 กิจกรรม</strong></span>
-                  <span>Owner: <strong className="text-gray-800">หัวหน้าตึก</strong></span>
-                  <span>Due Date: <strong className="text-gray-800">30/09/2026</strong></span>
-                  <span className="flex items-center gap-1">Status: <span className="w-2 h-2 rounded-full bg-amber-400 inline-block"></span> <strong className="text-amber-700">In progress</strong></span>
-                </div>
-              </div>
+          {/* Top Risks */}
+          <div className="flex flex-col rounded-2xl border border-gray-100 bg-white p-6 shadow-sm">
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-base font-bold text-gray-800">Top Risks / Attention</h3>
+              <span className="rounded bg-rose-100 px-2 py-0.5 text-[10px] font-bold text-rose-800">เกินเป้า</span>
             </div>
-
-            <button className="w-full mt-4 bg-gray-900 hover:bg-gray-800 text-white py-2 rounded-xl text-xs font-medium transition-all shadow-sm">
-              ดูรายงานอุบัติการณ์ฉบับเต็มทั้งหมด
-            </button>
+            <p className="mb-4 text-xs text-gray-500">หน่วยงานที่อัตรา Fall / Pressure Injury ทั้งปีเกินเป้า เรียงจากเกินมากที่สุด</p>
+            {loading ? <p className="text-xs text-gray-400">กำลังโหลดข้อมูล…</p>
+              : !data.attention.length ? <p className="rounded-xl bg-emerald-50 p-4 text-xs text-emerald-800">ไม่มีหน่วยงานที่เกินเป้า</p>
+              : <ol className="space-y-2 text-xs">{data.attention.slice(0, 6).map((a, i) => (
+                <li key={a.ward + a.kpi} className="flex items-center gap-2 rounded-xl border border-rose-100 bg-rose-50/60 px-3 py-2">
+                  <span className="w-4 text-right text-rose-400">{i + 1}</span>
+                  <span className="min-w-0 flex-1"><strong className="text-gray-800">{a.ward}</strong><span className="block text-gray-500">{a.kpi}</span></span>
+                  <strong className="tabular-nums text-rose-600">{fmt(a.value)}</strong>
+                </li>
+              ))}</ol>}
+            <div className="mt-4 rounded-xl border border-dashed border-gray-200 bg-gray-50 p-3 text-[11px] text-gray-400">RCA / Corrective Action / ผู้รับผิดชอบ / Due date — ยังไม่มีข้อมูลในระบบ</div>
           </div>
-
         </div>
-
       </div>
     </div>
   );

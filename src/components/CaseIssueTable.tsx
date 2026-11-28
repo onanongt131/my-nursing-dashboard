@@ -74,11 +74,11 @@ export default function CaseIssueTable({ kind, year, severeOnly = false, include
 
   const current = state?.key === key ? state : null;
   const cases = (current?.items ?? []).filter((c) => (!month || Number(String(c.date).slice(5, 7)) === month) && (includePending || c.status === 'approved') && (kind !== 'pressure' || ['2', '3', '4'].includes(String(c.wound_level))) && (!severeOnly || SEVERE.includes(String(c.severity || '').toUpperCase())));
-  const counts = cfg.issues.map((i) => cases.filter((c) => isHit(i.value(c))).length);
   // รายละเอียดสาเหตุแสดงใต้ ✓ (ยกเว้น Pressure sore ที่ค่าเป็นแค่ระดับ/ผลลัพธ์)
   const detailUnderCheck = kind !== 'pressure';
   // "-" หรือ "ไม่พบปัญหา" ไม่นับเป็นประเด็น (ไม่ติ๊ก ✓ และไม่นับจำนวนราย)
   const isHit = (v: string | null) => !!v && (!detailUnderCheck || !isNoIssue(v));
+  const counts = cfg.issues.map((i) => cases.filter((c) => isHit(i.value(c))).length);
 
   return (
     <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">

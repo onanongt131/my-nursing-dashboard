@@ -83,7 +83,7 @@ export default function ReadmitAmaReport({fixedKind}:{fixedKind?:ReportKind}){
   <ReportViewSwitch summary={<><ExecutiveSummary metric={meta.rateLabel} unit="%" good={v=>v===0} goodLabel="0% (ไม่เกิดเหตุการณ์)" badness={v=>v}
    overall={overall.rate} monthly={execMonthly} rows={execRows} pendingCount={pendingAll}
    note={`${meta.rateLabel} = จำนวนราย ÷ ${meta.denominator} × 100 · ${includePending?'รวมรายการรออนุมัติ':'เฉพาะรายการอนุมัติ'}`}/>
-   {kind==='readmit'&&<CaseIssueTable kind="readmit" year={year} includePending={includePending}/>}</>}>
+   <CaseIssueTable key={kind} kind={kind} year={year} includePending={includePending}/></>}>
   <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-3"><div><h2 className="text-sm font-bold text-slate-800">{meta.rateLabel} (%) = จำนวนราย ÷ {meta.denominator} × 100</h2></div>
     <div className="text-sm font-semibold text-slate-700">รวมทั้งปี {fmt(overall.rate)}% ({overall.ratedCount}/{overall.denominator??'?'} • ทั้งหมด {overall.count} ราย){pendingAll>0&&<span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-800">รออนุมัติ {pendingAll}</span>}</div></div>

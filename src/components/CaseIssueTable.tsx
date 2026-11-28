@@ -4,14 +4,14 @@ import { useEffect, useState } from 'react';
 import FiscalMonthSelect, { monthLabel } from '@/components/FiscalMonthSelect';
 import { isNoIssue } from '@/lib/noIssue';
 
-type Kind = 'fall' | 'pressure' | 'readmit';
+type Kind = 'fall' | 'pressure' | 'readmit' | 'ama';
 type Case = Record<string, any> & { id: number | string; status: string; date: string; department: string };
 type Issue = { key: string; label: string; value: (c: Case) => string | null };
 
 const text = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
 const SEVERE = ['E', 'F', 'G', 'H', 'I'];
 
-const CONFIG: Record<Kind, { title: string; summary: (c: Case) => string | null; extra: (c: Case) => (string | null)[]; dateSuffix?: (c: Case) => string | null; anInline?: boolean; caseWidth?: string; summaryWidth?: string; issueWidth?: string; issues: Issue[]; note?: (c: Case) => string | null; noteLabel?: string }> = {
+const CONFIG: Record<Kind, { title: string; summary: (c: Case) => string | null; extra: (c: Case) => (string | null)[]; dateSuffix?: (c: Case) => string | null; anInline?: boolean; caseWidth?: string; summaryWidth?: string; issueWidth?: string; summaryLabel?: string; groupKey?: (c: Case) => string | null; issues: Issue[]; note?: (c: Case) => string | null; noteLabel?: string }> = {
   fall: {
     title: 'สรุปประเด็นรายกรณี · พลัดตกหกล้ม',
     summary: (c) => text(c.description),
@@ -39,6 +39,17 @@ const CONFIG: Record<Kind, { title: string; summary: (c: Case) => string | null;
       { key: 'h', label: 'หาย', value: (c) => (c.wound_outcome === 'หาย' ? 'หาย' : null) },
       { key: 't', label: 'ย้าย / จำหน่าย', value: (c) => text(c.discharge_status) },
     ],
+  },
+  ama: {
+    title: 'สรุปสาเหตุจำหน่ายไม่สมัครใจอยู่ (AMA)',
+    summaryLabel: 'สาเหตุที่ไม่สมัครใจอยู่',
+    summary: (c) => text(c.ama_reason),
+    extra: () => [],
+    anInline: true,
+    issues: [],
+    note: (c) => text(c.treatment_right),
+    noteLabel: 'สิทธิการรักษา',
+    groupKey: (c) => text(c.ama_reason)?.replace(/\s+/g, ' ') ?? null,
   },
   readmit: {
     title: 'สรุปประเด็นรายกรณี · Re-admit',
@@ -78,6 +89,8 @@ export default function CaseIssueTable({ kind, year, severeOnly = false, include
   const detailUnderCheck = kind !== 'pressure';
   // "-" หรือ "ไม่พบปัญหา" ไม่นับเป็นประเด็น (ไม่ติ๊ก ✓ และไม่นับจำนวนราย)
   const isHit = (v: string | null) => !!v && (!detailUnderCheck || !isNoIssue(v));
+  const hasIssues = cfg.issues.length > 0, rs = hasIssues ? 2 : 1;
+  const groups = cfg.groupKey ? [...cases.reduce((m, c) => { const k = cfg.groupKey!(c); if (k) m.set(k, (m.get(k) ?? 0) + 1); return m; }, new Map<string, number>()).entries()].sort((a, b) => b[1] - a[1]) : [];
   const counts = cfg.issues.map((i) => cases.filter((c) => isHit(i.value(c))).length);
 
   return (
@@ -87,21 +100,26 @@ export default function CaseIssueTable({ kind, year, severeOnly = false, include
           <h3 className="text-sm font-bold text-slate-800">{cfg.title}{severeOnly && ' (ระดับ E ขึ้นไป)'} <span className="font-normal text-slate-400">({cases.length} ราย)</span></h3>
           <FiscalMonthSelect value={month} onChange={setMonth} year={year} />
         </div>
-        <p className="text-xs text-slate-500">สรุปจากผลที่บันทึก{includePending ? ' รวมรายการรออนุมัติ' : 'ที่อนุมัติแล้ว'} ตามสิทธิ์{detailUnderCheck ? ' · รายละเอียดสาเหตุแสดงใต้เครื่องหมาย ✓' : ''}</p>
+        <p className="text-xs text-slate-500">สรุปจากผลที่บันทึก{includePending ? ' รวมรายการรออนุมัติ' : 'ที่อนุมัติแล้ว'} ตามสิทธิ์{detailUnderCheck && hasIssues ? ' · รายละเอียดสาเหตุแสดงใต้เครื่องหมาย ✓' : ''}</p>
       </div>
       {!current ? <p className="p-6 text-sm text-slate-500">กำลังโหลดรายกรณี…</p>
         : current.error ? <p role="alert" className="p-4 text-sm text-red-700">{current.error}</p>
         : !cases.length ? <p className="p-6 text-sm text-slate-500">ไม่มีรายกรณี{month ? `ในเดือน${monthLabel(month, year)}` : `ในปีงบประมาณ ${year}`}</p>
-        : <div className="max-h-[70vh] overflow-auto">
-          <table className={`w-full border-collapse text-sm ${detailUnderCheck ? 'min-w-[1200px]' : 'min-w-[860px]'}`}>
+        : <>{groups.length > 0 && <div className="border-b border-slate-100 px-4 py-3">
+          <p className="mb-2 text-xs font-semibold text-slate-600">สาเหตุที่พบ ({groups.length} สาเหตุ · เรียงจากพบมากไปน้อย)</p>
+          <ol className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">{groups.slice(0, 9).map(([k, n], i) => <li key={k} className="flex items-start gap-2 rounded-lg bg-slate-50 px-2.5 py-1.5 text-xs text-slate-700"><span className="w-4 shrink-0 text-right text-slate-400">{i + 1}</span><span className="min-w-0 flex-1">{k}</span><b className="shrink-0 tabular-nums text-rose-600">{n} ราย</b></li>)}</ol>
+          {groups.length > 9 && <p className="mt-1.5 text-xs text-slate-400">และอีก {groups.length - 9} สาเหตุ (ดูในตารางด้านล่าง)</p>}
+        </div>}
+        <div className="max-h-[70vh] overflow-auto">
+          <table className={`w-full border-collapse text-sm ${!hasIssues ? 'min-w-[760px]' : detailUnderCheck ? 'min-w-[1200px]' : 'min-w-[860px]'}`}>
             <thead className="sticky top-0 z-10 bg-slate-50 text-xs text-slate-600">
               <tr>
-                <th rowSpan={2} className={`${cfg.caseWidth ?? 'w-40 min-w-[150px]'} border border-slate-200 px-3 py-2 text-center`}>เคส</th>
-                <th rowSpan={2} className={`${cfg.summaryWidth ?? 'min-w-[340px]'} border border-slate-200 px-3 py-2 text-center`}>สรุปอาการและเหตุการณ์สำคัญ</th>
-                <th colSpan={cfg.issues.length} className="border border-slate-200 px-3 py-2 text-center">ประเด็นที่พบ</th>
-                {cfg.note && <th rowSpan={2} className="min-w-[220px] border border-slate-200 px-3 py-2 text-center">{cfg.noteLabel}</th>}
+                <th rowSpan={rs} className={`${cfg.caseWidth ?? 'w-40 min-w-[150px]'} border border-slate-200 px-3 py-2 text-center`}>เคส</th>
+                <th rowSpan={rs} className={`${cfg.summaryWidth ?? 'min-w-[340px]'} border border-slate-200 px-3 py-2 text-center`}>{cfg.summaryLabel ?? 'สรุปอาการและเหตุการณ์สำคัญ'}</th>
+                {hasIssues && <th colSpan={cfg.issues.length} className="border border-slate-200 px-3 py-2 text-center">ประเด็นที่พบ</th>}
+                {cfg.note && <th rowSpan={rs} className="min-w-[220px] border border-slate-200 px-3 py-2 text-center">{cfg.noteLabel}</th>}
               </tr>
-              <tr>{cfg.issues.map((i, k) => <th key={i.key} className={`${cfg.issueWidth ?? (detailUnderCheck ? 'min-w-[140px]' : 'w-24')} border border-slate-200 px-2 py-2 text-center font-semibold`}>{i.label}<span className="block text-[10px] font-normal text-slate-400">{counts[k]} ราย</span></th>)}</tr>
+              {hasIssues && <tr>{cfg.issues.map((i, k) => <th key={i.key} className={`${cfg.issueWidth ?? (detailUnderCheck ? 'min-w-[140px]' : 'w-24')} border border-slate-200 px-2 py-2 text-center font-semibold`}>{i.label}<span className="block text-[10px] font-normal text-slate-400">{counts[k]} ราย</span></th>)}</tr>}
             </thead>
             <tbody>
               {cases.map((c) => {
@@ -130,7 +148,7 @@ export default function CaseIssueTable({ kind, year, severeOnly = false, include
               })}
             </tbody>
           </table>
-        </div>}
+        </div></>}
     </section>
   );
 }

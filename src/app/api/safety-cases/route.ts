@@ -6,10 +6,11 @@ import {monthlyNpRoster} from '@/lib/monthlyNpRoster';
 export const runtime='nodejs';
 export const dynamic='force-dynamic';
 
-type Kind='fall'|'pressure'|'readmit';
+type Kind='fall'|'pressure'|'readmit'|'ama';
 const CONFIG:Record<Kind,{table:string;date:string;columns:string}>={
  fall:{table:'fall_incident_records',date:'incident_date',columns:'incident_date,hn,an,shift,severity,description,cause_patient,cause_personnel,cause_environment,cause_system,review_and_solution'},
  pressure:{table:'pressure_sore_incident_records',date:'wound_found_date',columns:'wound_found_date,hn,an,diagnosis,age,admission_bs,found_bs,wound_site,wound_level,discharge_status,wound_outcome'},
+ ama:{table:'ama_incident_records',date:'incident_date',columns:'incident_date,hn,an,treatment_right,ama_reason'},
  readmit:{table:'readmit_incident_records',date:'admit_date',columns:'admit_date,hn,an,age,admit_diagnosis,previous_discharge_date,discharge_ward,discharge_diagnosis,cause_patient,cause_discharge_planning,cause_disease_condition'},
 };
 
@@ -21,12 +22,12 @@ export async function GET(request:NextRequest){
   if(!user)return fail('กรุณาเข้าสู่ระบบ',401);
   const kind=request.nextUrl.searchParams.get('kind') as Kind;
   const fiscalYear=Number(request.nextUrl.searchParams.get('year'));
-  if(!(kind in CONFIG)||!Number.isInteger(fiscalYear)||fiscalYear<2560||fiscalYear>2642)return fail('รายงานหรือปีงบประมาณไม่ถูกต้อง');
+  if(!Object.hasOwn(CONFIG,kind??'')||!Number.isInteger(fiscalYear)||fiscalYear<2560||fiscalYear>2642)return fail('รายงานหรือปีงบประมาณไม่ถูกต้อง');
   const year=fiscalYear-543,start=`${year-1}-10-01`,end=`${year}-10-01`;
   const client=db();
   const {data:departments,error}=await client.from('departments').select('id,Department').order('id');
   if(error)throw error;
-  const roster=kind==='readmit'?await monthlyNpRoster():null;
+  const roster=kind==='readmit'||kind==='ama'?await monthlyNpRoster():null;
   const candidates=(departments??[]).filter(d=>{
    if(roster)return roster.has(String(d.id));
    const name=d.Department??'';

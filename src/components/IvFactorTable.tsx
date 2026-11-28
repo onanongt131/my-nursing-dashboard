@@ -113,10 +113,9 @@ export default function IvFactorTable({ incidents, year, complication, name }: {
               const id = String(r.id ?? i), gs = groupsOf(r), legacy = legacyOf(r);
               return <tr key={id} className="align-top">
                 <td className="border border-slate-200 px-3 py-2 text-xs text-slate-700">
-                  <div className="font-semibold text-slate-900">{name(r.department_id)}</div>
+                  <div className="font-semibold text-slate-900">{name(r.department_id)}{r.status === 'pending' && <span className="ml-1.5 inline-block rounded-full bg-amber-100 px-2 py-0.5 align-middle text-[10px] font-semibold text-amber-800">รออนุมัติ</span>}</div>
                   <div>{r.record_date}</div>
                   <span className="mt-1 inline-block rounded-full bg-slate-100 px-2 py-0.5 text-[10px] text-slate-600">{r.complication} ระดับ {r.grade}</span>
-                  {r.status === 'pending' && <span className="ml-1 mt-1 inline-block rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold text-amber-800">รออนุมัติ</span>}
                 </td>
                 {GROUPS.map((g) => {
                   const hit = gs.find((x) => codeOf(x) === g.code);

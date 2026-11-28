@@ -2,6 +2,7 @@
 import { ReportStatusIcon, ReportStatusLegend, ReportValue, MonthlyTableViewport } from '@/components/MonthlyReportStatus';
 import { sortMonthlyDepartments } from '@/lib/monthlyReportDepartments';
 import ReportMonthHeading from '@/components/ReportMonthHeading';
+import {ExecutiveSummary,ReportViewSwitch} from '@/components/ExecutiveSummary';
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 
@@ -337,6 +338,10 @@ export default function WpQaDashboard() {
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
   }
 
+  const overview=selectedDept==='';
+  const execRows=tableData.map(r=>({name:r.labelName,months:r.months.map(v=>typeof v==='number'?v:null),annual:typeof r.average==='number'?r.average:null,pending:r.pendingMonths.size>0}));
+  const execMonthly=MONTHS.map((_,i)=>{const v=execRows.map(r=>r.months[i]).filter((x):x is number=>x!==null);return v.length?v.reduce((a,b)=>a+b,0)/v.length:null;});
+  const execPending=tableData.reduce((n,r)=>n+r.pendingMonths.size,0);
   return (
     <div className="p-4 bg-white rounded-xl shadow-xs space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-2 lg:flex-nowrap">
@@ -391,6 +396,10 @@ export default function WpQaDashboard() {
       {loadError&&<p role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">{loadError}</p>}
       {!loadError&&invalidRows>0&&<p role="alert" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">มีข้อมูลจำนวนประเมินหรือผลประเมินไม่ถูกต้อง {invalidRows} รายการ กรุณาตรวจข้อมูลต้นทาง</p>}
 
+      {!loadError && loading && <p className="p-6 text-center text-sm text-gray-500">กำลังโหลดข้อมูล…</p>}
+      {!loadError && !loading && <ReportViewSwitch tableLabel={overview?'ตารางรายหน่วยงาน':'ตารางรายตัวชี้วัด'} summary={<ExecutiveSummary metric={overview?'ร้อยละตัวชี้วัดที่ผ่านเกณฑ์':'คะแนนตัวชี้วัด'} unit="%" decimals={1} good={v=>v>=90} goodLabel="≥ 90%" badness={v=>-v} lines={[90]}
+        overall={totalItemsCount>0?summaryPercentage:null} monthly={execMonthly} rows={execRows} rowLabel={overview?'หน่วยงาน':'ตัวชี้วัด'} pendingCount={execPending}
+        note={overview?'แต่ละหน่วยงาน = ร้อยละของตัวชี้วัด WP/QA ที่ได้คะแนน ≥ 90 · แนวโน้มเป็นค่าเฉลี่ยของหน่วยงานที่มีข้อมูล':`ตัวชี้วัด WP/QA ของ ${departments.find(d=>String(d.id)===selectedDept)?.name??'หน่วยงานที่เลือก'} · ทั้งปีของหน่วยงาน = ร้อยละตัวชี้วัดที่ผ่านเกณฑ์`}/>}>
       {!loadError && !loading && <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 rounded-xl border border-purple-100 bg-purple-50/50 px-3 py-2 text-sm">
         <div className="flex items-center gap-2 font-semibold text-slate-700">
           <span>ผ่านเกณฑ์</span>
@@ -478,6 +487,7 @@ export default function WpQaDashboard() {
         </table>
         </MonthlyTableViewport>
       </div>
+      </ReportViewSwitch>}
 
       <div ref={detailPanel} popover="auto" role="region" aria-label="รายละเอียดตัวชี้วัด WP/QA"
         className="fixed inset-auto m-0 overflow-auto rounded-lg border border-purple-200 bg-white p-3 text-left text-xs text-slate-700 shadow-lg"

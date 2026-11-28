@@ -2,6 +2,7 @@
 import { ReportStatusIcon, ReportStatusLegend, ReportValue, MonthlyTableViewport } from '@/components/MonthlyReportStatus';
 import {sortMonthlyDepartments} from '@/lib/monthlyReportDepartments';
 import ReportMonthHeading from '@/components/ReportMonthHeading';
+import {ExecutiveSummary,ReportViewSwitch} from '@/components/ExecutiveSummary';
 import {useCallback,useEffect,useMemo,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
 import {buildCells,fiscalMonths,summaryMonth,total,type Incident,type ReportKind,type Summary} from '@/lib/readmitAmaReport';
@@ -36,6 +37,9 @@ export default function ReadmitAmaReport({fixedKind}:{fixedKind?:ReportKind}){
  const open=(title:string,rows:Incident[])=>setDetail({title,rows:[...rows].sort((a,b)=>String(a.date).localeCompare(String(b.date)))});
  const casesOf=(id:string,month?:string)=>incidents.filter(i=>String(i.department_id)===id&&(!month||String(i.date).slice(0,7)===month)&&(i.status==='approved'||(includePending&&i.status==='pending')));
  const years=[currentFiscalYear()+1,currentFiscalYear(),currentFiscalYear()-1,2570].filter((y,i,a)=>y>=2570&&a.indexOf(y)===i);
+
+ const execRows=departments.map(d=>{const id=String(d.id);return {name:d.name,months:months.map(m=>cellOf(id,m)?.rate??null),annual:total(cells,includePending,id).rate,pending:cells.some(c=>c.department_id===id&&(c.pending>0||pendingSummaries.has(id+'|'+c.month)))};});
+ const execMonthly=months.map(m=>total(cells.filter(c=>c.month===m),includePending).rate);
 
  return <div data-print-readmit-ama className="mx-auto w-full min-w-0 max-w-[1480px] space-y-3 px-3 py-4 sm:px-5 lg:px-6">
   <style>{`
@@ -74,6 +78,10 @@ export default function ReadmitAmaReport({fixedKind}:{fixedKind?:ReportKind}){
    return <button key={k.key} type="button" aria-pressed={active} onClick={()=>setKind(k.key)} className={`rounded-2xl border p-4 text-left shadow-sm transition ${active?'border-teal-600 bg-teal-50 ring-2 ring-teal-600/20':'border-slate-200 bg-white hover:border-teal-300'}`}>
     <div className="text-sm font-bold text-slate-800">{k.title}</div><div className="mt-1 text-2xl font-extrabold text-teal-800">{approved+(includePending?pending:0)} <span className="text-sm font-semibold text-slate-500">ราย</span></div>
     <div className="mt-1 text-xs text-slate-500">อนุมัติแล้ว {approved}{pending>0&&<span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 font-semibold text-amber-800">รออนุมัติ {pending}</span>}</div></button>;})}</section>}
+  {loading?<p className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500">กำลังโหลด…</p>:
+  <ReportViewSwitch summary={<ExecutiveSummary metric={meta.rateLabel} unit="%" good={v=>v===0} goodLabel="0% (ไม่เกิดเหตุการณ์)" badness={v=>v}
+   overall={overall.rate} monthly={execMonthly} rows={execRows} pendingCount={pendingAll}
+   note={`${meta.rateLabel} = จำนวนราย ÷ ${meta.denominator} × 100 · ${includePending?'รวมรายการรออนุมัติ':'เฉพาะรายการอนุมัติ'}`}/>}>
   <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-3"><div><h2 className="text-sm font-bold text-slate-800">{meta.rateLabel} (%) = จำนวนราย ÷ {meta.denominator} × 100</h2></div>
     <div className="text-sm font-semibold text-slate-700">รวมทั้งปี {fmt(overall.rate)}% ({overall.ratedCount}/{overall.denominator??'?'} • ทั้งหมด {overall.count} ราย){pendingAll>0&&<span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs text-amber-800">รออนุมัติ {pendingAll}</span>}</div></div>
@@ -133,6 +141,7 @@ export default function ReadmitAmaReport({fixedKind}:{fixedKind?:ReportKind}){
      </td>
     </tr>;})}</tbody></table></MonthlyTableViewport>}
   </section>
+  </ReportViewSwitch>}
   {detail&&createPortal(<div role="dialog" aria-modal="true" aria-label={detail.title} onClick={e=>{if(e.target===e.currentTarget)setDetail(null);}} className="fixed inset-0 z-[99999] flex items-center justify-center bg-slate-950/60 p-3">
    <div className="flex max-h-[90dvh] w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
     <header className="flex items-center justify-between bg-teal-700 px-5 py-3 text-white"><div><h3 className="font-bold">{meta.title}</h3><p className="text-xs text-teal-100">{detail.title} • {detail.rows.length} ราย</p></div><button type="button" aria-label="ปิด" onClick={()=>setDetail(null)} className="rounded-full px-2 text-xl hover:bg-white/10">×</button></header>

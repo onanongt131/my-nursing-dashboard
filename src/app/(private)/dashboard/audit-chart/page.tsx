@@ -2,6 +2,7 @@
 import { ReportStatusIcon, ReportStatusLegend, ReportValue, MonthlyTableViewport } from '@/components/MonthlyReportStatus';
 import { sortMonthlyDepartments } from '@/lib/monthlyReportDepartments';
 import ReportMonthHeading from '@/components/ReportMonthHeading';
+import {ExecutiveSummary,ReportViewSwitch} from '@/components/ExecutiveSummary';
 
 import React, { useState, useEffect, useMemo } from 'react';
 import {auditNoteFields,reportPercent} from '@/lib/audits/report';
@@ -279,6 +280,10 @@ export default function AuditChartPage() {
     window.setTimeout(()=>URL.revokeObjectURL(url),1000);
   }
 
+  const toNum=(v:unknown)=>{const n=Number(v);return v===undefined||v===null||v==='—'||v===''||!Number.isFinite(n)?null:n;};
+  const execRows=tableRows.map(r=>({name:r.departmentName||'—',months:allMonths.map(m=>toNum(r.months[m.code])),annual:toNum(r.avgTotal),pending:r.pendingMonths.size>0}));
+  const execMonthly=allMonths.map((_,i)=>{const v=execRows.map(r=>r.months[i]).filter((x):x is number=>x!==null);return v.length?v.reduce((a,b)=>a+b,0)/v.length:null;});
+  const execPending=tableRows.reduce((n,r)=>n+r.pendingMonths.size,0);
   return (
     <div className="mx-auto w-full min-w-0 max-w-[1480px] space-y-3 px-3 py-4 sm:px-5 lg:px-6">
       {error&&<p role="alert" className="rounded-xl bg-red-50 p-3 text-red-700">{error}</p>}
@@ -305,6 +310,9 @@ export default function AuditChartPage() {
         <div className="col-span-2 flex flex-col justify-center rounded-2xl bg-teal-800 px-4 py-3 text-white shadow-sm lg:col-span-1"><p className="text-xs font-semibold text-teal-100">คะแนนเฉลี่ยรวม APIE</p><p className="mt-1 text-2xl font-extrabold tabular-nums">{summaryStats.totalAPIE}<span className="ml-1 text-base text-teal-200">{summaryStats.totalAPIE==='—'?'':'%'}</span></p></div>
       </section>
 
+      <ReportViewSwitch summary={<ExecutiveSummary metric="คะแนน APIE" unit="%" good={v=>v>=90} goodLabel="≥ 90%" badness={v=>-v} lines={[90]}
+        overall={toNum(summaryStats.totalAPIE)} monthly={execMonthly} rows={execRows} pendingCount={execPending}
+        note="แนวโน้มรายเดือนเป็นค่าเฉลี่ยของหน่วยงานที่มีข้อมูลในเดือนนั้น"/>}>
       <section className="min-w-0 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-4"><div className="flex flex-wrap items-baseline gap-x-3"><h2 className="text-sm font-bold text-slate-800">ผลการประเมินรายหน่วยงาน</h2><p className="text-xs text-slate-400">{tableRows.length} หน่วยงาน · ตุลาคม – กันยายน · คะแนนร้อยละ</p></div><div className="flex items-center gap-4 text-[11px] text-slate-500"><span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-emerald-500"/>ตั้งแต่ 90%</span><span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-full bg-rose-500"/>ต่ำกว่า 90%</span></div></div>
         <MonthlyTableViewport label="ตาราง Audit Chart">
@@ -408,6 +416,7 @@ export default function AuditChartPage() {
         </table>
         </MonthlyTableViewport>
       </section>
+      </ReportViewSwitch>
 
       {/* Modal แสดงรายละเอียด A, P, I, E และ D/C เมื่อคลิกตัวเลขรายเดือน */}
       {cellModalOpen && (

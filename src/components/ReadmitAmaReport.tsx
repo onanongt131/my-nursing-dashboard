@@ -15,6 +15,8 @@ const KINDS:{key:ReportKind;title:string;rateLabel:string;denominator:string;det
  {key:'readmit',title:'Re-admit',rateLabel:'อัตรา Re-admit',denominator:'จำหน่ายเดือนก่อน',detail:'โรคที่ Admit'},
  {key:'ama',title:'จำหน่ายไม่สมัครอยู่ (AMA)',rateLabel:'อัตรา AMA',denominator:'จำหน่ายทั้งหมด',detail:'เหตุผลไม่สมัครอยู่'},
 ];
+// เป้าหมาย: Re-admit < 2% · AMA = 0% (ไม่เกิดเหตุการณ์)
+const TARGETS:Record<ReportKind,{good:(v:number)=>boolean;label:string;lines?:number[]}>={readmit:{good:v=>v<2,label:'< 2%',lines:[2]},ama:{good:v=>v===0,label:'0% (ไม่เกิดเหตุการณ์)'}};
 const fmt=(v:number|null)=>v===null?'—':v.toFixed(2);
 function currentFiscalYear(){const now=new Date(),y=now.getFullYear()+543;return now.getMonth()>=9?y+1:y;}
 
@@ -80,7 +82,7 @@ export default function ReadmitAmaReport({fixedKind}:{fixedKind?:ReportKind}){
     <div className="text-sm font-bold text-slate-800">{k.title}</div><div className="mt-1 text-2xl font-extrabold text-teal-800">{approved+(includePending?pending:0)} <span className="text-sm font-semibold text-slate-500">ราย</span></div>
     <div className="mt-1 text-xs text-slate-500">อนุมัติแล้ว {approved}{pending>0&&<span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 font-semibold text-amber-800">รออนุมัติ {pending}</span>}</div></button>;})}</section>}
   {loading?<p className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500">กำลังโหลด…</p>:
-  <ReportViewSwitch summary={<><ExecutiveSummary metric={meta.rateLabel} unit="%" good={v=>v===0} goodLabel="0% (ไม่เกิดเหตุการณ์)" badness={v=>v}
+  <ReportViewSwitch summary={<><ExecutiveSummary metric={meta.rateLabel} unit="%" good={TARGETS[kind].good} goodLabel={TARGETS[kind].label} lines={TARGETS[kind].lines} badness={v=>v}
    overall={overall.rate} monthly={execMonthly} rows={execRows} pendingCount={pendingAll}
    note={`${meta.rateLabel} = จำนวนราย ÷ ${meta.denominator} × 100 · ${includePending?'รวมรายการรออนุมัติ':'เฉพาะรายการอนุมัติ'}`}/>
    <CaseIssueTable key={kind} kind={kind} year={year} includePending={includePending}/></>}>
@@ -117,7 +119,7 @@ export default function ReadmitAmaReport({fixedKind}:{fixedKind?:ReportKind}){
            <ReportValue align="compact" warning={pending&&<ReportStatusIcon status="pending" detail={statusDetail}/>}>
              <button type="button" disabled={!count} onClick={()=>open(d.name+' • '+label(m),casesOf(id,m))}
                className="max-w-full rounded text-right leading-tight tabular-nums enabled:hover:bg-teal-50 disabled:cursor-default">
-               <div className={'font-bold '+(c.rate>0?'text-rose-600':'text-emerald-700')}>{fmt(c.rate)}</div>
+               <div className={'font-bold '+(TARGETS[kind].good(c.rate)?'text-emerald-700':'text-rose-600')}>{fmt(c.rate)}</div>
                <div className="break-all text-[10px] tabular-nums text-slate-500">{count}/{c.denominator}</div>
              </button>
            </ReportValue>

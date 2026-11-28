@@ -9,8 +9,9 @@ import CaseIssueTable from '@/components/CaseIssueTable';
 type Month={cases:number|null;severe?:number;days:number|null;riskDays:number|null;pending:boolean;reportedRate?:number|null};
 type Row={id:number;name:string;months:Month[];historical?:Partial<Record<'all'|'risk',{cases:number;days:number;rate:number|null}>>};
 const months=[10,11,12,1,2,3,4,5,6,7,8,9];
-// หอผู้ป่วยวิกฤต (ICU) สำหรับแยกกราฟแผลกดทับ · ICCU นับเป็นนอก ICU
-const isIcuWard=(name:string)=>{const n=name.toUpperCase().replace(/\s+/g,'');return n!=='ICCU'&&!n.startsWith('ICCU')&&(/ICU/.test(n)||n==='CCU');};
+// หอผู้ป่วยวิกฤต (ICU) สำหรับแยกกราฟแผลกดทับ: SICU NICU MICU CCU RCU PICU · ICCU และหออื่นนับเป็นนอก ICU
+const ICU_WARDS=new Set(['SICU','NICU','MICU','CCU','RCU','PICU']);
+const isIcuWard=(name:string)=>ICU_WARDS.has(name.toUpperCase().replace(/\s+/g,''));
 type Scope='all'|'icu'|'nonicu';
 
 export default function SafetyMonthlyReport({kind}:{kind:'fall'|'pressure'}){
